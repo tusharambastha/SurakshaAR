@@ -78,70 +78,28 @@ export default function SafetyChatbot() {
 
   return (
     <>
-      {/* Floating button stylish speech badge */}
+      {/* Floating button label */}
       {!open && (
         <div
-          onClick={handleOpen}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleOpen() }}
           style={{
             position: 'fixed',
             bottom: 88,
             right: 24,
             background: 'var(--color-surface)',
-            border: '1.5px solid rgba(224, 90, 0, 0.35)',
-            borderRadius: '16px 16px 4px 16px',
-            padding: '7px 14px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(224, 90, 0, 0.18)',
-            zIndex: 'var(--z-modal)',
-            cursor: 'pointer',
-            userSelect: 'none',
+            color: 'var(--color-text-primary)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-pill)',
+            padding: '5px 12px',
+            fontSize: '0.75rem',
+            fontWeight: 600,
             whiteSpace: 'nowrap',
+            boxShadow: 'var(--shadow-md)',
+            zIndex: 'var(--z-modal)',
+            pointerEvents: 'none',
+            lineHeight: 1.2,
           }}
         >
-          {/* Bot icon in subtle brand tint */}
-          <div style={{
-            width: 22, height: 22,
-            borderRadius: '50%',
-            background: 'rgba(224, 90, 0, 0.12)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <Bot size={13} style={{ color: 'var(--color-brand)' }} />
-          </div>
-
-          {/* Styled Typography */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, lineHeight: 1 }}>
-            <span style={{
-              color: 'var(--color-text-secondary)',
-              fontSize: '0.78rem',
-              fontWeight: 500,
-            }}>
-              Aapka Apna
-            </span>
-            <span style={{
-              color: 'var(--color-brand)',
-              fontSize: '0.84rem',
-              fontWeight: 800,
-              letterSpacing: '-0.01em',
-            }}>
-              Suraksha Saathi
-            </span>
-          </div>
-
-          {/* Active online dot */}
-          <span style={{
-            width: 7, height: 7,
-            borderRadius: '50%',
-            background: '#2ECC71',
-            boxShadow: '0 0 6px #2ECC71',
-            flexShrink: 0,
-            marginLeft: 2,
-          }} />
+          Aapka Apna Suraksha Saathi
         </div>
       )}
 
