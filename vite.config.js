@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: './',
+  base: '/SurakshaAR/',
   server: {
     port: 5174,
     host: true,
