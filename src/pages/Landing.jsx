@@ -39,7 +39,7 @@ export default function Landing() {
           <div
             style={{
               position: 'absolute', inset: -15,
-              backgroundImage: 'url(/images/industrial-facility.jpg)',
+              backgroundImage: `url(${import.meta.env.BASE_URL}images/industrial-facility.jpg)`,
               backgroundSize: 'cover',
               backgroundPosition: 'right 35%',
               filter: 'saturate(0.85) contrast(0.92) brightness(0.96)',
@@ -102,7 +102,7 @@ export default function Landing() {
             justifyContent: 'center',
           }}>
             <img
-              src="/images/surakshaar-logo.png"
+              src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
               alt="SurakshaAR — Immersive Training for a Safer Bharat"
               style={{
                 height: 'clamp(90px, 16vw, 150px)',

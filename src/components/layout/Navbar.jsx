@@ -56,7 +56,7 @@ export function Navbar() {
           style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}
         >
           <img
-            src="/images/surakshaar-logo.png"
+            src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
             alt="SurakshaAR"
             style={{ height: 44, width: 'auto', objectFit: 'contain', display: 'block' }}
           />

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './contexts/AuthContext'
 import { LanguageProvider } from './contexts/LanguageContext'
@@ -89,7 +89,7 @@ export default function App() {
           <AccessibilityProvider>
             <AuthProvider>
               <OfflineProvider>
-                <BrowserRouter>
+                <HashRouter>
                   <OfflineBanner />
 
                   <Routes>
@@ -123,7 +123,7 @@ export default function App() {
 
                   {/* Safety chatbot persists across all protected pages */}
                   <SafetyChatbot />
-                </BrowserRouter>
+                </HashRouter>
               </OfflineProvider>
             </AuthProvider>
           </AccessibilityProvider>
