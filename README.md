@@ -1,25 +1,50 @@
-# SurakshaAR (सुरक्षाAR)
-> **Immersive Training for a Safer Bharat.**  
-> *Smart India Hackathon 2026 · Problem Statement SIH26041*  
-> **Topic:** AR-Based Vocational Training Simulator for Industrial Safety in Jharkhand's Mining & Manufacturing Sector.
+<p align="center">
+  <img src="./public/images/surakshaar-logo.png" alt="SurakshaAR Logo" width="380" />
+</p>
 
-[![React](https://img.shields.io/badge/React-18.3-61dafb.svg?logo=react)](https://reactjs.org/)
-[![Vite](https://img.shields.io/badge/Vite-5.4-646cff.svg?logo=vite)](https://vitejs.dev/)
-[![Three.js](https://img.shields.io/badge/Three.js-0.170-black.svg?logo=three.js)](https://threejs.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-Database%20%26%20Auth-3ecf8e.svg?logo=supabase)](https://supabase.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+<p align="center">
+  <strong>Immersive Training for a Safer Bharat.</strong><br />
+  <em>Smart India Hackathon 2026 · Problem Statement SIH26041</em><br />
+  <strong>AR & 3D Vocational Safety Training Simulator for Industrial & Mining Workers</strong>
+</p>
+
+<p align="center">
+  <a href="https://reactjs.org/"><img src="https://img.shields.io/badge/React-18.3-61dafb.svg?logo=react&logoColor=black&style=for-the-badge" alt="React" /></a>
+  <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-5.4-646cff.svg?logo=vite&style=for-the-badge" alt="Vite" /></a>
+  <a href="https://threejs.org/"><img src="https://img.shields.io/badge/Three.js-WebGL-black.svg?logo=three.js&style=for-the-badge" alt="Three.js" /></a>
+  <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-Database%20%26%20Auth-3ecf8e.svg?logo=supabase&style=for-the-badge" alt="Supabase" /></a>
+  <a href="#"><img src="https://img.shields.io/badge/SIH-2026-E05A00.svg?style=for-the-badge" alt="SIH 2026" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License" /></a>
+</p>
+
+<br />
+
+<p align="center">
+  <img src="./public/images/surakshaar-hero-preview.png" alt="SurakshaAR Platform Interface" width="100%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
+</p>
 
 ---
 
 ## 📌 Problem Context
 
-Industrial workers and vocational trainees across Jharkhand’s mining, steel, and mica manufacturing sectors operate in high-risk environments. Traditional classroom training often fails to build real situational reflexes, while hands-on emergency drills carry safety risks and high costs.
+Industrial workers and vocational trainees across Jharkhand’s mining, steel, and manufacturing sectors operate in hazardous high-risk environments. Traditional classroom training often fails to build real situational muscle memory, while hands-on emergency drills carry high logistical costs and genuine physical risks.
 
-**SurakshaAR** bridges this gap by delivering mobile-accessible, immersive augmented reality safety simulations on mid-range Android smartphones (Android 10+) without requiring expensive external VR headsets.
+**SurakshaAR** bridges this critical gap by delivering mobile-first, immersive augmented reality safety simulations directly on standard Android smartphones without requiring expensive specialized headsets.
 
 ---
 
-## ✨ Key Features
+## 🌟 Live Experience & Highlights
+
+- 📱 **Camera AR Mode**: Live camera passthrough with 3D hazard overlays and interactive emergency response sequences.
+- 🕹️ **Interactive 3D Simulation**: Full 360° rotational simulation with OrbitControls, directional D-pad, and smooth camera target focusing.
+- 🤖 **Aapka Apna Suraksha Saathi**: Dedicated floating safety chatbot with curated industrial regulations and instant voice text-to-speech.
+- 🌐 **Trilingual by Design**: Complete accessibility in **English**, **Hindi (हिंदी)**, and **Santali (Ol Chiki ᱥᱟᱱᱛᱟᱲᱤ)**.
+- 🔐 **Blockchain Integrity Certificates**: Cryptographic SHA-256 certificate hashing with instant public QR verification.
+- 📶 **Offline-First Resilience**: Powered by IndexedDB for uninterrupted training in underground mines or zero-connectivity sites.
+
+---
+
+## ✨ Key Features Detailed
 
 ### 1. 📷 Camera AR & 3D Simulation
 - **Dual-Mode Experience**:
