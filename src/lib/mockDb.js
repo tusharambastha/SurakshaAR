@@ -41,7 +41,7 @@ const DEMO_SCENARIOS = [
     thumbnail_url: null,
     created_at: new Date('2026-01-01').toISOString(),
     steps: [
-      { index: 0, label: 'Identify Fire Source', instruction: 'Locate and identify the electrical fire near the control panel', position: [3, 1.2, 3], color: '#ef4444', is_ppe_step: false },
+      { index: 0, label: 'Identify Fire Source', instruction: 'Point camera at fire hazard for real-time computer vision detection, or locate the fire near the control panel', position: [3, 1.2, 3], color: '#ef4444', is_ppe_step: false },
       { index: 1, label: 'Trigger Fire Alarm', instruction: 'Activate the nearest manual fire alarm call point', position: [2.5, 2.0, -2], color: '#f97316', is_ppe_step: false },
       { index: 2, label: 'Equip Fire-Rated PPE', instruction: 'Put on fire-rated gloves, helmet, and protective gear from the station', position: [-4, 0.9, 1], color: '#22c55e', is_ppe_step: true },
       { index: 3, label: 'Use CO\u2082 Extinguisher', instruction: 'Select the correct CO\u2082 extinguisher and aim at the base of the fire', position: [1.5, 0.8, 2], color: '#3b82f6', is_ppe_step: false },

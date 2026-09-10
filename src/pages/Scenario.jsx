@@ -37,6 +37,7 @@ import { mockGetScenario, mockCreateSession, mockUpdateSession, mockInsertFeedba
 import { calculateScore } from '../lib/scoring'
 import { queueOfflineAction } from '../lib/indexeddb'
 import { speak } from '../lib/voice'
+import FireDetectionOverlay from '../components/ar/FireDetectionOverlay'
 
 // ─── Floating Canvas Text Sprite Helper ────────────────────────────────────────
 function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
@@ -91,14 +92,13 @@ function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
 }
 
 // ─── Camera AR Live Video Background ──────────────────────────────────────────
-function CameraBackground({ streamRef }) {
-  const videoRef = useRef(null)
+function CameraBackground({ streamRef, videoRef }) {
   useEffect(() => {
-    if (videoRef.current && streamRef.current) {
+    if (videoRef?.current && streamRef?.current) {
       videoRef.current.srcObject = streamRef.current
       videoRef.current.play().catch(() => {})
     }
-  }, [streamRef])
+  }, [streamRef, videoRef])
 
   return (
     <video
@@ -136,6 +136,7 @@ export default function Scenario() {
 
   const canvasRef = useRef(null)
   const cameraStreamRef = useRef(null)
+  const cameraVideoRef = useRef(null)
 
   // Three.js persistent references
   const threeRef = useRef({
@@ -161,25 +162,43 @@ export default function Scenario() {
     },
   })
 
+  const isFireScenario = scenario?.hazard_type === 'fire'
+
+  // Helper to open real camera stream across mobile & desktop webcams
+  const requestCameraStream = useCallback(async () => {
+    if (!navigator.mediaDevices?.getUserMedia) return null
+    try {
+      // Prioritize environment rear camera on phones/tablets
+      return await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      })
+    } catch {
+      try {
+        // Fallback to standard webcam/front camera
+        return await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      } catch (err) {
+        console.warn('[Camera] getUserMedia failed:', err)
+        return null
+      }
+    }
+  }, [])
+
   // Auto-dismiss help hint after 5 seconds
   useEffect(() => {
     const t = setTimeout(() => setShowControlsHelp(false), 6000)
     return () => clearTimeout(t)
   }, [])
 
-  // Check camera availability
+  // Check camera availability & auto-start AR mode
   useEffect(() => {
     async function checkCamera() {
-      const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent)
-      const hasGetUserMedia = !!navigator.mediaDevices?.getUserMedia
-      if (isMobile && hasGetUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      if (navigator.mediaDevices?.getUserMedia) {
+        const stream = await requestCameraStream()
+        if (stream) {
           cameraStreamRef.current = stream
           setCameraAvail(true)
-          setArMode(true) // Default to camera AR on phones
-        } catch {
-          setCameraAvail(false)
+          setArMode(true) // Auto-start in Camera AR mode for real-time fire detection
         }
       }
       setCameraChecked(true)
@@ -190,7 +209,7 @@ export default function Scenario() {
         cameraStreamRef.current.getTracks().forEach(t => t.stop())
       }
     }
-  }, [])
+  }, [requestCameraStream])
 
   // Create training session record
   useEffect(() => {
@@ -401,21 +420,59 @@ export default function Scenario() {
   }
 
   async function toggleARMode() {
-    if (!arMode && cameraAvail) {
+    if (!arMode && cameraAvail && cameraStreamRef.current) {
       setArMode(true)
     } else if (arMode) {
       setArMode(false)
     } else {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      const stream = await requestCameraStream()
+      if (stream) {
         cameraStreamRef.current = stream
         setCameraAvail(true)
         setArMode(true)
-      } catch {
-        alert('Camera permission required for AR. Using 3D Simulation Mode.')
+      } else {
+        alert('Camera permission required for Camera AR Fire Detection. Using 3D Simulation Mode.')
       }
     }
   }
+
+  // Real-time camera flame detection listener
+  const handleFireDetected = useCallback((result) => {
+    console.log('[FireDetection] Real-time flame detected with confidence:', result.confidence)
+  }, [])
+
+  // Interactive fire safety training response handler (Phase 4 & 5)
+  const handleFireTaskCompleted = useCallback(async ({ wasCorrect, responseTimeMs, selectedAnswer }) => {
+    // Record feedback log in mockDb / Supabase
+    if (!isSupabaseConfigured) {
+      await mockInsertFeedbackLog({
+        sessionId,
+        userId: user?.id,
+        stepIndex: 0,
+        feedbackType: wasCorrect ? 'correct' : 'incorrect',
+        message: `AR Fire Extinguisher Protocol: Selected Option ${selectedAnswer} (${wasCorrect ? 'Correct' : 'Incorrect'}) in ${(responseTimeMs / 1000).toFixed(1)}s`,
+      })
+    }
+
+    // If currently on Step 0 (Identify Fire Source), automatically complete it
+    if (currentStep === 0) {
+      const step = scenario?.steps?.[0]
+      const log = {
+        id: crypto.randomUUID(),
+        session_id: sessionId,
+        step_index: 0,
+        was_correct: wasCorrect,
+        time_taken_ms: responseTimeMs,
+        is_ppe_step: step?.is_ppe_step ?? false,
+      }
+      setStepLogs(prev => [...prev, log])
+      setCompletedSteps(prev => (prev.includes(0) ? prev : [...prev, 0]))
+      setCurrentStep(1)
+      setStepStartTime(Date.now())
+      setStepFeedback({ correct: wasCorrect, label: 'Fire Hazard Identified & Extinguisher Protocol Verified! ✓' })
+      setTimeout(() => setStepFeedback(null), 2500)
+    }
+  }, [sessionId, user, currentStep, scenario])
 
   // ─── Three.js Scene Mounting (ONE TIME ONLY) ────────────────────────────────
   useEffect(() => {
@@ -849,8 +906,21 @@ export default function Scenario() {
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#1F242D', position: 'relative', overflow: 'hidden' }}>
 
-      {/* Camera Live Feed (AR Mode) */}
-      {arMode && cameraAvail && <CameraBackground streamRef={cameraStreamRef} />}
+      {/* Camera Live Feed (AR Mode) with Real-Time Computer Vision Fire Detection */}
+      {arMode && cameraAvail && (
+        <>
+          <CameraBackground streamRef={cameraStreamRef} videoRef={cameraVideoRef} />
+          {isFireScenario && (
+            <FireDetectionOverlay
+              videoRef={cameraVideoRef}
+              isActive={arMode}
+              lang={lang}
+              onFireDetected={handleFireDetected}
+              onTaskCompleted={handleFireTaskCompleted}
+            />
+          )}
+        </>
+      )}
 
       {/* Persistent Three.js Canvas */}
       <canvas
@@ -1027,7 +1097,9 @@ export default function Scenario() {
             color: 'white', fontSize: 12, fontWeight: 700,
           }}>
             {arMode ? <Camera size={14} color="var(--color-brand)" /> : <Monitor size={14} color="#0E7C7B" />}
-            {arMode ? '📷 Camera AR Mode' : '🖥️ 3D Simulation Mode'}
+            {arMode
+              ? (isFireScenario ? '🔥 Camera AR · Real-Time Fire Detection' : '📷 Camera AR Mode')
+              : '🖥️ 3D Simulation Mode'}
           </div>
 
           {/* Right Action Controls */}
