@@ -7,7 +7,6 @@
  */
 import { useState, useRef } from 'react'
 import { MessageCircle, X, Send, Bot, Volume2 } from 'lucide-react'
-import { useAuth } from '../../contexts/AuthContext'
 import { useLang } from '../../contexts/LanguageContext'
 import { queryKnowledgeBase } from '../../lib/safetyKnowledge'
 import { speak, isTTSSupported } from '../../lib/voice'
@@ -19,7 +18,6 @@ const WELCOME_MESSAGE = {
 }
 
 export default function SafetyChatbot() {
-  const { user } = useAuth()
   const { lang } = useLang()
   const [open, setOpen]         = useState(false)
   const [input, setInput]       = useState('')
@@ -28,8 +26,6 @@ export default function SafetyChatbot() {
   const bottomRef = useRef()
   const inputRef  = useRef()
 
-  // Only show if logged in
-  if (!user) return null
 
   function scrollBottom() {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
