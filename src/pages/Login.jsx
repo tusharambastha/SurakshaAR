@@ -23,13 +23,26 @@ export default function Login() {
     setLoading(true)
     try {
       if (!isSupabaseConfigured) {
-        const { error: err } = await mockSignIn({ email, password })
+        const { data, error: err } = await mockSignIn({ email, password })
         if (err) { setError(err.message); setLoading(false); return }
+        if (data?.session?.role === 'admin') {
+          // Reject admin login on trainee portal
+          setError('This portal is for Trainees only. Admin personnel must sign in via the Admin Login page (/admin-login).')
+          setLoading(false)
+          return
+        }
         await refreshProfile()
         navigate('/dashboard', { replace: true })
       } else {
-        const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+        const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
         if (err) { setError(friendlyAuthError(err)); setLoading(false); return }
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
+        if (profile?.role === 'admin') {
+          await supabase.auth.signOut()
+          setError('This portal is for Trainees only. Admin personnel must sign in via the Admin Login page (/admin-login).')
+          setLoading(false)
+          return
+        }
         navigate('/dashboard', { replace: true })
       }
     } catch {

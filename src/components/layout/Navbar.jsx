@@ -44,11 +44,14 @@ export function Navbar() {
       zIndex: 'var(--z-dropdown)',
       display: 'flex',
       alignItems: 'center',
-      padding: '0 var(--space-4)',
+      padding: '0 clamp(8px, 3vw, var(--space-4))',
+      boxSizing: 'border-box',
+      maxWidth: '100vw',
+      overflow: 'hidden',
     }}>
       <div style={{
         maxWidth: 1100, margin: '0 auto', width: '100%',
-        display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
+        display: 'flex', alignItems: 'center', gap: 'clamp(6px, 2vw, var(--space-4))',
       }}>
         {/* Logo */}
         <Link

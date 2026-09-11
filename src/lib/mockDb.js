@@ -644,6 +644,332 @@ export function mockGetAllCertificates() {
   return { data: allCerts, error: null }
 }
 
+// ─── Admin Trainee Creation & Management ─────────────────────
+export async function mockCreateTraineeByAdmin({ adminUserId, fullName, email, mobile, password, language, assignedModuleIds }) {
+  await delay(200)
+  const profiles = load(PROFILES_KEY, {})
+  
+  // Security validation: verify caller is an admin
+  const admin = profiles[adminUserId]
+  if (!admin || admin.role !== 'admin') {
+    return { data: null, error: { message: 'Unauthorized: Admin privileges required to create trainees.' } }
+  }
+
+  const cleanEmail = (email || '').trim().toLowerCase()
+  if (!cleanEmail) {
+    return { data: null, error: { message: 'Email or Mobile identifier is required.' } }
+  }
+
+  if (Object.values(profiles).some(p => (p.email || '').toLowerCase() === cleanEmail)) {
+    return { data: null, error: { message: 'A trainee with this email/mobile already exists.' } }
+  }
+
+  const newId = uuid()
+  const modules = assignedModuleIds && assignedModuleIds.length
+    ? assignedModuleIds
+    : ['a1b2c3d4-0001-0001-0001-000000000001']
+
+  const newTrainee = {
+    id: newId,
+    email: cleanEmail,
+    mobile: mobile || '',
+    full_name: (fullName || 'Trainee').trim(),
+    employee_id: `TRN-${Math.floor(1000 + Math.random() * 9000)}`,
+    department: 'Industrial Safety',
+    site_location: 'Jharkhand Industrial Facility',
+    preferred_language: language || 'en',
+    assigned_modules: modules,
+    role: 'trainee',
+    created_at: new Date().toISOString(),
+    _password: password || 'Trainee@123',
+  }
+
+  profiles[newId] = newTrainee
+  save(PROFILES_KEY, profiles)
+  return { data: newTrainee, error: null }
+}
+
+// ─── Admin Leaderboard Data Aggregator ────────────────────────
+export function mockGetLeaderboard() {
+  ensureInitialData()
+  const profiles = load(PROFILES_KEY, {})
+  const sessions = load(SESSIONS_KEY, {})
+  const certs = load(CERTS_KEY, {})
+
+  const trainees = Object.values(profiles).filter(p => p.role === 'trainee')
+
+  const leaderboardData = trainees.map(t => {
+    const userSessions = Object.values(sessions).filter(s => s.user_id === t.id && s.status === 'completed')
+    const userCerts = Object.values(certs).filter(c => c.user_id === t.id && c.is_valid !== false)
+
+    // Calculate best score and average score
+    const bestScore = userSessions.length
+      ? Math.max(...userSessions.map(s => s.score ?? 0))
+      : 0
+    const avgScore = userSessions.length
+      ? Math.round(userSessions.reduce((acc, s) => acc + (s.score ?? 0), 0) / userSessions.length)
+      : 0
+
+    // Assigned module names
+    const assignedIds = t.assigned_modules || ['a1b2c3d4-0001-0001-0001-000000000001']
+    const assignedScenarios = DEMO_SCENARIOS.filter(s => assignedIds.includes(s.id))
+    const moduleTitles = assignedScenarios.map(s => s.title).join(', ') || 'Fire & Explosion Response'
+
+    // Distinct completed modules
+    const completedModuleIds = new Set(userSessions.map(s => s.scenario_id))
+    const completedCount = assignedIds.filter(id => completedModuleIds.has(id)).length
+    const progressPct = Math.min(100, Math.round((completedCount / assignedIds.length) * 100))
+
+    let status = 'Not Started'
+    if (progressPct === 100) status = 'Completed'
+    else if (userSessions.length > 0 || progressPct > 0) status = 'In Progress'
+
+    const sortedSessions = userSessions.sort(
+      (a, b) => new Date(b.completed_at || b.created_at) - new Date(a.completed_at || a.created_at)
+    )
+    const lastSession = sortedSessions[0]
+
+    return {
+      id: t.id,
+      name: t.full_name || 'Trainee',
+      email: t.email,
+      mobile: t.mobile || '—',
+      employeeId: t.employee_id || 'TRN-2026',
+      location: t.site_location || 'Jharkhand Plant',
+      department: t.department || 'Operations',
+      language: t.preferred_language || 'en',
+      assignedModules: assignedIds,
+      module: moduleTitles,
+      score: bestScore,
+      avgScore,
+      progress: progressPct,
+      completedModules: completedCount,
+      totalModules: assignedIds.length,
+      sessionsCount: userSessions.length,
+      status,
+      isCertified: userCerts.length > 0,
+      certificateNumber: userCerts[0]?.certificate_number || null,
+      lastActive: lastSession ? (lastSession.completed_at || lastSession.created_at) : t.created_at,
+    }
+  })
+
+  // Rank by score descending, then by progress descending
+  leaderboardData.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score
+    return b.progress - a.progress
+  })
+
+  return {
+    data: leaderboardData.map((item, index) => ({
+      ...item,
+      rank: index + 1,
+    })),
+    error: null,
+  }
+}
+
+// ─── Admin Overview Metrics ──────────────────────────────────
+export function mockGetAdminOverview() {
+  const { data: leaderboard } = mockGetLeaderboard()
+  const sessions = load(SESSIONS_KEY, {})
+  const completedSessions = Object.values(sessions).filter(s => s.status === 'completed')
+
+  const totalTrainees = leaderboard.length
+  const completedTraining = leaderboard.filter(t => t.status === 'Completed').length
+  const inProgress = leaderboard.filter(t => t.status === 'In Progress').length
+  const notStarted = leaderboard.filter(t => t.status === 'Not Started').length
+  const certified = leaderboard.filter(t => t.isCertified).length
+
+  const avgScore = completedSessions.length
+    ? Math.round(completedSessions.reduce((acc, s) => acc + (s.score ?? 0), 0) / completedSessions.length)
+    : 0
+
+  const passRate = completedSessions.length
+    ? Math.round((completedSessions.filter(s => (s.score ?? 0) >= 63).length / completedSessions.length) * 100)
+    : 0
+
+  return {
+    data: {
+      totalTrainees,
+      completedTraining,
+      inProgress,
+      notStarted,
+      certified,
+      avgScore,
+      passRate,
+      totalSessions: completedSessions.length,
+    },
+    error: null,
+  }
+}
+
+// ─── Seed initial realistic demo records if empty ────────────
+function ensureInitialData() {
+  const profiles = load(PROFILES_KEY, {})
+  // If no trainee profiles exist, seed 4 realistic industrial trainees
+  const hasTrainees = Object.values(profiles).some(p => p.role === 'trainee')
+  if (!hasTrainees) {
+    const defaultTrainees = [
+      {
+        id: 'trainee-001',
+        email: 'rajesh.kumar@bokarosteel.in',
+        mobile: '+91 98351 23456',
+        full_name: 'Rajesh Kumar',
+        employee_id: 'BSL-4091',
+        department: 'Blast Furnace Operations',
+        site_location: 'Bokaro Steel Plant',
+        preferred_language: 'hi',
+        assigned_modules: ['a1b2c3d4-0001-0001-0001-000000000001'],
+        role: 'trainee',
+        created_at: new Date('2026-01-10').toISOString(),
+        _password: 'Password@123',
+      },
+      {
+        id: 'trainee-002',
+        email: 'sunita.soren@bccldhanbad.gov.in',
+        mobile: '+91 94311 87654',
+        full_name: 'Sunita Soren',
+        employee_id: 'BCCL-8820',
+        department: 'Underground Safety Inspection',
+        site_location: 'Jharia Coalfield Pit 4',
+        preferred_language: 'sat',
+        assigned_modules: ['a1b2c3d4-0001-0001-0001-000000000001', 'a1b2c3d4-0002-0002-0002-000000000002'],
+        role: 'trainee',
+        created_at: new Date('2026-01-12').toISOString(),
+        _password: 'Password@123',
+      },
+      {
+        id: 'trainee-003',
+        email: 'priya.murmu@tatasteel.com',
+        mobile: '+91 91234 56789',
+        full_name: 'Priya Murmu',
+        employee_id: 'TATA-7102',
+        department: 'Fire & Emergency Response',
+        site_location: 'Jamshedpur Works',
+        preferred_language: 'en',
+        assigned_modules: ['a1b2c3d4-0001-0001-0001-000000000001'],
+        role: 'trainee',
+        created_at: new Date('2026-01-15').toISOString(),
+        _password: 'Password@123',
+      },
+      {
+        id: 'trainee-004',
+        email: 'amit.verma@hecltd.in',
+        mobile: '+91 98765 43210',
+        full_name: 'Amit Verma',
+        employee_id: 'HEC-3319',
+        department: 'Heavy Machinery Assembly',
+        site_location: 'HEC Ranchi Plant',
+        preferred_language: 'hi',
+        assigned_modules: ['a1b2c3d4-0001-0001-0001-000000000001', 'a1b2c3d4-0002-0002-0002-000000000002'],
+        role: 'trainee',
+        created_at: new Date('2026-01-18').toISOString(),
+        _password: 'Password@123',
+      },
+    ]
+
+    defaultTrainees.forEach(t => {
+      profiles[t.id] = t
+    })
+    save(PROFILES_KEY, profiles)
+
+    // Seed corresponding sessions & certificates
+    const sessions = load(SESSIONS_KEY, {})
+    const certs = load(CERTS_KEY, {})
+
+    // Rajesh sessions
+    sessions['sess-rajesh-01'] = {
+      id: 'sess-rajesh-01',
+      user_id: 'trainee-001',
+      scenario_id: 'a1b2c3d4-0001-0001-0001-000000000001',
+      scenarios: { id: 'a1b2c3d4-0001-0001-0001-000000000001', title: 'Fire & Explosion Response', hazard_type: 'fire' },
+      status: 'completed',
+      score: 95,
+      reaction_time_ms: 42000,
+      completed_at: new Date('2026-01-15T10:30:00Z').toISOString(),
+      created_at: new Date('2026-01-15T10:00:00Z').toISOString(),
+    }
+    certs['cert-rajesh-01'] = {
+      id: 'cert-rajesh-01',
+      user_id: 'trainee-001',
+      scenario_id: 'a1b2c3d4-0001-0001-0001-000000000001',
+      certificate_number: 'SR-2026-RAJ95',
+      score: 95,
+      user_name: 'Rajesh Kumar',
+      course_name: 'Fire & Explosion Response',
+      issued_at: new Date('2026-01-15T10:35:00Z').toISOString(),
+      is_valid: true,
+      created_at: new Date('2026-01-15T10:35:00Z').toISOString(),
+    }
+
+    // Priya Murmu session (Top score 100)
+    sessions['sess-priya-01'] = {
+      id: 'sess-priya-01',
+      user_id: 'trainee-003',
+      scenario_id: 'a1b2c3d4-0001-0001-0001-000000000001',
+      scenarios: { id: 'a1b2c3d4-0001-0001-0001-000000000001', title: 'Fire & Explosion Response', hazard_type: 'fire' },
+      status: 'completed',
+      score: 100,
+      reaction_time_ms: 36000,
+      completed_at: new Date('2026-01-20T14:15:00Z').toISOString(),
+      created_at: new Date('2026-01-20T14:00:00Z').toISOString(),
+    }
+    certs['cert-priya-01'] = {
+      id: 'cert-priya-01',
+      user_id: 'trainee-003',
+      scenario_id: 'a1b2c3d4-0001-0001-0001-000000000001',
+      certificate_number: 'SR-2026-PRI100',
+      score: 100,
+      user_name: 'Priya Murmu',
+      course_name: 'Fire & Explosion Response',
+      issued_at: new Date('2026-01-20T14:20:00Z').toISOString(),
+      is_valid: true,
+      created_at: new Date('2026-01-20T14:20:00Z').toISOString(),
+    }
+
+    // Sunita Soren sessions
+    sessions['sess-sunita-01'] = {
+      id: 'sess-sunita-01',
+      user_id: 'trainee-002',
+      scenario_id: 'a1b2c3d4-0001-0001-0001-000000000001',
+      scenarios: { id: 'a1b2c3d4-0001-0001-0001-000000000001', title: 'Fire & Explosion Response', hazard_type: 'fire' },
+      status: 'completed',
+      score: 88,
+      reaction_time_ms: 48000,
+      completed_at: new Date('2026-01-22T09:40:00Z').toISOString(),
+      created_at: new Date('2026-01-22T09:15:00Z').toISOString(),
+    }
+    certs['cert-sunita-01'] = {
+      id: 'cert-sunita-01',
+      user_id: 'trainee-002',
+      scenario_id: 'a1b2c3d4-0001-0001-0001-000000000001',
+      certificate_number: 'SR-2026-SUN88',
+      score: 88,
+      user_name: 'Sunita Soren',
+      course_name: 'Fire & Explosion Response',
+      issued_at: new Date('2026-01-22T09:45:00Z').toISOString(),
+      is_valid: true,
+      created_at: new Date('2026-01-22T09:45:00Z').toISOString(),
+    }
+
+    // Amit Verma session (In Progress - 1 completed, 1 pending)
+    sessions['sess-amit-01'] = {
+      id: 'sess-amit-01',
+      user_id: 'trainee-004',
+      scenario_id: 'a1b2c3d4-0001-0001-0001-000000000001',
+      scenarios: { id: 'a1b2c3d4-0001-0001-0001-000000000001', title: 'Fire & Explosion Response', hazard_type: 'fire' },
+      status: 'completed',
+      score: 72,
+      reaction_time_ms: 56000,
+      completed_at: new Date('2026-01-25T16:20:00Z').toISOString(),
+      created_at: new Date('2026-01-25T15:50:00Z').toISOString(),
+    }
+
+    save(SESSIONS_KEY, sessions)
+    save(CERTS_KEY, certs)
+  }
+}
+
 // ─── Utility ─────────────────────────────────────────────────
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))

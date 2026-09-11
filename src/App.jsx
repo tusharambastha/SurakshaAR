@@ -28,6 +28,7 @@ import AdminTrainees from './pages/admin/AdminTrainees'
 import AdminTraineeDetail from './pages/admin/AdminTraineeDetail'
 import AdminCompliance from './pages/admin/AdminCompliance'
 import AdminCertificates from './pages/admin/AdminCertificates'
+import AdminLeaderboard from './pages/admin/AdminLeaderboard'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -115,6 +116,7 @@ export default function App() {
                     <Route path="/admin/trainees/:id"    element={<AdminRoute><AdminTraineeDetail /></AdminRoute>} />
                     <Route path="/admin/compliance"      element={<AdminRoute><AdminCompliance /></AdminRoute>} />
                     <Route path="/admin/certificates"    element={<AdminRoute><AdminCertificates /></AdminRoute>} />
+                    <Route path="/admin/leaderboard"     element={<AdminRoute><AdminLeaderboard /></AdminRoute>} />
 
                     {/* ── Default ── */}
                     <Route path="/" element={<Navigate to="/landing" replace />} />

@@ -95,19 +95,19 @@ export default function Profile() {
 
           {/* Profile form */}
           <div className="card" style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24, flexWrap: 'wrap' }}>
               <div style={{
                 width: 52, height: 52, borderRadius: '50%',
                 background: 'var(--color-brand)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.3rem', fontWeight: 800, color: 'white',
+                fontSize: '1.3rem', fontWeight: 800, color: 'white', flexShrink: 0,
               }}>
                 {(profile?.full_name ?? 'T')[0].toUpperCase()}
               </div>
-              <div>
+              <div style={{ minWidth: 0, flex: 1, wordBreak: 'break-word' }}>
                 <div style={{ fontWeight: 700, fontSize: 'var(--text-md)' }}>{profile?.full_name ?? 'Trainee'}</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>{user?.email}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', wordBreak: 'break-all' }}>{user?.email}</div>
               </div>
-              <span className="badge badge-brand" style={{ marginLeft: 'auto' }}>TRAINEE</span>
+              <span className="badge badge-brand" style={{ marginLeft: 'auto', flexShrink: 0 }}>TRAINEE</span>
             </div>
 
             {saveMsg && (

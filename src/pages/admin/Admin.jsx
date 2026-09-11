@@ -1,13 +1,18 @@
 /**
  * Admin Dashboard — overview of platform compliance metrics
  */
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Users, Award, TrendingUp, BarChart2, Shield, ChevronRight, AlertTriangle } from 'lucide-react'
+import {
+  Users, Award, TrendingUp, BarChart2, Shield, ChevronRight,
+  AlertTriangle, Trophy, UserPlus, CheckCircle, Clock
+} from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
-import { mockGetAllProfiles, mockGetAllSessions } from '../../lib/mockDb'
+import { mockGetAllProfiles, mockGetAllSessions, mockGetAdminOverview } from '../../lib/mockDb'
 import { Navbar } from '../../components/layout/Navbar'
 import { scoreRating } from '../../lib/scoring'
+import CreateTraineeModal from '../../components/admin/CreateTraineeModal'
 
 function fmtDate(s) {
   if (!s) return '—'
@@ -16,6 +21,16 @@ function fmtDate(s) {
 
 export default function Admin() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+
+  const { data: overview } = useQuery({
+    queryKey: ['admin-overview'],
+    queryFn: async () => {
+      if (!isSupabaseConfigured) return mockGetAdminOverview().data
+      return null
+    },
+  })
 
   const { data: profiles, isLoading: loadP } = useQuery({
     queryKey: ['admin-profiles'],
@@ -52,17 +67,22 @@ export default function Admin() {
     },
   })
 
-  const totalTrainees = profiles?.length ?? 0
-  const totalSessions = sessions?.length ?? 0
-  const avgScore = sessions?.length
+  const totalTrainees = overview?.totalTrainees ?? (profiles?.length ?? 0)
+  const completedTraining = overview?.completedTraining ?? 0
+  const inProgress = overview?.inProgress ?? 0
+  const notStarted = overview?.notStarted ?? 0
+  const certifiedCount = overview?.certified ?? (certs ?? 0)
+  const _totalSessions = overview?.totalSessions ?? (sessions?.length ?? 0)
+  const avgScore = overview?.avgScore ?? (sessions?.length
     ? Math.round(sessions.reduce((s, sess) => s + (sess.score ?? 0), 0) / sessions.length)
-    : null
-  const passRate = sessions?.length
+    : null)
+  const passRate = overview?.passRate ?? (sessions?.length
     ? Math.round((sessions.filter(s => (s.score ?? 0) >= 63).length / sessions.length) * 100)
-    : null
+    : null)
   const rating = avgScore !== null ? scoreRating(avgScore) : null
 
   const QUICK_LINKS = [
+    { label: 'Leaderboard', icon: <Trophy size={18} />, path: '/admin/leaderboard' },
     { label: 'Trainees', icon: <Users size={18} />, path: '/admin/trainees' },
     { label: 'Compliance Report', icon: <BarChart2 size={18} />, path: '/admin/compliance' },
     { label: 'Certificates', icon: <Award size={18} />, path: '/admin/certificates' },
@@ -75,14 +95,31 @@ export default function Admin() {
         <div className="page-container">
 
           {/* Header */}
-          <div style={{ marginBottom: 28 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <Shield size={22} style={{ color: 'var(--color-brand)' }} />
-              <h1 style={{ fontSize: 'var(--text-2xl)' }}>Admin Dashboard</h1>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: 28,
+            gap: 16,
+            flexWrap: 'wrap',
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <Shield size={22} style={{ color: 'var(--color-brand)' }} />
+                <h1 style={{ fontSize: 'var(--text-2xl)' }}>Admin Dashboard</h1>
+              </div>
+              <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+                Industrial Safety Compliance Overview · Jharkhand Mining & Manufacturing
+              </p>
             </div>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
-              Industrial Safety Compliance Overview · Jharkhand Mining & Manufacturing
-            </p>
+
+            <button
+              className="btn btn-primary"
+              onClick={() => setCreateModalOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            >
+              <UserPlus size={16} /> Create Trainee Account
+            </button>
           </div>
 
           {/* Quick links */}
@@ -94,24 +131,65 @@ export default function Admin() {
             ))}
           </div>
 
-          {/* Stat cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 16, marginBottom: 36 }}>
-            <AdminStat icon={<Users size={20} style={{ color: '#6366f1' }} />}
-              label="Total Trainees" value={loadP ? '…' : totalTrainees} bg="#EDEDFF" color="#6366f1" />
-            <AdminStat icon={<TrendingUp size={20} style={{ color: 'var(--color-brand)' }} />}
-              label="Sessions Completed" value={loadS ? '…' : totalSessions} bg="var(--color-brand-50)" color="var(--color-brand)" />
-            <AdminStat icon={<BarChart2 size={20} style={{ color: rating?.color ?? 'var(--color-text-muted)' }} />}
-              label="Platform Avg Score" value={avgScore !== null ? `${avgScore} pts` : '—'}
-              bg={rating?.bg ?? 'var(--color-surface-alt)'} color={rating?.color ?? 'var(--color-text-muted)'}
-              sub={rating?.label} />
-            <AdminStat icon={<Award size={20} style={{ color: 'var(--color-success)' }} />}
-              label="Certificates Issued" value={certs ?? 0} bg="var(--color-success-bg)" color="var(--color-success)" />
+          {/* Stat cards: Metrics grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 36 }}>
+            <AdminStat
+              icon={<Users size={20} style={{ color: '#6366f1' }} />}
+              label="Total Trainees"
+              value={loadP ? '…' : totalTrainees}
+              bg="#EDEDFF"
+              color="#6366f1"
+              sub="Registered workers"
+            />
+            <AdminStat
+              icon={<CheckCircle size={20} style={{ color: 'var(--color-success)' }} />}
+              label="Completed Training"
+              value={completedTraining}
+              bg="var(--color-success-bg)"
+              color="var(--color-success)"
+              sub="All modules cleared"
+            />
+            <AdminStat
+              icon={<TrendingUp size={20} style={{ color: 'var(--color-brand)' }} />}
+              label="In Progress"
+              value={inProgress}
+              bg="var(--color-brand-50)"
+              color="var(--color-brand)"
+              sub="Active training sessions"
+            />
+            <AdminStat
+              icon={<Clock size={20} style={{ color: '#7A7A7A' }} />}
+              label="Pending / Not Started"
+              value={notStarted}
+              bg="var(--color-surface-alt)"
+              color="var(--color-text-secondary)"
+              sub="Awaiting first attempt"
+            />
+            <AdminStat
+              icon={<Award size={20} style={{ color: '#D97706' }} />}
+              label="Certified Trainees"
+              value={certifiedCount}
+              bg="#FEF3C7"
+              color="#D97706"
+              sub="Valid QR certificates"
+            />
+            <AdminStat
+              icon={<BarChart2 size={20} style={{ color: rating?.color ?? 'var(--color-text-muted)' }} />}
+              label="Platform Avg Score"
+              value={avgScore !== null ? `${avgScore} pts` : '—'}
+              bg={rating?.bg ?? 'var(--color-surface-alt)'}
+              color={rating?.color ?? 'var(--color-text-muted)'}
+              sub={rating?.label}
+            />
             {passRate !== null && (
-              <AdminStat icon={<Shield size={20} style={{ color: passRate >= 60 ? 'var(--color-success)' : 'var(--color-warning)' }} />}
-                label="Pass Rate" value={`${passRate}%`}
+              <AdminStat
+                icon={<Shield size={20} style={{ color: passRate >= 60 ? 'var(--color-success)' : 'var(--color-warning)' }} />}
+                label="Pass Rate"
+                value={`${passRate}%`}
                 bg={passRate >= 60 ? 'var(--color-success-bg)' : 'var(--color-warning-bg)'}
                 color={passRate >= 60 ? 'var(--color-success)' : 'var(--color-warning)'}
-                sub="≥ 63 pts threshold" />
+                sub="≥ 63 pts threshold"
+              />
             )}
           </div>
 
@@ -176,6 +254,17 @@ export default function Admin() {
           </div>
         </div>
       </main>
+
+      <CreateTraineeModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['admin-overview'] })
+          queryClient.invalidateQueries({ queryKey: ['admin-profiles'] })
+          queryClient.invalidateQueries({ queryKey: ['admin-sessions'] })
+          queryClient.invalidateQueries({ queryKey: ['admin-leaderboard'] })
+        }}
+      />
     </div>
   )
 }

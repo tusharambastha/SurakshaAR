@@ -19,10 +19,11 @@ const WELCOME_MESSAGE = {
 
 export default function SafetyChatbot() {
   const { lang } = useLang()
-  const [open, setOpen]         = useState(false)
-  const [input, setInput]       = useState('')
-  const [messages, setMessages] = useState([WELCOME_MESSAGE])
-  const [typing, setTyping]     = useState(false)
+  const [open, setOpen]                 = useState(false)
+  const [badgeDismissed, setBadgeDismissed] = useState(false)
+  const [input, setInput]               = useState('')
+  const [messages, setMessages]         = useState([WELCOME_MESSAGE])
+  const [typing, setTyping]             = useState(false)
   const bottomRef = useRef()
   const inputRef  = useRef()
 
@@ -74,8 +75,8 @@ export default function SafetyChatbot() {
 
   return (
     <>
-      {/* Floating button stylish speech badge */}
-      {!open && (
+      {/* Floating button stylish speech badge with dismiss (×) option */}
+      {!open && !badgeDismissed && (
         <div
           onClick={handleOpen}
           role="button"
@@ -85,10 +86,11 @@ export default function SafetyChatbot() {
             position: 'fixed',
             bottom: 88,
             right: 24,
+            maxWidth: 'calc(100vw - 48px)',
             background: 'var(--color-surface)',
             border: '1.5px solid rgba(224, 90, 0, 0.35)',
             borderRadius: '16px 16px 4px 16px',
-            padding: '7px 14px',
+            padding: '6px 10px 6px 12px',
             display: 'inline-flex',
             alignItems: 'center',
             gap: 8,
@@ -138,6 +140,31 @@ export default function SafetyChatbot() {
             flexShrink: 0,
             marginLeft: 2,
           }} />
+
+          {/* Small, clearly visible dismiss (×) button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setBadgeDismissed(true)
+            }}
+            aria-label="Close notification"
+            title="Dismiss label"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '2px 4px',
+              marginLeft: 4,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-text-muted)',
+              borderRadius: '50%',
+              flexShrink: 0,
+            }}
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
