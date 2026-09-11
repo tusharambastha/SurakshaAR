@@ -31,6 +31,49 @@ export default function Assessment() {
   const [issuing, setIssuing] = useState(false)
   const [showCompletion, setShowCompletion] = useState(false)
   const [scenario, setScenario] = useState(null)
+  const [shuffledQuestions, setShuffledQuestions] = useState(null)
+
+  /** Fisher-Yates shuffle — returns a new shuffled array */
+  function shuffleArray(arr) {
+    const a = [...arr]
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]]
+    }
+    return a
+  }
+
+  /**
+   * Prepares randomized, jumbled questions:
+   * 1. Shuffles all available questions in the question bank
+   * 2. Takes 5 questions so every test session presents different questions
+   * 3. Randomizes the A/B/C/D option ordering and updates correct_index accordingly
+   */
+  function prepareJumbledQuestions(rawQuestions) {
+    if (!rawQuestions || !rawQuestions.length) return []
+    const shuffledList = shuffleArray(rawQuestions)
+    const selectedCount = Math.min(5, shuffledList.length)
+    const picked = shuffledList.slice(0, selectedCount)
+
+    return picked.map(q => {
+      const numOptions = q.options_en?.length ?? 4
+      const indices = Array.from({ length: numOptions }, (_, i) => i)
+      const shuffledIndices = shuffleArray(indices)
+
+      return {
+        ...q,
+        options_en: shuffledIndices.map(idx => q.options_en?.[idx]),
+        options_hi: q.options_hi ? shuffledIndices.map(idx => q.options_hi?.[idx]) : undefined,
+        options_sat: q.options_sat ? shuffledIndices.map(idx => q.options_sat?.[idx]) : undefined,
+        correct_index: shuffledIndices.indexOf(q.correct_index),
+      }
+    })
+  }
+
+  /** Active questions list — shuffled on start/refresh, falls back to fetched order */
+  const activeQuestions = shuffledQuestions ?? questions ?? []
+  const currentQ = activeQuestions[qIndex]
+  const totalQ = activeQuestions.length
 
   // Fetch scenario info
   useEffect(() => {
@@ -61,8 +104,33 @@ export default function Assessment() {
     },
   })
 
-  const currentQ = questions?.[qIndex]
-  const totalQ = questions?.length ?? 0
+  // Auto-generate fresh jumbled questions whenever questions data arrives or scenario changes
+  useEffect(() => {
+    if (questions && questions.length) {
+      setShuffledQuestions(prepareJumbledQuestions(questions))
+    }
+  }, [questions])
+
+  function handleStartAssessment() {
+    if (!questions || !questions.length) return
+    setShuffledQuestions(prepareJumbledQuestions(questions))
+    setQIndex(0)
+    setSelected(null)
+    setShowFeedback(false)
+    setAnswers([])
+    setPhase('question')
+  }
+
+  function handleRetryAssessment() {
+    if (questions && questions.length) {
+      setShuffledQuestions(prepareJumbledQuestions(questions))
+    }
+    setQIndex(0)
+    setSelected(null)
+    setShowFeedback(false)
+    setAnswers([])
+    setPhase('lang-pick')
+  }
 
   function getQuestion(q) {
     if (assessLang === 'hi' && q.question_hi) return q.question_hi
@@ -178,7 +246,7 @@ export default function Assessment() {
 
             <button
               className="btn btn-primary btn-lg btn-full"
-              onClick={() => setPhase('question')}
+              onClick={handleStartAssessment}
               disabled={isLoading || !questions?.length}
             >
               {isLoading ? <div className="spinner spinner-sm" style={{ borderTopColor: 'white' }} /> : <>Start Assessment <ArrowRight size={18} /></>}
@@ -242,8 +310,7 @@ export default function Assessment() {
                 </button>
               )}
               {!rating?.passed && (
-                <button className="btn btn-primary btn-lg btn-full"
-                  onClick={() => { setPhase('lang-pick'); setQIndex(0); setAnswers([]); setSelected(null); setShowFeedback(false) }}>
+                <button className="btn btn-primary btn-lg btn-full" onClick={handleRetryAssessment}>
                   <RotateCcw size={16} /> {T('retryAssessment')}
                 </button>
               )}
