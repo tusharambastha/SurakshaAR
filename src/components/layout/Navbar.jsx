@@ -46,8 +46,6 @@ export function Navbar() {
       alignItems: 'center',
       padding: '0 clamp(8px, 3vw, var(--space-4))',
       boxSizing: 'border-box',
-      maxWidth: '100vw',
-      overflow: 'hidden',
     }}>
       <div style={{
         maxWidth: 1100, margin: '0 auto', width: '100%',
