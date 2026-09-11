@@ -62,17 +62,30 @@ export default function FireDetectionOverlay({
   const animRef = useRef(null)
   const fireSoundPlayedRef = useRef(false)
 
-  // Initialize detector
+  // Initialize detector with strict pixel threshold
   useEffect(() => {
     detectorRef.current = new FireDetector({
       sampleWidth: 160,
       sampleHeight: 120,
-      minPixels: 10,
+      minPixels: 18,
     })
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current)
     }
   }, [])
+
+  function handleSimulateFire() {
+    detectorRef.current?.triggerSimulation(true)
+  }
+
+  function handleResetDetection() {
+    detectorRef.current?.reset()
+    setFireConfirmed(false)
+    setDetection({ isFire: false, confidence: 0, bbox: null, flameCenter: null, pixelCount: 0 })
+    setTaskState('detecting')
+    setSelectedOption(null)
+    fireSoundPlayedRef.current = false
+  }
 
   // Live frame analysis loop
   useEffect(() => {
@@ -217,10 +230,27 @@ export default function FireDetectionOverlay({
               width: 9, height: 9, borderRadius: '50%', background: '#10B981',
               boxShadow: '0 0 10px #10B981', animation: 'pulse 1.5s infinite',
             }} />
-            <span>AI Camera Active · Scanning live frames for flame hazards…</span>
-            <span style={{ color: '#94A3B8', fontSize: '0.74rem', borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: 8 }}>
-              Show candle/match flame to camera
-            </span>
+            <span>AI Camera Active · Scanning for flame hazards…</span>
+            <button
+              onClick={handleSimulateFire}
+              title="Test fire detection alarm safely"
+              style={{
+                background: 'rgba(234, 88, 12, 0.25)',
+                border: '1px solid var(--color-brand)',
+                color: '#FFB347',
+                borderRadius: 12,
+                padding: '3px 10px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                marginLeft: 4,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <Flame size={12} color="#FFB347" /> Simulate Fire
+            </button>
           </div>
         ) : (
           <div style={{
@@ -231,12 +261,24 @@ export default function FireDetectionOverlay({
             boxShadow: '0 6px 24px rgba(220, 38, 38, 0.5)',
             animation: 'slideDownFade 0.25s ease-out',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.96rem', fontWeight: 800, letterSpacing: '0.04em' }}>
-              <Flame size={18} color="#FEF08A" />
-              🔥 FIRE HAZARD DETECTED
-              <span style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 6, fontSize: '0.74rem' }}>
-                {Math.round(detection.confidence * 100)}% CONFIDENCE
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.96rem', fontWeight: 800, letterSpacing: '0.04em' }}>
+                <Flame size={18} color="#FEF08A" />
+                🔥 FIRE HAZARD DETECTED
+                <span style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 6, fontSize: '0.74rem' }}>
+                  {Math.round(detection.confidence * 100)}% CONFIDENCE
+                </span>
+              </div>
+              <button
+                onClick={handleResetDetection}
+                style={{
+                  background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.3)',
+                  color: 'white', borderRadius: 8, padding: '3px 8px', fontSize: '0.72rem',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                <RotateCcw size={12} /> Reset
+              </button>
             </div>
             <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#FEF08A', display: 'flex', alignItems: 'center', gap: 6 }}>
               <ShieldAlert size={15} /> ⚠️ MAINTAIN SAFE DISTANCE
@@ -255,19 +297,28 @@ export default function FireDetectionOverlay({
       {/* ── 3. INTERACTIVE SAFETY TRAINING CARD (PHASE 4 & 5) ── */}
       {(taskState === 'question' || taskState === 'feedback_correct' || taskState === 'feedback_wrong') && (
         <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 16,
           pointerEvents: 'all',
-          margin: '0 auto 20px',
-          width: 'min(580px, calc(100vw - 32px))',
-          background: 'rgba(15, 23, 42, 0.94)',
-          backdropFilter: 'blur(16px)',
-          border: taskState === 'feedback_correct' ? '2px solid #10B981'
-            : taskState === 'feedback_wrong' ? '2px solid #EF4444'
-            : '1.5px solid rgba(255, 255, 255, 0.2)',
-          borderRadius: 20,
-          padding: '22px 24px',
-          boxShadow: '0 12px 36px rgba(0, 0, 0, 0.6)',
-          animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
         }}>
+          <div style={{
+            width: 'min(560px, 100%)',
+            background: 'rgba(15, 23, 42, 0.96)',
+            border: taskState === 'feedback_correct' ? '2px solid #10B981'
+              : taskState === 'feedback_wrong' ? '2px solid #EF4444'
+              : '1.5px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: 20,
+            padding: '24px 26px',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8)',
+            animation: 'slideUpFade 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}>
 
           {/* Card Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -437,6 +488,7 @@ export default function FireDetectionOverlay({
               </button>
             )}
           </div>
+        </div>
         </div>
       )}
 
