@@ -241,35 +241,38 @@ export default function Landing() {
                 filter: 'blur(2px)',
               }} />
 
-              {/* Hazard marker */}
+              {/* Hazard marker — bottom-left, clear of other labels */}
               <div style={{
-                position: 'absolute', bottom: 120, left: '30%',
+                position: 'absolute', bottom: '18%', left: '8%',
                 background: 'rgba(255,69,0,0.9)',
-                borderRadius: 8, padding: '6px 12px',
-                color: 'white', fontSize: 13, fontWeight: 700,
+                borderRadius: 8, padding: '5px 10px',
+                color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
                 boxShadow: '0 0 20px rgba(255,69,0,0.6)',
+                whiteSpace: 'nowrap',
               }}>
                 ⚠ FIRE HAZARD
               </div>
 
-              {/* Exit marker */}
+              {/* Exit marker — top-right corner */}
               <div style={{
-                position: 'absolute', right: 40, top: '50%',
+                position: 'absolute', top: '30%', right: '6%',
                 background: 'rgba(46,139,87,0.9)',
-                borderRadius: 8, padding: '6px 12px',
-                color: 'white', fontSize: 13, fontWeight: 700,
+                borderRadius: 8, padding: '5px 10px',
+                color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
                 boxShadow: '0 0 20px rgba(46,139,87,0.6)',
+                whiteSpace: 'nowrap',
               }}>
                 🚪 FIRE EXIT →
               </div>
 
-              {/* PPE marker */}
+              {/* PPE marker — top-left, below the CAMERA AR MODE badge */}
               <div style={{
-                position: 'absolute', left: 30, top: '40%',
+                position: 'absolute', top: '30%', left: '6%',
                 background: 'rgba(52,152,219,0.9)',
-                borderRadius: 8, padding: '6px 12px',
-                color: 'white', fontSize: 13, fontWeight: 700,
+                borderRadius: 8, padding: '5px 10px',
+                color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
                 boxShadow: '0 0 20px rgba(52,152,219,0.6)',
+                whiteSpace: 'nowrap',
               }}>
                 🦺 PPE STATION
               </div>

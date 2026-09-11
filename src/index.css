@@ -969,3 +969,11 @@ tr:hover td { background: var(--color-bg); }
   .card { padding: 14px; }
   .form-input, .form-select { font-size: 16px; } /* Prevents iOS/Android auto-zoom on input focus */
 }
+
+/* ── Navbar responsive — hide secondary utility buttons on small phones ── */
+@media (max-width: 480px) {
+  /* Hide Voice and High-Contrast buttons on narrow screens */
+  .navbar-secondary-btn {
+    display: none !important;
+  }
+}

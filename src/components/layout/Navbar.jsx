@@ -154,9 +154,10 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Voice button */}
+          {/* Voice button — hidden on small mobile */}
           <button
             onClick={handleVoice}
+            className="navbar-secondary-btn"
             style={{
               width: 36,
               height: 36,
@@ -178,9 +179,10 @@ export function Navbar() {
             <Volume2 size={16} />
           </button>
 
-          {/* High contrast toggle */}
+          {/* High contrast toggle — hidden on small mobile */}
           <button
             onClick={toggleHighContrast}
+            className="navbar-secondary-btn"
             style={{
               width: 36,
               height: 36,
@@ -228,7 +230,14 @@ export function Navbar() {
                 }}>
                   {firstName[0]?.toUpperCase()}
                 </div>
-                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                <span style={{
+                  fontSize: 'var(--text-sm)', fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                  maxWidth: 72,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
                   {firstName}
                 </span>
                 <ChevronDown size={12} style={{ color: 'var(--color-text-muted)' }} />
