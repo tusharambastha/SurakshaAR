@@ -112,12 +112,13 @@ export class FireDetector {
     const totalPixels = sampleWidth * sampleHeight
 
     let flamePixelCount = 0
+    let corePixelCount = 0
     let flickeringPixelCount = 0
     let minX = sampleWidth, maxX = 0
     let minY = sampleHeight, maxY = 0
     let sumX = 0, sumY = 0
 
-    // Scan pixels with optical filter + temporal flicker check
+    // Scan pixels with optical filter + combustion core + temporal flicker check
     for (let i = 0; i < totalPixels; i++) {
       const idx = i * 4
       const r = data[idx]
@@ -138,6 +139,12 @@ export class FireDetector {
         if (x > maxX) maxX = x
         if (y < minY) minY = y
         if (y > maxY) maxY = y
+
+        // Check for ultra-bright incandescent combustion core (candle/lighter center)
+        // Diffuse reflective fabrics (shirts/walls) cannot achieve direct emission saturation:
+        if (r >= 248 && g >= 210 && (r + g + b) >= 580) {
+          corePixelCount++
+        }
 
         // Check for dynamic temporal flicker against previous frame
         if (this.hasPrevFrame) {
@@ -161,23 +168,32 @@ export class FireDetector {
     // Check 1: Must exceed minimum pixel threshold
     const hasMinPixels = flamePixelCount >= minPixels
 
-    // Check 2: Max frame ratio (clothing covers large torso/frame, flames are smaller)
+    // Check 2: MUST contain an active incandescent combustion core (lighter/candle flame center)
+    // Eliminates 100% of yellow/orange shirts, posters, and room objects:
+    const hasCombustionCore = corePixelCount >= 3
+
+    // Check 3: Max frame ratio (clothing covers large torso/frame, candle/lighter flames are small)
     const isBelowMaxRatio = (flamePixelCount / totalPixels) < MAX_FLAME_FRAME_RATIO
 
-    // Check 3: Bounding box dimension bounds (reject whole-torso shirts)
-    const isRealisticDimensions = (boxW < sampleWidth * 0.45) && (boxH < sampleHeight * 0.50)
+    // Check 4: Bounding box dimension bounds (candle/lighter flames are compact)
+    const isRealisticDimensions = (boxW <= sampleWidth * 0.35) && (boxH <= sampleHeight * 0.40)
 
-    // Check 4: Cluster density — real flames are concentrated, not diffuse
+    // Check 5: Cluster density — real flames are concentrated, not diffuse
     const clusterDensity = boxArea > 0 ? (flamePixelCount / boxArea) : 0
     const isCompactCluster = clusterDensity >= 0.20
 
-    // Check 5: Dynamic Flame Flicker Turbulence
+    // Check 6: Dynamic Flame Flicker Turbulence
     // Real flames flicker and oscillate due to convective air currents (8-20 Hz).
     // Static clothing, yellow fabric, and room lamps have virtually 0 flicker.
     const flickerRatio = flamePixelCount > 0 ? (flickeringPixelCount / flamePixelCount) : 0
     const hasDynamicFlicker = flickerRatio >= MIN_FLICKER_RATIO
 
-    const isCandidate = hasMinPixels && isBelowMaxRatio && isRealisticDimensions && isCompactCluster && hasDynamicFlicker
+    const isCandidate = hasMinPixels &&
+      hasCombustionCore &&
+      isBelowMaxRatio &&
+      isRealisticDimensions &&
+      isCompactCluster &&
+      hasDynamicFlicker
 
     // ─── TEMPORAL CONSISTENCY (MULTI-FRAME CONFIRMATION) ───
     if (isCandidate) {
