@@ -37,7 +37,7 @@ function fmtTime(ms) {
 
 export default function Dashboard() {
   const { user, profile } = useAuth()
-  const { T } = useLang()
+  const { T, lang } = useLang()
   const navigate = useNavigate()
 
   const { data: scenarios, isLoading: loadingS } = useQuery({
@@ -123,7 +123,7 @@ export default function Dashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
                 {scenarios.map(s => (
                   <ModuleCard key={s.id} scenario={s} sessions={sessions}
-                    onStart={() => navigate(`/tutorial/${s.id}`)} T={T} />
+                    onStart={() => navigate(`/tutorial/${s.id}`)} T={T} lang={lang} />
                 ))}
               </div>
             )}
@@ -198,10 +198,14 @@ function StatCard({ icon, label, value, sub, color, bg, loading }) {
   )
 }
 
-function ModuleCard({ scenario, sessions, onStart, T }) {
+function ModuleCard({ scenario, sessions, onStart, T, lang }) {
   const best = sessions?.filter(s => s.scenario_id === scenario.id).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0]
   const rating = best ? scoreRating(best.score ?? 0) : null
   const isComingSoon = scenario.coming_soon
+
+  // Resolve localized title/description — fall back to English
+  const localTitle = (lang && lang !== 'en' && scenario[`title_${lang}`]) || scenario.title
+  const localDesc = (lang && lang !== 'en' && scenario[`description_${lang}`]) || scenario.description
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 14, opacity: isComingSoon ? 0.75 : 1 }}>
@@ -216,10 +220,10 @@ function ModuleCard({ scenario, sessions, onStart, T }) {
         <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-md)', background: 'var(--color-brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-brand)', flexShrink: 0 }}>
           {HAZARD_ICONS[scenario.hazard_type]}
         </div>
-        <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700 }}>{scenario.title}</h3>
+        <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700 }}>{localTitle}</h3>
       </div>
 
-      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.55, flex: 1 }}>{scenario.description}</p>
+      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.55, flex: 1 }}>{localDesc}</p>
 
       <div style={{ display: 'flex', gap: 14, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
         {!isComingSoon && <span>📋 {scenario.steps?.length ?? 0} {T('steps')}</span>}
