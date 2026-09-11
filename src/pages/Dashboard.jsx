@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Trophy, Clock, Star, TrendingUp, ChevronRight, AlertTriangle, Flame, Wind, Cog, Lock } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { mockGetScenarios, mockGetSessions } from '../lib/mockDb'
+import { getScenarioText } from '../lib/i18n'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { Navbar } from '../components/layout/Navbar'
@@ -109,7 +110,7 @@ export default function Dashboard() {
           {/* Modules */}
           <section style={{ marginBottom: 40 }}>
             <h2 className="section-title" style={{ marginBottom: 4 }}>{T('trainingModules')}</h2>
-            <p className="section-subtitle" style={{ marginBottom: 20 }}>Select a safety module to begin AR training</p>
+            <p className="section-subtitle" style={{ marginBottom: 20 }}>{T('selectModuleSubtitle')}</p>
 
             {loadingS ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
@@ -203,9 +204,9 @@ function ModuleCard({ scenario, sessions, onStart, T, lang }) {
   const rating = best ? scoreRating(best.score ?? 0) : null
   const isComingSoon = scenario.coming_soon
 
-  // Resolve localized title/description — fall back to English
-  const localTitle = (lang && lang !== 'en' && scenario[`title_${lang}`]) || scenario.title
-  const localDesc = (lang && lang !== 'en' && scenario[`description_${lang}`]) || scenario.description
+  // Resolve from i18n table — always reactive to lang changes, bypasses cache
+  const localTitle = getScenarioText(scenario.id, lang, 'title') || scenario.title
+  const localDesc = getScenarioText(scenario.id, lang, 'description') || scenario.description
 
   return (
     <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 14, opacity: isComingSoon ? 0.75 : 1 }}>

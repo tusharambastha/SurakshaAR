@@ -90,6 +90,7 @@ export const t = {
     retryScenario: 'Retry Scenario',
     noSessionsYet: 'No completed sessions yet.',
     noScenariosYet: 'No training modules available. Contact your admin.',
+    selectModuleSubtitle: 'Select a safety module to begin AR training',
     steps: 'steps',
     benchmark: 'Benchmark',
     bestScore: 'Best',
@@ -275,6 +276,7 @@ export const t = {
     retryScenario: 'पुनः प्रयास करें',
     noSessionsYet: 'अभी तक कोई सत्र पूर्ण नहीं हुआ।',
     noScenariosYet: 'कोई ट्रेनिंग मॉड्यूल उपलब्ध नहीं। अपने एडमिन से संपर्क करें।',
+    selectModuleSubtitle: 'AR ट्रेनिंग शुरू करने के लिए एक सुरक्षा मॉड्यूल चुनें',
     steps: 'चरण',
     benchmark: 'बेंचमार्क',
     bestScore: 'सर्वश्रेष्ठ',
@@ -433,4 +435,66 @@ export function getText(lang, key, ...args) {
 /** Get tutorial steps for a language */
 export function getTutorialSteps(lang) {
   return t[lang]?.tutorial ?? t['en'].tutorial
+}
+
+/**
+ * Scenario content translations by scenario ID and language.
+ * Used by ModuleCard so titles/descriptions switch with the language toggle
+ * without depending on the React Query cache or data layer.
+ */
+export const SCENARIO_I18N = {
+  'a1b2c3d4-0001-0001-0001-000000000001': {
+    en: {
+      title: 'Fire & Explosion Response',
+      description: 'Simulate responding to an electrical fire on a manufacturing floor. Identify the hazard, activate emergency protocols, don PPE, use the correct extinguisher, and evacuate safely.',
+    },
+    hi: {
+      title: 'आग और विस्फोट प्रतिक्रिया',
+      description: 'एक मैन्युफैक्चरिंग फ्लोर पर बिजली की आग का जवाब देने का अभ्यास करें। खतरे की पहचान करें, आपातकालीन प्रोटोकॉल सक्रिय करें, PPE पहनें, सही अग्निशामक का उपयोग करें और सुरक्षित निकासी करें।',
+    },
+    sat: {
+      title: 'Fire & Explosion Response',
+      description: 'Simulate responding to an electrical fire on a manufacturing floor. Identify the hazard, activate emergency protocols, don PPE, use the correct extinguisher, and evacuate safely.',
+    },
+  },
+  'a1b2c3d4-0002-0002-0002-000000000002': {
+    en: {
+      title: 'Gas Leak & Confined Space Protocol',
+      description: 'Practice responding to a hazardous gas leak in a mining tunnel using the buddy system. Identify the leak, activate protocols, don breathing apparatus, and evacuate safely.',
+    },
+    hi: {
+      title: 'गैस रिसाव और सीमित स्थान प्रोटोकॉल',
+      description: 'बडी सिस्टम का उपयोग करते हुए माइनिंग सुरंग में खतरनाक गैस रिसाव का जवाब देने का अभ्यास करें। रिसाव की पहचान करें, प्रोटोकॉल सक्रिय करें, श्वास उपकरण पहनें और सुरक्षित निकासी करें।',
+    },
+    sat: {
+      title: 'Gas Leak & Confined Space Protocol',
+      description: 'Practice responding to a hazardous gas leak in a mining tunnel using the buddy system. Identify the leak, activate protocols, don breathing apparatus, and evacuate safely.',
+    },
+  },
+  'a1b2c3d4-0003-0003-0003-000000000003': {
+    en: {
+      title: 'Machinery Safety & Lockout/Tagout',
+      description: 'Learn to safely isolate and lock out machinery before maintenance using the LOTO procedure. Prevents accidental machine startup during maintenance.',
+    },
+    hi: {
+      title: 'मशीनरी सुरक्षा और लॉकआउट/टैगआउट',
+      description: 'LOTO प्रक्रिया का उपयोग करते हुए रखरखाव से पहले मशीनरी को सुरक्षित रूप से अलग और लॉक करना सीखें। रखरखाव के दौरान आकस्मिक मशीन स्टार्टअप को रोकता है।',
+    },
+    sat: {
+      title: 'Machinery Safety & Lockout/Tagout',
+      description: 'Learn to safely isolate and lock out machinery before maintenance using the LOTO procedure. Prevents accidental machine startup during maintenance.',
+    },
+  },
+}
+
+/**
+ * Get scenario title or description in the given language.
+ * Falls back to English if no translation is found.
+ */
+export function getScenarioText(scenarioId, lang, field) {
+  return (
+    SCENARIO_I18N[scenarioId]?.[lang]?.[field] ??
+    SCENARIO_I18N[scenarioId]?.['en']?.[field] ??
+    null
+  )
 }
