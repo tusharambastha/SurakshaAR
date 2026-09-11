@@ -2,56 +2,57 @@
  * SurakshaAR — Zero-False-Alarm Computer Vision Fire & Flame Detection Engine
  *
  * Designed to detect genuine flames (match, lighter, candle, flame video) while
- * completely eliminating false alarms on human skin tones, room lighting,
- * and warm interior walls.
+ * completely eliminating false alarms on yellow/orange clothing, human skin tones,
+ * room lighting, and warm interior walls.
  *
  * Multi-Stage Verification Pipeline:
- * 1. Strict Thermodynamic Emission & Chromatic Separation Filter
- * 2. Skin Tone & Non-Incandescent Object Rejection
- * 3. Local Spatial Cluster Density & Compactness Analysis (No full-screen false boxes)
- * 4. Multi-Frame Temporal Confirmation (3 consecutive positive frames)
+ * 1. Strict Incandescent Emission & Chromatic Dominance Filter (Rejects yellow/orange clothing & skin)
+ * 2. Dynamic Temporal Frame Differencing & Flicker Analysis (Flames flicker at 8-20Hz; clothing is static)
+ * 3. Spatial Compactness & Scale Bounds (Flames are localized; rejects full-torso clothing)
+ * 4. Multi-Frame Temporal Consistency (Requires 8 consecutive positive flickering frames)
  */
 
 const SAMPLE_WIDTH = 160
 const SAMPLE_HEIGHT = 120
-const MIN_FLAME_PIXELS = 18 // minimum concentrated glowing pixels
-const MAX_FLAME_FRAME_RATIO = 0.35 // reject if filling >35% of entire frame (ambient light)
+const MIN_FLAME_PIXELS = 24 // minimum concentrated glowing pixels
+const MAX_FLAME_FRAME_RATIO = 0.25 // reject if filling >25% of frame (clothing/walls)
+const FLICKER_LUMA_DELTA = 10 // minimum intensity fluctuation between frames
+const MIN_FLICKER_RATIO = 0.12 // at least 12% of candidate pixels must dynamically flicker
 
 /**
  * Optical evaluator for a single pixel.
- * Returns true ONLY if pixel exhibits physical characteristics of an emitting flame.
+ * Returns true ONLY if pixel exhibits physical characteristics of an emitting incandescent flame.
+ * Strictly excludes yellow/orange fabric, skin tones, and ambient lighting.
  */
 export function isFlamePixel(r, g, b) {
-  // 1. Extreme brightness requirement — flames are active luminous emitters
-  if (r < 225) return false
+  // 1. Minimum extreme brightness requirement — flames are active luminous emitters
+  if (r < 235) return false
 
   // 2. Minimum total radiant energy
   const sum = r + g + b
-  if (sum < 350) return false
+  if (sum < 360) return false
 
-  // 3. Chromatic separation: In warm flames, Red strongly dominates Blue
-  // (In human skin and beige walls, (r - b) is typically < 65)
-  if ((r - b) < 70) return false
+  // 3. Chromatic separation: Red must strongly dominate Blue
+  // In human skin, (r - b) is typically < 65. In yellow fabric, (r - b) is often high but (r - g) is small.
+  if ((r - b) < 85) return false
 
-  // 4. Red must be greater than or equal to Green
-  if (r < g) return false
+  // 4. Red must be strictly greater than Green
+  if (r <= g) return false
 
-  // 5. Green must be greater than Blue (warm flame, eliminates magenta/purple LEDs)
+  // 5. Green must be greater than Blue (warm flame, eliminates purple/magenta LEDs)
   if (g < b) return false
 
   // 6. Distinct optical flame signatures:
-  // Signature A: Super-bright incandescent flame core (white-yellow peak glow)
-  const isIncandescentCore = (r >= 245 && g >= 210 && sum >= 580)
+  // Signature A: Super-bright incandescent flame core (white-yellow peak glow / sensor blowout)
+  // Direct emission creates extreme saturation in all channels:
+  const isIncandescentCore = (r >= 250 && g >= 225 && b >= 150 && sum >= 640)
 
-  // Signature B: Vibrant radiant orange/red flame (candle/lighter body)
-  // Low blue (b <= 75), strong red dominance (r - g >= 15), strong red-blue difference (r - b >= 90)
-  const isRadiantFlame = (r >= 230 && (r - b) >= 90 && b <= 75 && (r - g) >= 15)
+  // Signature B: Vibrant radiant orange/red flame body (candle, lighter, match)
+  // High red dominance over green (r - g >= 35), deep blue suppression (b <= 65), huge red-blue gap (r - b >= 110)
+  // (Yellow clothing typically has r - g < 30 and g > 175, failing this test)
+  const isRadiantFlame = (r >= 238 && (r - g) >= 35 && (r - b) >= 110 && b <= 65)
 
-  // Signature C: Brilliant yellow flame
-  // High red and green, deep blue suppression (b <= 90), large (r - b >= 120)
-  const isYellowFlame = (r >= 240 && g >= 160 && (r - b) >= 120 && b <= 90)
-
-  return isIncandescentCore || isRadiantFlame || isYellowFlame
+  return isIncandescentCore || isRadiantFlame
 }
 
 /**
@@ -68,10 +69,13 @@ export class FireDetector {
     this.canvas.height = this.sampleHeight
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })
 
-    this.history = []
-    this.maxHistory = 6
+    // Luminance buffer for frame-differencing flicker analysis
+    const totalPixels = this.sampleWidth * this.sampleHeight
+    this.prevLuminance = new Float32Array(totalPixels)
+    this.hasPrevFrame = false
+
     this.consecutiveDetections = 0
-    this.stableThreshold = 3 // Requires 3 consecutive confirmed frames
+    this.stableThreshold = 8 // Requires 8 consecutive positive frames (~150-200ms)
     this.simulated = false
   }
 
@@ -89,7 +93,7 @@ export class FireDetector {
     if (this.simulated) {
       return {
         isFire: true,
-        confidence: 0.95,
+        confidence: 0.96,
         bbox: { x: 0.35, y: 0.32, width: 0.30, height: 0.32 },
         flameCenter: { x: 0.50, y: 0.48 },
         pixelCount: 220,
@@ -108,16 +112,20 @@ export class FireDetector {
     const totalPixels = sampleWidth * sampleHeight
 
     let flamePixelCount = 0
+    let flickeringPixelCount = 0
     let minX = sampleWidth, maxX = 0
     let minY = sampleHeight, maxY = 0
     let sumX = 0, sumY = 0
 
-    // Scan pixels with strict flame optical filter
+    // Scan pixels with optical filter + temporal flicker check
     for (let i = 0; i < totalPixels; i++) {
       const idx = i * 4
       const r = data[idx]
       const g = data[idx + 1]
       const b = data[idx + 2]
+
+      // Current pixel luminance
+      const luma = 0.299 * r + 0.587 * g + 0.114 * b
 
       if (isFlamePixel(r, g, b)) {
         const x = i % sampleWidth
@@ -130,10 +138,22 @@ export class FireDetector {
         if (x > maxX) maxX = x
         if (y < minY) minY = y
         if (y > maxY) maxY = y
+
+        // Check for dynamic temporal flicker against previous frame
+        if (this.hasPrevFrame) {
+          const deltaLuma = Math.abs(luma - this.prevLuminance[i])
+          if (deltaLuma >= FLICKER_LUMA_DELTA) {
+            flickeringPixelCount++
+          }
+        }
       }
+
+      this.prevLuminance[i] = luma
     }
 
-    // ─── SPATIAL CLUSTERING & NOISE REJECTION ───
+    this.hasPrevFrame = true
+
+    // ─── SPATIAL CLUSTERING & SCALE REJECTION ───
     const boxW = maxX >= minX ? (maxX - minX + 1) : 0
     const boxH = maxY >= minY ? (maxY - minY + 1) : 0
     const boxArea = boxW * boxH
@@ -141,23 +161,29 @@ export class FireDetector {
     // Check 1: Must exceed minimum pixel threshold
     const hasMinPixels = flamePixelCount >= minPixels
 
-    // Check 2: Max frame ratio (reject ambient scene glare)
+    // Check 2: Max frame ratio (clothing covers large torso/frame, flames are smaller)
     const isBelowMaxRatio = (flamePixelCount / totalPixels) < MAX_FLAME_FRAME_RATIO
 
-    // Check 3: Bounding box dimension bounds (reject full-screen false positive boxes)
-    const isRealisticDimensions = (boxW < sampleWidth * 0.70) && (boxH < sampleHeight * 0.70)
+    // Check 3: Bounding box dimension bounds (reject whole-torso shirts)
+    const isRealisticDimensions = (boxW < sampleWidth * 0.45) && (boxH < sampleHeight * 0.50)
 
-    // Check 4: Cluster density — real flames are compact, not scattered single pixels
+    // Check 4: Cluster density — real flames are concentrated, not diffuse
     const clusterDensity = boxArea > 0 ? (flamePixelCount / boxArea) : 0
-    const isCompactCluster = clusterDensity >= 0.18
+    const isCompactCluster = clusterDensity >= 0.20
 
-    const isCandidate = hasMinPixels && isBelowMaxRatio && isRealisticDimensions && isCompactCluster
+    // Check 5: Dynamic Flame Flicker Turbulence
+    // Real flames flicker and oscillate due to convective air currents (8-20 Hz).
+    // Static clothing, yellow fabric, and room lamps have virtually 0 flicker.
+    const flickerRatio = flamePixelCount > 0 ? (flickeringPixelCount / flamePixelCount) : 0
+    const hasDynamicFlicker = flickerRatio >= MIN_FLICKER_RATIO
 
-    // ─── TEMPORAL CONSISTENCY ───
+    const isCandidate = hasMinPixels && isBelowMaxRatio && isRealisticDimensions && isCompactCluster && hasDynamicFlicker
+
+    // ─── TEMPORAL CONSISTENCY (MULTI-FRAME CONFIRMATION) ───
     if (isCandidate) {
       this.consecutiveDetections++
     } else {
-      this.consecutiveDetections = Math.max(0, this.consecutiveDetections - 1)
+      this.consecutiveDetections = Math.max(0, this.consecutiveDetections - 2)
     }
 
     const isConfirmed = this.consecutiveDetections >= this.stableThreshold
@@ -182,10 +208,10 @@ export class FireDetector {
     const normW = Math.min(sampleWidth, boxW + pad * 2) / sampleWidth
     const normH = Math.min(sampleHeight, boxH + pad * 2) / sampleHeight
 
-    // Calculate confidence score based on density and count
-    const densityBonus = Math.min(0.15, clusterDensity * 0.25)
-    const countScore = Math.min(0.12, (flamePixelCount / 80) * 0.12)
-    const confidence = Math.min(0.98, Math.max(0.75, 0.75 + densityBonus + countScore))
+    // Calculate confidence score based on density and flicker
+    const densityBonus = Math.min(0.12, clusterDensity * 0.2)
+    const flickerBonus = Math.min(0.10, flickerRatio * 0.2)
+    const confidence = Math.min(0.99, Math.max(0.78, 0.78 + densityBonus + flickerBonus))
 
     return {
       isFire: true,
@@ -205,8 +231,9 @@ export class FireDetector {
   }
 
   reset() {
-    this.history = []
     this.consecutiveDetections = 0
     this.simulated = false
+    this.hasPrevFrame = false
+    this.prevLuminance.fill(0)
   }
 }
