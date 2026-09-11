@@ -31,6 +31,25 @@ export default function Assessment() {
   const [issuing, setIssuing] = useState(false)
   const [showCompletion, setShowCompletion] = useState(false)
   const [scenario, setScenario] = useState(null)
+  const [attemptSeed, setAttemptSeed] = useState(() => Date.now())
+
+  // Fetch questions — always fresh per attempt, never served from stale cache
+  const { data: questions, isLoading } = useQuery({
+    queryKey: ['questions', scenarioId, attemptSeed],
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
+    queryFn: async () => {
+      if (!isSupabaseConfigured) return mockGetQuestions(scenarioId).data ?? []
+      const { data, error } = await supabase
+        .from('assessment_questions')
+        .select('*')
+        .eq('scenario_id', scenarioId)
+      if (error) throw error
+      return data ?? []
+    },
+  })
+
   const [shuffledQuestions, setShuffledQuestions] = useState(null)
 
   /** Fisher-Yates shuffle — returns a new shuffled array */
@@ -88,25 +107,6 @@ export default function Assessment() {
     }
     fetchScenario()
   }, [scenarioId])
-
-  const [attemptSeed, setAttemptSeed] = useState(() => Date.now())
-
-  // Fetch questions — always fresh per attempt, never served from stale cache
-  const { data: questions, isLoading } = useQuery({
-    queryKey: ['questions', scenarioId, attemptSeed],
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: 'always',
-    queryFn: async () => {
-      if (!isSupabaseConfigured) return mockGetQuestions(scenarioId).data ?? []
-      const { data, error } = await supabase
-        .from('assessment_questions')
-        .select('*')
-        .eq('scenario_id', scenarioId)
-      if (error) throw error
-      return data ?? []
-    },
-  })
 
   // Auto-generate fresh jumbled questions whenever questions data arrives or scenario changes
   useEffect(() => {
