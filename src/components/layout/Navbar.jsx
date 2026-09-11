@@ -154,10 +154,9 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Voice button — hidden on small mobile */}
+          {/* Voice button — always visible, even on mobile */}
           <button
             onClick={handleVoice}
-            className="navbar-secondary-btn"
             style={{
               width: 36,
               height: 36,
