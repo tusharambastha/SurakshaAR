@@ -654,9 +654,39 @@ export function mockGetFeedbackLogs(sessionId) {
 
 // ─── Assessment Questions ─────────────────────────────────────
 export function mockGetQuestions(scenarioId) {
-  const questions = DEMO_QUESTIONS.filter(q => q.scenario_id === scenarioId)
-    .sort((a, b) => a.order_index - b.order_index)
-  return { data: questions, error: null }
+  const matching = DEMO_QUESTIONS.filter(q => q.scenario_id === scenarioId)
+  if (!matching.length) return { data: [], error: null }
+
+  // 1. Shuffle all questions for this scenario
+  const shuffled = [...matching]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+
+  // 2. Pick 5 questions from the pool
+  const picked = shuffled.slice(0, Math.min(5, shuffled.length))
+
+  // 3. Jumble the options (A, B, C, D) for each question
+  const jumbled = picked.map((q, qIdx) => {
+    const numOpts = q.options_en?.length ?? 4
+    const indices = Array.from({ length: numOpts }, (_, i) => i)
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]]
+    }
+
+    return {
+      ...q,
+      order_index: qIdx + 1,
+      options_en: indices.map(idx => q.options_en[idx]),
+      options_hi: q.options_hi ? indices.map(idx => q.options_hi[idx]) : undefined,
+      options_sat: q.options_sat ? indices.map(idx => q.options_sat[idx]) : undefined,
+      correct_index: indices.indexOf(q.correct_index),
+    }
+  })
+
+  return { data: jumbled, error: null }
 }
 
 // ─── Assessment Attempts ──────────────────────────────────────

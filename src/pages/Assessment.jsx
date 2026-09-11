@@ -89,16 +89,20 @@ export default function Assessment() {
     fetchScenario()
   }, [scenarioId])
 
-  // Fetch questions
+  const [attemptSeed, setAttemptSeed] = useState(() => Date.now())
+
+  // Fetch questions — always fresh per attempt, never served from stale cache
   const { data: questions, isLoading } = useQuery({
-    queryKey: ['questions', scenarioId],
+    queryKey: ['questions', scenarioId, attemptSeed],
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
       if (!isSupabaseConfigured) return mockGetQuestions(scenarioId).data ?? []
       const { data, error } = await supabase
         .from('assessment_questions')
         .select('*')
         .eq('scenario_id', scenarioId)
-        .order('order_index')
       if (error) throw error
       return data ?? []
     },
@@ -112,8 +116,9 @@ export default function Assessment() {
   }, [questions])
 
   function handleStartAssessment() {
-    if (!questions || !questions.length) return
-    setShuffledQuestions(prepareJumbledQuestions(questions))
+    const pool = (questions && questions.length) ? questions : (mockGetQuestions(scenarioId).data ?? [])
+    if (!pool.length) return
+    setShuffledQuestions(prepareJumbledQuestions(pool))
     setQIndex(0)
     setSelected(null)
     setShowFeedback(false)
@@ -122,8 +127,10 @@ export default function Assessment() {
   }
 
   function handleRetryAssessment() {
-    if (questions && questions.length) {
-      setShuffledQuestions(prepareJumbledQuestions(questions))
+    setAttemptSeed(Date.now())
+    const fresh = mockGetQuestions(scenarioId).data ?? questions ?? []
+    if (fresh.length) {
+      setShuffledQuestions(prepareJumbledQuestions(fresh))
     }
     setQIndex(0)
     setSelected(null)
