@@ -64,16 +64,32 @@ class ErrorBoundary extends React.Component {
             <p style={{ color: '#4A4A4A', fontSize: '0.9rem', marginBottom: 20 }}>
               {this.state.error?.message || 'An unexpected error occurred.'}
             </p>
-            <button
-              onClick={() => { this.setState({ hasError: false }); window.location.href = '/dashboard' }}
-              style={{
-                background: '#E05A00', color: 'white', border: 'none',
-                borderRadius: 10, padding: '12px 24px', fontWeight: 700,
-                cursor: 'pointer', fontSize: '1rem',
-              }}
-            >
-              Return to Dashboard
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false })
+                  window.location.hash = '#/dashboard'
+                  window.location.reload()
+                }}
+                style={{
+                  background: '#E05A00', color: 'white', border: 'none',
+                  borderRadius: 10, padding: '12px 24px', fontWeight: 700,
+                  cursor: 'pointer', fontSize: '1rem', width: '100%',
+                }}
+              >
+                Return to Dashboard
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  background: 'transparent', color: '#4A4A4A', border: '1px solid #E3DDD5',
+                  borderRadius: 10, padding: '10px 20px', fontWeight: 600,
+                  cursor: 'pointer', fontSize: '0.9rem', width: '100%',
+                }}
+              >
+                Reload Page
+              </button>
+            </div>
           </div>
         </div>
       )
