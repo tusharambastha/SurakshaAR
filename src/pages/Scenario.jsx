@@ -469,7 +469,7 @@ export default function Scenario() {
       setCompletedSteps(prev => (prev.includes(0) ? prev : [...prev, 0]))
       setCurrentStep(1)
       setStepStartTime(Date.now())
-      setStepFeedback({ correct: wasCorrect, label: 'Fire Hazard Identified & Extinguisher Protocol Verified! ✓' })
+      setStepFeedback({ correct: wasCorrect, label: 'Fire Hazard Identified! Step 1 Complete ✓' })
       setTimeout(() => setStepFeedback(null), 2500)
     }
   }, [sessionId, user, currentStep, scenario])
