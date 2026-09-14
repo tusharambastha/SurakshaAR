@@ -903,12 +903,14 @@ export default function Scenario() {
     const t = threeRef.current
     if (!t.stepNodes.length) return
 
+    const hide3DInARStep0 = arMode && (isGasScenario || isFireScenario) && currentStep === 0
+
     t.stepNodes.forEach(node => {
       const isCompleted = completedSteps.includes(node.stepIndex)
       const isActive = node.stepIndex === currentStep
 
-      if (isCompleted) {
-        // Hide finished step or turn subtle green
+      if (isCompleted || hide3DInARStep0) {
+        // Hide during camera scanning or when finished
         node.group.visible = false
       } else {
         node.group.visible = true
@@ -935,7 +937,7 @@ export default function Scenario() {
         t.scene.background = new THREE.Color('#1F242D') // Crisp slate studio room
       }
     }
-  }, [currentStep, completedSteps, arMode])
+  }, [currentStep, completedSteps, arMode, isGasScenario, isFireScenario])
 
   if (isLoading || !cameraChecked) {
     return (

@@ -248,41 +248,121 @@ export default function GasLeakDetectionOverlay({
       </div>
 
       {/* ── AR RETICLE & VIRTUAL GAS SCENARIO VISUALIZATION ────────────── */}
+      {/* ── AR RETICLE / TARGETING GUIDE & VIRTUAL GAS SCENARIO VISUALIZATION ────────────── */}
       <div
         style={{
           position:  'absolute',
-          top:       detection.bbox ? `${detection.bbox.y * 100}%` : '42%',
+          top:       detection.bbox ? `${detection.bbox.y * 100}%` : '44%',
           left:      detection.bbox ? `${detection.bbox.x * 100}%` : '50%',
           transform: 'translate(-50%, -50%)',
-          width:     detection.bbox ? `${Math.max(140, detection.bbox.width * window.innerWidth * 0.9)}px` : '180px',
-          height:    detection.bbox ? `${Math.max(140, detection.bbox.height * window.innerHeight * 0.9)}px` : '180px',
+          width:     detection.bbox ? `${Math.max(170, detection.bbox.width * window.innerWidth * 0.9)}px` : '240px',
+          height:    detection.bbox ? `${Math.max(170, detection.bbox.height * window.innerHeight * 0.9)}px` : '240px',
           transition: 'all 0.15s ease-out',
+          pointerEvents: !isConfirmed ? 'auto' : 'none',
+          cursor: !isConfirmed ? 'pointer' : 'default',
         }}
+        onClick={() => {
+          if (!isConfirmed) handleSimulateSource()
+        }}
+        title={!isConfirmed ? 'Tap to trigger marker simulation' : ''}
       >
-        {/* Reticle Boundary */}
-        <div
-          style={{
-            position:     'absolute',
-            inset:        0,
-            borderRadius: isConfirmed ? '18px' : '50%',
-            border:       isConfirmed ? '3px solid #10B981' : isVerifying ? '2.5px dashed #F59E0B' : '2px dashed rgba(255, 255, 255, 0.5)',
-            boxShadow:    isConfirmed ? '0 0 25px rgba(16, 185, 129, 0.6), inset 0 0 15px rgba(16, 185, 129, 0.3)' : 'none',
-            transition:   'all 0.2s ease',
-          }}
-        />
-
-        {/* Center Target Dot when idle */}
+        {/* On-Screen Targeting Guide Frame when searching */}
         {!isConfirmed && (
+          <>
+            {/* Corner Brackets */}
+            <div style={{ position: 'absolute', top: -3, left: -3, width: 26, height: 26, borderTop: '3.5px solid #F59E0B', borderLeft: '3.5px solid #F59E0B', borderRadius: '4px 0 0 0' }} />
+            <div style={{ position: 'absolute', top: -3, right: -3, width: 26, height: 26, borderTop: '3.5px solid #F59E0B', borderRight: '3.5px solid #F59E0B', borderRadius: '0 4px 0 0' }} />
+            <div style={{ position: 'absolute', bottom: -3, left: -3, width: 26, height: 26, borderBottom: '3.5px solid #F59E0B', borderLeft: '3.5px solid #F59E0B', borderRadius: '0 0 0 4px' }} />
+            <div style={{ position: 'absolute', bottom: -3, right: -3, width: 26, height: 26, borderBottom: '3.5px solid #F59E0B', borderRight: '3.5px solid #F59E0B', borderRadius: '0 0 4px 0' }} />
+
+            {/* Inner dashed guide */}
+            <div
+              style={{
+                position:     'absolute',
+                inset:        8,
+                borderRadius: '16px',
+                border:       isVerifying ? '2px solid #10B981' : '1.5px dashed rgba(255, 255, 255, 0.45)',
+                background:   isVerifying ? 'rgba(16, 185, 129, 0.08)' : 'rgba(0, 0, 0, 0.15)',
+                display:      'flex',
+                flexDirection:'column',
+                alignItems:   'center',
+                justifyContent:'center',
+                gap:          6,
+                padding:      10,
+                textAlign:    'center',
+                boxShadow:    isVerifying ? '0 0 20px rgba(16, 185, 129, 0.4)' : 'none',
+              }}
+            >
+              {/* Ghost marker diamond icon */}
+              <div
+                style={{
+                  width:        '44px',
+                  height:       '44px',
+                  background:   isVerifying ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)',
+                  border:       isVerifying ? '2px solid #10B981' : '2px solid #F59E0B',
+                  borderRadius: '6px',
+                  transform:    'rotate(45deg)',
+                  display:      'flex',
+                  alignItems:   'center',
+                  justifyContent:'center',
+                  transition:   'all 0.2s ease',
+                }}
+              >
+                <div style={{ transform: 'rotate(-45deg)', fontSize: '1.2rem', lineHeight: 1 }}>⚠️</div>
+              </div>
+
+              {/* Target Instruction Label */}
+              <span
+                style={{
+                  color:      isVerifying ? '#34D399' : '#FDE047',
+                  fontSize:   '0.68rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                }}
+              >
+                {isVerifying ? 'Verifying Marker...' : 'Align Marker Here'}
+              </span>
+
+              {/* Verification Progress Bar */}
+              {isVerifying && (
+                <div style={{ width: '80%', height: '5px', background: 'rgba(255,255,255,0.2)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${Math.round((detection.verifyProgress || 0.5) * 100)}%`,
+                      background: '#10B981',
+                      transition: 'width 0.1s ease',
+                    }}
+                  />
+                </div>
+              )}
+
+              <span
+                style={{
+                  color:      'rgba(255, 255, 255, 0.7)',
+                  fontSize:   '0.58rem',
+                  fontWeight: 500,
+                  lineHeight: 1.2,
+                }}
+              >
+                {isVerifying ? 'Keep steady inside frame' : 'Normal objects & sprays rejected'}
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Reticle Boundary when Confirmed */}
+        {isConfirmed && (
           <div
             style={{
               position:     'absolute',
-              top:          '50%',
-              left:         '50%',
-              transform:    'translate(-50%, -50%)',
-              width:        8,
-              height:       8,
-              borderRadius: '50%',
-              background:   isVerifying ? '#F59E0B' : '#ffffff',
+              inset:        0,
+              borderRadius: '18px',
+              border:       '3px solid #10B981',
+              boxShadow:    '0 0 25px rgba(16, 185, 129, 0.7), inset 0 0 15px rgba(16, 185, 129, 0.35)',
+              transition:   'all 0.2s ease',
             }}
           />
         )}
@@ -434,56 +514,36 @@ export default function GasLeakDetectionOverlay({
           flexDirection: 'column',
           gap:           6,
           pointerEvents: 'auto',
+          zIndex:        20,
         }}
       >
-        {/* Toggle Training Marker Card Modal */}
-        <button
-          onClick={() => setShowMarkerModal(true)}
-          style={{
-            background:     'rgba(15, 23, 42, 0.85)',
-            border:         '1px solid rgba(255, 255, 255, 0.3)',
-            borderRadius:   '20px',
-            padding:        '6px 12px',
-            color:          '#ffffff',
-            fontSize:       '0.72rem',
-            fontWeight:     600,
-            cursor:         'pointer',
-            display:        'inline-flex',
-            alignItems:     'center',
-            gap:            6,
-            backdropFilter: 'blur(6px)',
-          }}
-        >
-          <FileText size={13} color="#FBBF24" />
-          <span>📄 View Training Marker</span>
-        </button>
-
-        {/* Place Simulated Training Source button */}
+        {/* Judge Demo / Fallback Trigger button */}
         {!isConfirmed ? (
           <button
             onClick={handleSimulateSource}
             style={{
-              background:     'rgba(224, 90, 0, 0.9)',
-              border:         '1px solid #FF8A3D',
+              background:     'linear-gradient(135deg, #E05A00 0%, #EA580C 100%)',
+              border:         '1.5px solid #FDBA74',
               borderRadius:   '20px',
-              padding:        '6px 12px',
+              padding:        '7px 14px',
               color:          '#ffffff',
-              fontSize:       '0.72rem',
-              fontWeight:     700,
+              fontSize:       '0.75rem',
+              fontWeight:     800,
               cursor:         'pointer',
               display:        'inline-flex',
               alignItems:     'center',
-              gap:            5,
-              boxShadow:      '0 4px 12px rgba(224, 90, 0, 0.4)',
+              gap:            6,
+              boxShadow:      '0 4px 14px rgba(224, 90, 0, 0.55)',
+              letterSpacing:  '0.02em',
             }}
           >
-            <span>🎯 Place Simulated Source</span>
+            <span>⚡ Judge Demo Trigger</span>
           </button>
         ) : (
           <button
             onClick={handleReset}
             style={{
-              background:     'rgba(71, 85, 105, 0.85)',
+              background:     'rgba(71, 85, 105, 0.9)',
               border:         '1px solid rgba(255, 255, 255, 0.3)',
               borderRadius:   '20px',
               padding:        '6px 12px',
@@ -500,6 +560,28 @@ export default function GasLeakDetectionOverlay({
             <span>Reset Source</span>
           </button>
         )}
+
+        {/* Toggle Training Marker Card Modal */}
+        <button
+          onClick={() => setShowMarkerModal(true)}
+          style={{
+            background:     'rgba(15, 23, 42, 0.88)',
+            border:         '1px solid rgba(255, 255, 255, 0.3)',
+            borderRadius:   '20px',
+            padding:        '6px 12px',
+            color:          '#ffffff',
+            fontSize:       '0.72rem',
+            fontWeight:     600,
+            cursor:         'pointer',
+            display:        'inline-flex',
+            alignItems:     'center',
+            gap:            6,
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          <FileText size={13} color="#FBBF24" />
+          <span>📄 View Training Marker</span>
+        </button>
       </div>
 
       {/* ── DESIGNATED TRAINING MARKER POPUP MODAL ────────────────────── */}
@@ -534,14 +616,14 @@ export default function GasLeakDetectionOverlay({
               Designated Gas Training Marker
             </h3>
             <p style={{ margin: '0 0 14px', fontSize: '0.74rem', color: '#64748B' }}>
-              Aim your camera at this high-contrast industrial training marker to trigger the AR gas-leak scenario.
+              Aim your camera at this high-contrast industrial training marker or use the demo button below.
             </p>
 
             {/* Industrial Hazard Diamond Pattern SVG */}
             <div
               style={{
-                width:        '180px',
-                height:       '180px',
+                width:        '170px',
+                height:       '170px',
                 margin:       '0 auto 16px',
                 background:   '#FBBF24',
                 border:       '10px solid #0F172A',
@@ -564,20 +646,43 @@ export default function GasLeakDetectionOverlay({
               </div>
             </div>
 
-            <p style={{ fontSize: '0.72rem', color: '#475569', margin: '0 0 16px' }}>
-              💡 <em>You can also test directly by clicking <strong>Place Simulated Source</strong> on the AR HUD.</em>
-            </p>
+            {/* Instant Demo Trigger button for Judges */}
+            <button
+              onClick={() => {
+                setShowMarkerModal(false)
+                handleSimulateSource()
+              }}
+              style={{
+                background:   'linear-gradient(135deg, #E05A00 0%, #EA580C 100%)',
+                color:        '#ffffff',
+                border:       'none',
+                borderRadius: '10px',
+                padding:      '10px 20px',
+                fontSize:     '0.84rem',
+                fontWeight:   800,
+                cursor:       'pointer',
+                width:        '100%',
+                marginBottom: '8px',
+                boxShadow:    '0 4px 14px rgba(224, 90, 0, 0.4)',
+                display:      'flex',
+                alignItems:   'center',
+                justifyContent:'center',
+                gap:          6,
+              }}
+            >
+              <span>⚡ Activate AR Scenario with this Marker</span>
+            </button>
 
             <button
               onClick={() => setShowMarkerModal(false)}
               style={{
-                background:   'var(--color-brand, #E05A00)',
-                color:        '#ffffff',
+                background:   '#F1F5F9',
+                color:        '#475569',
                 border:       'none',
                 borderRadius: '10px',
-                padding:      '10px 24px',
-                fontSize:     '0.84rem',
-                fontWeight:   700,
+                padding:      '8px 20px',
+                fontSize:     '0.78rem',
+                fontWeight:   600,
                 cursor:       'pointer',
                 width:        '100%',
               }}
