@@ -204,106 +204,375 @@ export default function Landing() {
         position: 'relative',
         overflow: 'hidden',
       }}>
+        <style>{`
+          @keyframes gasPlumeBillow {
+            0% { transform: scale(0.7) translateY(0); opacity: 0.85; }
+            50% { transform: scale(1.15) translateY(-14px); opacity: 0.6; }
+            100% { transform: scale(1.4) translateY(-26px); opacity: 0.1; }
+          }
+          @keyframes gasPlumePuff2 {
+            0% { transform: scale(0.6) translateY(2px); opacity: 0.9; }
+            50% { transform: scale(1.1) translateY(-18px); opacity: 0.55; }
+            100% { transform: scale(1.45) translateY(-32px); opacity: 0.08; }
+          }
+          @keyframes arHazardPulse {
+            0%, 100% { transform: scale(0.96); opacity: 0.65; }
+            50% { transform: scale(1.03); opacity: 0.95; }
+          }
+        `}</style>
+
         <div className="page-container" style={{ textAlign: 'center' }}>
           <p style={{
             color: '#888', fontSize: 'var(--text-xs)', fontWeight: 700,
             letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 24,
           }}>
-            AR TRAINING PREVIEW
+            AR TRAINING PREVIEWS
           </p>
-          {/* Simulated AR scene */}
+
+          {/* Responsive 2-Scenario Grid */}
           <div style={{
-            position: 'relative',
-            height: 280,
-            background: 'linear-gradient(180deg, #2A2A2A 0%, #1A1A1A 100%)',
-            borderRadius: 'var(--radius-xl)',
-            border: '1px solid #333',
-            overflow: 'hidden',
-            maxWidth: 700,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))',
+            gap: 24,
+            maxWidth: 980,
             margin: '0 auto',
+            textAlign: 'left',
           }}>
-            {/* Simulated camera feed background */}
+
+            {/* ── SCENARIO 1: FIRE HAZARD AR PREVIEW ── */}
             <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(135deg, #1E2A1E 0%, #2A1A0A 50%, #1A1A2A 100%)',
-              opacity: 0.8,
-            }} />
-
-            {/* AR overlays simulation */}
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {/* Fire effect */}
-              <div style={{
-                position: 'absolute', bottom: 40, left: '35%',
-                width: 60, height: 80,
-                background: 'radial-gradient(ellipse at bottom, #FF4500, #FF8C00, transparent)',
-                borderRadius: '50% 50% 20% 20%',
-                animation: 'pulse 0.8s ease-in-out infinite alternate',
-                filter: 'blur(2px)',
-              }} />
-
-              {/* Hazard marker — bottom-left, clear of other labels */}
-              <div style={{
-                position: 'absolute', bottom: '18%', left: '8%',
-                background: 'rgba(255,69,0,0.9)',
-                borderRadius: 8, padding: '5px 10px',
-                color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
-                boxShadow: '0 0 20px rgba(255,69,0,0.6)',
-                whiteSpace: 'nowrap',
-              }}>
-                ⚠ FIRE HAZARD
-              </div>
-
-              {/* Exit marker — top-right corner */}
-              <div style={{
-                position: 'absolute', top: '30%', right: '6%',
-                background: 'rgba(46,139,87,0.9)',
-                borderRadius: 8, padding: '5px 10px',
-                color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
-                boxShadow: '0 0 20px rgba(46,139,87,0.6)',
-                whiteSpace: 'nowrap',
-              }}>
-                🚪 FIRE EXIT →
-              </div>
-
-              {/* PPE marker — top-left, below the CAMERA AR MODE badge */}
-              <div style={{
-                position: 'absolute', top: '30%', left: '6%',
-                background: 'rgba(52,152,219,0.9)',
-                borderRadius: 8, padding: '5px 10px',
-                color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
-                boxShadow: '0 0 20px rgba(52,152,219,0.6)',
-                whiteSpace: 'nowrap',
-              }}>
-                🦺 PPE STATION
-              </div>
-
-              {/* AR indicator */}
-              <div style={{
-                position: 'absolute', top: 16, left: 16,
-                background: 'rgba(0,0,0,0.7)',
-                border: '1px solid #00FF88',
-                borderRadius: 'var(--radius-pill)',
-                padding: '4px 12px',
-                color: '#00FF88',
-                fontSize: 11, fontWeight: 700,
-                letterSpacing: '0.08em',
-              }}>
-                📷 CAMERA AR MODE
-              </div>
-
-              {/* Scan lines overlay */}
+              position: 'relative',
+              height: 280,
+              background: 'linear-gradient(180deg, #2A2A2A 0%, #1A1A1A 100%)',
+              borderRadius: 'var(--radius-xl)',
+              border: '1px solid #333',
+              overflow: 'hidden',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
+            }}>
+              {/* Simulated camera feed background */}
               <div style={{
                 position: 'absolute', inset: 0,
-                background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.01) 2px, rgba(255,255,255,0.01) 4px)',
-                pointerEvents: 'none',
+                background: 'linear-gradient(135deg, #1E2A1E 0%, #2A1A0A 50%, #1A1A2A 100%)',
+                opacity: 0.8,
               }} />
+
+              {/* AR overlays simulation */}
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {/* Fire effect */}
+                <div style={{
+                  position: 'absolute', bottom: 40, left: '35%',
+                  width: 60, height: 80,
+                  background: 'radial-gradient(ellipse at bottom, #FF4500, #FF8C00, transparent)',
+                  borderRadius: '50% 50% 20% 20%',
+                  animation: 'pulse 0.8s ease-in-out infinite alternate',
+                  filter: 'blur(2px)',
+                }} />
+
+                {/* Hazard marker — bottom-left */}
+                <div style={{
+                  position: 'absolute', bottom: '18%', left: '8%',
+                  background: 'rgba(255,69,0,0.9)',
+                  borderRadius: 8, padding: '5px 10px',
+                  color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
+                  boxShadow: '0 0 20px rgba(255,69,0,0.6)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  ⚠ FIRE HAZARD
+                </div>
+
+                {/* Exit marker — top-right corner */}
+                <div style={{
+                  position: 'absolute', top: '30%', right: '6%',
+                  background: 'rgba(46,139,87,0.9)',
+                  borderRadius: 8, padding: '5px 10px',
+                  color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
+                  boxShadow: '0 0 20px rgba(46,139,87,0.6)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  🚪 FIRE EXIT →
+                </div>
+
+                {/* PPE marker — top-left */}
+                <div style={{
+                  position: 'absolute', top: '30%', left: '6%',
+                  background: 'rgba(52,152,219,0.9)',
+                  borderRadius: 8, padding: '5px 10px',
+                  color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
+                  boxShadow: '0 0 20px rgba(52,152,219,0.6)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  🦺 PPE STATION
+                </div>
+
+                {/* AR Mode indicator */}
+                <div style={{
+                  position: 'absolute', top: 16, left: 16,
+                  background: 'rgba(0,0,0,0.7)',
+                  border: '1px solid #00FF88',
+                  borderRadius: 'var(--radius-pill)',
+                  padding: '4px 12px',
+                  color: '#00FF88',
+                  fontSize: 11, fontWeight: 700,
+                  letterSpacing: '0.08em',
+                }}>
+                  📷 CAMERA AR MODE
+                </div>
+
+                {/* Scenario Module Pill */}
+                <div style={{
+                  position: 'absolute', top: 16, right: 16,
+                  background: 'rgba(15,23,42,0.85)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 'var(--radius-pill)',
+                  padding: '3px 10px',
+                  color: '#CBD5E1',
+                  fontSize: 10, fontWeight: 700,
+                  letterSpacing: '0.04em',
+                }}>
+                  🔥 FIRE PROTOCOL
+                </div>
+
+                {/* Communication Flow Footer */}
+                <div style={{
+                  position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+                  background: 'rgba(0,0,0,0.6)',
+                  borderRadius: 6, padding: '2px 10px',
+                  color: 'rgba(255,255,255,0.7)',
+                  fontSize: 9.5, fontWeight: 600,
+                  letterSpacing: '0.02em',
+                  whiteSpace: 'nowrap',
+                }}>
+                  Camera AR → Flame Detection → PPE Donning → Safe Exit
+                </div>
+
+                {/* Scan lines overlay */}
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.01) 2px, rgba(255,255,255,0.01) 4px)',
+                  pointerEvents: 'none',
+                }} />
+              </div>
             </div>
+
+            {/* ── SCENARIO 2: GAS LEAK & CONFINED SPACE PROTOCOL PREVIEW ── */}
+            <div style={{
+              position: 'relative',
+              height: 280,
+              background: 'linear-gradient(180deg, #2A2A2A 0%, #1A1A1A 100%)',
+              borderRadius: 'var(--radius-xl)',
+              border: '1px solid #333',
+              overflow: 'hidden',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
+            }}>
+              {/* Simulated camera feed background — industrial plant lighting */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(135deg, #14202A 0%, #1A2420 50%, #221A26 100%)',
+                opacity: 0.85,
+              }} />
+
+              {/* AR overlays simulation */}
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                
+                {/* Industrial Gas Pipe & Valve Assembly with Leak Point */}
+                <svg
+                  width="130"
+                  height="95"
+                  viewBox="0 0 130 95"
+                  fill="none"
+                  style={{
+                    position: 'absolute',
+                    bottom: 24,
+                    right: '20%',
+                    filter: 'drop-shadow(0 6px 12px rgba(0,0,0,0.6))',
+                  }}
+                >
+                  {/* Base floor shadow */}
+                  <ellipse cx="65" cy="88" rx="55" ry="6" fill="rgba(0,0,0,0.45)" />
+
+                  {/* Main Steel Pipeline */}
+                  <rect x="8" y="52" width="114" height="20" rx="3" fill="url(#steelPipeGrad)" stroke="#334155" strokeWidth="1.5" />
+                  
+                  {/* Flange Collar & Bolt Details */}
+                  <rect x="22" y="47" width="9" height="30" rx="2" fill="#475569" stroke="#1E293B" strokeWidth="1" />
+                  <rect x="99" y="47" width="9" height="30" rx="2" fill="#475569" stroke="#1E293B" strokeWidth="1" />
+                  <circle cx="26.5" cy="52" r="1.8" fill="#94A3B8" />
+                  <circle cx="26.5" cy="72" r="1.8" fill="#94A3B8" />
+                  <circle cx="103.5" cy="52" r="1.8" fill="#94A3B8" />
+                  <circle cx="103.5" cy="72" r="1.8" fill="#94A3B8" />
+
+                  {/* Valve Riser & Bonnet */}
+                  <rect x="56" y="34" width="18" height="20" rx="2" fill="#64748B" stroke="#1E293B" strokeWidth="1" />
+                  <rect x="63" y="20" width="4" height="16" fill="#CBD5E1" stroke="#475569" strokeWidth="0.8" />
+
+                  {/* Emergency Valve Handwheel */}
+                  <ellipse cx="65" cy="18" rx="17" ry="6.5" fill="#DC2626" stroke="#991B1B" strokeWidth="1.5" />
+                  <ellipse cx="65" cy="18" rx="11" ry="4" fill="#B91C1C" />
+                  <circle cx="65" cy="18" r="2.8" fill="#FDE047" />
+
+                  {/* Leak Emitter Joint Glow */}
+                  <circle cx="65" cy="52" r="5.5" fill="#38BDF8" opacity="0.85" filter="blur(1px)" />
+
+                  <defs>
+                    <linearGradient id="steelPipeGrad" x1="8" y1="52" x2="8" y2="72" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#64748B" />
+                      <stop offset="0.35" stopColor="#94A3B8" />
+                      <stop offset="0.75" stopColor="#475569" />
+                      <stop offset="1" stopColor="#1E293B" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+
+                {/* Visible Semi-Transparent Grey/White AR Gas Plume (with subtle blue/grey tones) */}
+                <div style={{
+                  position: 'absolute', bottom: 55, right: '28%',
+                  width: 75, height: 105,
+                  pointerEvents: 'none',
+                }}>
+                  {/* Billowing Plume Puff 1 */}
+                  <div style={{
+                    position: 'absolute', bottom: 0, left: '46%',
+                    width: 48, height: 55,
+                    borderRadius: '50% 50% 35% 35%',
+                    background: 'radial-gradient(ellipse at bottom, rgba(241, 245, 249, 0.85) 0%, rgba(186, 230, 253, 0.5) 45%, rgba(148, 163, 184, 0.22) 75%, transparent 100%)',
+                    filter: 'blur(3px)',
+                    animation: 'gasPlumeBillow 2.2s ease-out infinite',
+                  }} />
+
+                  {/* Billowing Plume Puff 2 */}
+                  <div style={{
+                    position: 'absolute', bottom: 12, left: '38%',
+                    width: 58, height: 66,
+                    borderRadius: '50% 50% 40% 40%',
+                    background: 'radial-gradient(ellipse at bottom, rgba(224, 242, 254, 0.8) 0%, rgba(203, 213, 225, 0.45) 50%, rgba(148, 163, 184, 0.15) 80%, transparent 100%)',
+                    filter: 'blur(4px)',
+                    animation: 'gasPlumePuff2 2.6s ease-out infinite 0.7s',
+                  }} />
+
+                  {/* Emitter source point */}
+                  <div style={{
+                    position: 'absolute', bottom: -2, left: '50%', transform: 'translateX(-50%)',
+                    width: 12, height: 12, borderRadius: '50%',
+                    background: 'rgba(56, 189, 248, 0.95)',
+                    boxShadow: '0 0 14px rgba(56, 189, 248, 0.85)',
+                  }} />
+                </div>
+
+                {/* AR Danger Zone Ground Perimeter Ring */}
+                <div style={{
+                  position: 'absolute', bottom: 20, right: '16%',
+                  width: 140, height: 42,
+                  borderRadius: '50%',
+                  border: '1.5px dashed rgba(239, 68, 68, 0.75)',
+                  boxShadow: '0 0 15px rgba(239, 68, 68, 0.35), inset 0 0 10px rgba(239, 68, 68, 0.2)',
+                  animation: 'arHazardPulse 2.2s ease-in-out infinite',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{
+                    fontSize: 8, fontWeight: 800, color: '#FCA5A5', letterSpacing: '0.04em',
+                    background: 'rgba(220, 38, 38, 0.8)', padding: '1px 6px', borderRadius: 4,
+                  }}>
+                    HAZARD ZONE: 10m
+                  </span>
+                </div>
+
+                {/* Hazard marker — bottom-left, matching Fire marker styling */}
+                <div style={{
+                  position: 'absolute', bottom: '18%', left: '8%',
+                  background: 'rgba(224, 90, 0, 0.94)', // SurakshaAR brand safety orange
+                  borderRadius: 8, padding: '5px 10px',
+                  color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
+                  boxShadow: '0 0 20px rgba(224, 90, 0, 0.65)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  ⚠ GAS LEAK HAZARD
+                </div>
+
+                {/* Direction marker — top-right corner, matching Exit marker */}
+                <div style={{
+                  position: 'absolute', top: '30%', right: '6%',
+                  background: 'rgba(46,139,87,0.9)', // Safety emerald green
+                  borderRadius: 8, padding: '5px 10px',
+                  color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
+                  boxShadow: '0 0 20px rgba(46,139,87,0.6)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  🛡️ SAFE DISTANCE →
+                </div>
+
+                {/* AR Gas Detected indicator — top-left */}
+                <div style={{
+                  position: 'absolute', top: '30%', left: '6%',
+                  background: 'rgba(14, 165, 233, 0.9)', // AR Cyan indicator
+                  borderRadius: 8, padding: '5px 10px',
+                  color: 'white', fontSize: 'clamp(10px, 2.5vw, 13px)', fontWeight: 700,
+                  boxShadow: '0 0 20px rgba(14, 165, 233, 0.6)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  💨 GAS DETECTED
+                </div>
+
+                {/* AR Mode indicator */}
+                <div style={{
+                  position: 'absolute', top: 16, left: 16,
+                  background: 'rgba(0,0,0,0.7)',
+                  border: '1px solid #00FF88',
+                  borderRadius: 'var(--radius-pill)',
+                  padding: '4px 12px',
+                  color: '#00FF88',
+                  fontSize: 11, fontWeight: 700,
+                  letterSpacing: '0.08em',
+                }}>
+                  📷 CAMERA AR MODE
+                </div>
+
+                {/* Scenario Module Pill */}
+                <div style={{
+                  position: 'absolute', top: 16, right: 16,
+                  background: 'rgba(15,23,42,0.85)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  borderRadius: 'var(--radius-pill)',
+                  padding: '3px 10px',
+                  color: '#CBD5E1',
+                  fontSize: 10, fontWeight: 700,
+                  letterSpacing: '0.04em',
+                }}>
+                  💨 GAS & CONFINED SPACE
+                </div>
+
+                {/* Communication Flow Footer */}
+                <div style={{
+                  position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+                  background: 'rgba(0,0,0,0.6)',
+                  borderRadius: 6, padding: '2px 10px',
+                  color: 'rgba(255,255,255,0.7)',
+                  fontSize: 9.5, fontWeight: 600,
+                  letterSpacing: '0.02em',
+                  whiteSpace: 'nowrap',
+                }}>
+                  Camera AR → Gas Leak Detection → Hazard Zone → Safe Evacuation
+                </div>
+
+                {/* Scan lines overlay */}
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.01) 2px, rgba(255,255,255,0.01) 4px)',
+                  pointerEvents: 'none',
+                }} />
+              </div>
+            </div>
+
           </div>
 
           <p style={{
-            color: '#666', fontSize: 'var(--text-xs)', marginTop: 12,
+            color: '#888', fontSize: 'var(--text-xs)', marginTop: 18,
           }}>
             Real camera feed + AR hazard overlays + interactive safety tasks
+          </p>
+          <p style={{
+            color: '#666', fontSize: 11, marginTop: 4,
+          }}>
+            ℹ️ Visual AR preview for training simulation demonstration • Does not measure actual gas concentration
           </p>
         </div>
       </section>
