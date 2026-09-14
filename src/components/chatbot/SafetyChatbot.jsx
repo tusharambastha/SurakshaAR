@@ -386,126 +386,122 @@ export default function SafetyChatbot() {
             animation: 'slideUpFade 0.25s ease',
           }}
         >
-          {/* Header */}
+          {/* Header with Integrated Chatbot-Only 4-Language Bar */}
           <div style={{
             background: 'var(--color-brand)',
-            padding: '12px 14px',
-            display: 'flex', alignItems: 'center', gap: 10,
-            flexShrink: 0,
-          }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.22)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Bot size={19} color="white" />
-            </div>
-            <div>
-              <p style={{ color: 'white', fontWeight: 800, fontSize: '0.92rem', lineHeight: 1.2 }}>
-                Suraksha Saathi
-              </p>
-              <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.68rem', fontWeight: 500 }}>
-                Curated Safety Knowledge Base
-              </p>
-            </div>
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                background: 'rgba(0,0,0,0.18)', padding: '2px 8px', borderRadius: '12px',
-              }}>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#4AFF91' }} />
-                <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.04em' }}>
-                  ONLINE
-                </span>
-              </div>
-              <button
-                onClick={handleClose}
-                aria-label="Close chat"
-                style={{
-                  background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%',
-                  width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', color: 'white',
-                }}
-              >
-                <X size={15} />
-              </button>
-            </div>
-          </div>
-
-          {/* 4-Language Selector Bar (English, Hindi, Hinglish, Santali) */}
-          <div style={{
-            background: 'var(--color-surface-alt, #F8F6F2)',
-            padding: '7px 10px',
-            borderBottom: '1px solid var(--color-border)',
+            padding: '12px 14px 10px',
             display: 'flex',
-            alignItems: 'center',
-            gap: 5,
+            flexDirection: 'column',
+            gap: 9,
             flexShrink: 0,
-            overflowX: 'auto',
-            scrollbarWidth: 'none',
+            boxShadow: '0 3px 10px rgba(224, 90, 0, 0.25)',
           }}>
-            <span style={{
-              fontSize: '0.68rem', fontWeight: 700,
-              color: 'var(--color-text-muted)',
-              display: 'flex', alignItems: 'center', gap: 3,
-              marginRight: 2, flexShrink: 0,
-            }}>
-              🌐 Lang:
-            </span>
-
-            {CHAT_LANGUAGES.map(item => {
-              const isSelected = chatLang === item.code
-              return (
+            {/* Top Row: Bot Icon, Title, Online Status, Close */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.22)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <Bot size={20} color="white" />
+              </div>
+              <div>
+                <p style={{ color: 'white', fontWeight: 800, fontSize: '0.94rem', lineHeight: 1.2 }}>
+                  Suraksha Saathi
+                </p>
+                <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.67rem', fontWeight: 500 }}>
+                  Curated Knowledge Base • Chatbot Only
+                </p>
+              </div>
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  background: 'rgba(0,0,0,0.22)', padding: '3px 8px', borderRadius: '12px',
+                }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#4AFF91' }} />
+                  <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.04em' }}>
+                    ONLINE
+                  </span>
+                </div>
                 <button
-                  key={item.code}
-                  onClick={() => handleLanguageChange(item.code)}
-                  title={item.voice ? `${item.name} (${item.voiceBadge})` : `${item.name} (Ol Chiki Text)`}
+                  onClick={handleClose}
+                  aria-label="Close chat"
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: '4px 9px',
-                    borderRadius: '16px',
-                    fontSize: '0.72rem',
-                    fontWeight: isSelected ? 700 : 500,
-                    border: isSelected ? '1.5px solid var(--color-brand)' : '1px solid var(--color-border)',
-                    background: isSelected ? 'var(--color-brand)' : 'var(--color-surface)',
-                    color: isSelected ? '#ffffff' : 'var(--color-text-primary)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    transition: 'all 0.15s ease',
-                    boxShadow: isSelected ? '0 2px 6px rgba(224,90,0,0.25)' : 'none',
+                    background: 'rgba(255,255,255,0.18)', border: 'none', borderRadius: '50%',
+                    width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', color: 'white', transition: 'background 0.15s',
                   }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.18)'}
                 >
-                  <span>{item.native}</span>
-                  {item.voice ? (
-                    <span style={{
-                      fontSize: '0.62rem',
-                      opacity: isSelected ? 0.95 : 0.7,
-                      background: isSelected ? 'rgba(255,255,255,0.22)' : 'rgba(224,90,0,0.1)',
-                      color: isSelected ? '#ffffff' : 'var(--color-brand)',
-                      padding: '1px 4px',
-                      borderRadius: '8px',
-                      lineHeight: 1.1,
-                    }}>
-                      🎙️
-                    </span>
-                  ) : (
-                    <span style={{
-                      fontSize: '0.62rem',
-                      opacity: isSelected ? 0.95 : 0.6,
-                      background: isSelected ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.06)',
-                      padding: '1px 4px',
-                      borderRadius: '8px',
-                      lineHeight: 1.1,
-                    }}>
-                      📝
-                    </span>
-                  )}
+                  <X size={15} />
                 </button>
-              )
-            })}
+              </div>
+            </div>
+
+            {/* In-Header Dedicated Language Bar (4 Languages, 3 with Voice) */}
+            <div style={{
+              background: 'rgba(0, 0, 0, 0.22)',
+              borderRadius: '12px',
+              padding: '3px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              justifyContent: 'space-between',
+            }}>
+              {CHAT_LANGUAGES.map(item => {
+                const isSelected = chatLang === item.code
+                return (
+                  <button
+                    key={item.code}
+                    onClick={() => handleLanguageChange(item.code)}
+                    title={
+                      item.voice
+                        ? `${item.name} (${item.voiceBadge} supported)`
+                        : `${item.name} (Ol Chiki Text)`
+                    }
+                    style={{
+                      flex: 1,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 3,
+                      padding: '5px 3px',
+                      borderRadius: '9px',
+                      fontSize: '0.72rem',
+                      fontWeight: isSelected ? 800 : 600,
+                      border: 'none',
+                      background: isSelected ? '#ffffff' : 'transparent',
+                      color: isSelected ? 'var(--color-brand, #E05A00)' : 'rgba(255,255,255,0.92)',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.18s ease',
+                      boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.2)' : 'none',
+                    }}
+                  >
+                    <span>{item.native}</span>
+                    {item.voice ? (
+                      <span style={{
+                        fontSize: '0.62rem',
+                        lineHeight: 1,
+                        opacity: isSelected ? 1 : 0.8,
+                      }}>
+                        🎙️
+                      </span>
+                    ) : (
+                      <span style={{
+                        fontSize: '0.62rem',
+                        lineHeight: 1,
+                        opacity: isSelected ? 1 : 0.7,
+                      }}>
+                        📝
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* Voice status notice if any */}
