@@ -66,13 +66,24 @@ export function olChikiToHindi(str) {
 export const TTS_LANG = {
   en: 'en-IN',
   hi: 'hi-IN',
-  sat: 'hi-IN', // Uses regional Indian phonetic voice with Ol Chiki transliteration
+  hinglish: 'hi-IN', // Indian phonetics for natural Hinglish speech
+  sat: 'hi-IN', // Regional Indian phonetic voice with Ol Chiki transliteration
+}
+
+export const VOICE_LANGUAGES = [
+  { code: 'en', label: 'English', stt: 'en-IN', tts: 'en-IN' },
+  { code: 'hi', label: 'Hindi', stt: 'hi-IN', tts: 'hi-IN' },
+  { code: 'hinglish', label: 'Hinglish', stt: 'hi-IN', tts: 'hi-IN' },
+]
+
+export function isVoiceSupported(lang) {
+  return ['en', 'hi', 'hinglish'].includes(lang)
 }
 
 let currentUtterance = null
 
 /** Speak text aloud. Returns false if TTS not supported. */
-export function speak(text, lang = 'en') {
+export function speak(text, lang = 'en', onEnd = null) {
   if (!window.speechSynthesis) return false
   const ttsLang = TTS_LANG[lang] || 'en-IN'
 
@@ -90,6 +101,17 @@ export function speak(text, lang = 'en') {
   utterance.rate = 0.88
   utterance.pitch = 1
   utterance.volume = 1
+
+  if (onEnd) {
+    utterance.onend = () => {
+      currentUtterance = null
+      onEnd()
+    }
+    utterance.onerror = () => {
+      currentUtterance = null
+      onEnd()
+    }
+  }
 
   // Try to find a matching Indian voice (hi-IN, bn-IN, or en-IN)
   const voices = window.speechSynthesis.getVoices()
@@ -131,7 +153,7 @@ export function getVoices() {
  * Start speech recognition (STT). Returns a controller object.
  * Only works in Chrome and Android WebView.
  * 
- * @param {string} lang - 'en' | 'hi'
+ * @param {string} lang - 'en' | 'hi' | 'hinglish'
  * @param {function} onResult - called with recognized text
  * @param {function} onError - called with error message
  * @returns {{ stop: function }} controller
@@ -144,7 +166,8 @@ export function startListening(lang, onResult, onError) {
   }
 
   const recognition = new SpeechRecognition()
-  recognition.lang = TTS_LANG[lang] ?? 'en-IN'
+  const sttLang = lang === 'en' ? 'en-IN' : 'hi-IN'
+  recognition.lang = sttLang
   recognition.interimResults = false
   recognition.maxAlternatives = 1
   recognition.continuous = false

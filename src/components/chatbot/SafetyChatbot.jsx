@@ -1,32 +1,145 @@
 /**
- * SurakshaAR — Safety Chatbot Component
+ * SurakshaAR — Safety Chatbot Component (Suraksha Saathi)
  *
- * NOT an LLM — keyword-based curated knowledge base matcher.
- * Clearly labelled as "Curated Safety Knowledge Base".
- * Safe, deterministic fallback for unrecognized queries.
+ * Curated industrial safety knowledge base matcher.
+ * Features:
+ * - 4-Language bar: English, हिंदी, Hinglish, ᱥᱟᱱᱛᱟᱲᱤ
+ * - 3-Language voice support: English (en-IN), Hindi (hi-IN), Hinglish (hi-IN)
+ * - Voice Input (Speech-to-Text) with live listening indicator
+ * - Voice Output (Text-to-Speech) with speaker toggle & stop
+ * - Quick suggested question pills
+ * - Safe, deterministic fallback for unrecognized queries
  */
-import { useState, useRef } from 'react'
-import { MessageCircle, X, Send, Bot, Volume2 } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { MessageCircle, X, Send, Bot, Volume2, VolumeX, Mic, MicOff, Sparkles } from 'lucide-react'
 import { useLang } from '../../contexts/LanguageContext'
 import { queryKnowledgeBase } from '../../lib/safetyKnowledge'
-import { speak, isTTSSupported } from '../../lib/voice'
+import { speak, stopSpeech, startListening, isTTSSupported, isVoiceSupported } from '../../lib/voice'
 
-const WELCOME_MESSAGE = {
-  id: 'welcome',
-  role: 'bot',
-  text: "👷 Hello! I'm your Safety Knowledge Assistant. Ask me about fire response, gas leaks, PPE, or emergency procedures. I use a curated industrial safety knowledge base.",
+export const CHAT_LANGUAGES = [
+  { code: 'en', name: 'English', native: 'English', flag: '🇬🇧', voice: true, voiceBadge: 'Voice 🎙️' },
+  { code: 'hi', name: 'Hindi', native: 'हिंदी', flag: '🇮🇳', voice: true, voiceBadge: 'आवाज़ 🎙️' },
+  { code: 'hinglish', name: 'Hinglish', native: 'Hinglish', flag: '🇮🇳', voice: true, voiceBadge: 'Awaaz 🎙️' },
+  { code: 'sat', name: 'Santali', native: 'ᱥᱟᱱᱛᱟᱲᱤ', flag: '🌿', voice: false, voiceBadge: 'Text' },
+]
+
+const WELCOME_MESSAGES = {
+  en: {
+    id: 'welcome-en',
+    role: 'bot',
+    text: "👷 Hello! I am your Suraksha Saathi safety assistant. Ask me about fire response, gas leaks, PPE safety gear, or emergency procedures.\n\nYou can also use the 🎙️ Mic button to speak in English, Hindi, or Hinglish!",
+    source: 'National Industrial Safety Protocol',
+  },
+  hi: {
+    id: 'welcome-hi',
+    role: 'bot',
+    text: "👷 नमस्ते! मैं आपका सुरक्षा साथी हूँ। मुझसे आग से बचाव, गैस रिसाव, PPE सुरक्षा उपकरण, या आपातकालीन प्रक्रियाओं के बारे में पूछें।\n\nआप 🎙️ माइक बटन दबाकर हिंदी, हिंग्लिश या अंग्रेज़ी में बोलकर भी पूछ सकते हैं!",
+    source: 'राष्ट्रीय औद्योगिक सुरक्षा प्रोटोकॉल',
+  },
+  hinglish: {
+    id: 'welcome-hinglish',
+    role: 'bot',
+    text: "👷 Namaste! Main aapka Suraksha Saathi hoon. Aap mujhse Fire safety, Gas leak, PPE kit, ya Emergency evacuation ke baare mein likhkar ya 🎙️ Mic button se bolkar pooch sakte hain!",
+    source: 'National Industrial Safety Protocol',
+  },
+  sat: {
+    id: 'welcome-sat',
+    role: 'bot',
+    text: "👷 ᱡᱚᱦᱟᱨ! ᱤᱧ ᱟᱢᱤᱡ ᱥᱩᱨᱠᱷᱟ ᱥᱟᱛᱷᱤ (Suraksha Saathi) ᱠᱟᱹᱱᱟᱹᱧ᱾ ᱥᱮᱸᱜᱮᱞ ᱤᱬᱤᱡ, ᱜᱮᱥ ᱞᱤᱠ, PPE ᱥᱟᱢᱟᱱ ᱟᱨ ᱟᱯᱟᱛᱠᱟᱞ ᱱᱤᱭᱟᱹᱢ ᱠᱚ ᱵᱟᱵᱚᱛ ᱠᱩᱞᱤᱭ ᱢᱮ᱾",
+    source: 'ᱡᱟᱹᱛᱤᱭᱟᱹᱨᱤ ᱠᱟᱹᱨᱜᱟᱲ ᱥᱩᱨᱠᱷᱟ ᱯᱨᱳᱴᱳᱠᱳᱞ',
+  },
+}
+
+const PLACEHOLDERS = {
+  en: 'Ask or speak about fire, gas leak, PPE…',
+  hi: 'आग, गैस रिसाव, PPE के बारे में पूछें या बोलें…',
+  hinglish: 'Fire, gas leak, PPE ke baare mein likhein ya bolein…',
+  sat: 'ᱥᱮᱸᱜᱮᱞ, ᱜᱮᱥ ᱞᱤᱠ, PPE ᱵᱟᱵᱚᱛ ᱠᱩᱞᱤᱭ ᱢᱮ…',
+}
+
+const QUICK_SUGGESTIONS = {
+  en: [
+    { label: '🔴 Fire Extinguisher', query: 'How to use a fire extinguisher?' },
+    { label: '⚡ Electrical Fire', query: 'Which extinguisher for electrical fire?' },
+    { label: '🦺 PPE Kit', query: 'What PPE should I wear during a fire?' },
+    { label: '💨 Gas Leak', query: 'How do I detect a gas leak?' },
+  ],
+  hi: [
+    { label: '🔴 अग्निशामक', query: 'अग्निशामक का उपयोग कैसे करें?' },
+    { label: '⚡ बिजली की आग', query: 'बिजली की आग के लिए कौन सा अग्निशामक?' },
+    { label: '🦺 PPE उपकरण', query: 'आग के दौरान कौन सा PPE पहनें?' },
+    { label: '💨 गैस रिसाव', query: 'गैस रिसाव कैसे पहचानें?' },
+  ],
+  hinglish: [
+    { label: '🔴 Fire Extinguisher', query: 'Fire extinguisher kaise use karein?' },
+    { label: '⚡ Bijli ki Aag', query: 'Bijli ki aag ke liye kaunsa extinguisher use karein?' },
+    { label: '🦺 PPE Kit', query: 'Fire emergency mein kaunsa PPE pehnein?' },
+    { label: '💨 Gas Leak', query: 'Gas leak kaise detect karein?' },
+  ],
+  sat: [
+    { label: '🔴 ᱥᱮᱸᱜᱮᱞ ᱤᱬᱤᱡᱤᱡ', query: 'ᱥᱮᱸᱜᱮᱞ ᱤᱬᱤᱡᱤᱡ ᱪᱮᱫ ᱞᱮᱠᱟ ᱵᱮᱵᱷᱟᱨᱟ?' },
+    { label: '⚡ ᱵᱤᱡᱽᱞᱤ ᱥᱮᱸᱜᱮᱞ', query: 'ᱵᱤᱡᱽᱞᱤ ᱥᱮᱸᱜᱮᱞ ᱞᱟᱹᱜᱤᱫ ᱚᱠᱟ ᱤᱬᱤᱡᱤᱡ?' },
+    { label: '🦺 PPE ᱥᱟᱢᱟᱱ', query: 'ᱥᱮᱸᱜᱮᱞ ᱚᱠᱛᱚ ᱪᱮᱫ PPE ᱦᱚᱨᱚᱜ ᱞᱟᱹᱠᱛᱤ?' },
+    { label: '💨 ᱜᱮᱥ ᱞᱤᱠ', query: 'ᱜᱮᱥ ᱞᱤᱠ ᱪᱮᱫ ᱞᱮᱠᱟ ᱪᱤᱱᱦᱟᱹᱣᱟ?' },
+  ],
 }
 
 export default function SafetyChatbot() {
-  const { lang } = useLang()
-  const [open, setOpen]                 = useState(false)
+  const { lang: globalLang } = useLang()
+  const [open, setOpen]                     = useState(false)
   const [badgeDismissed, setBadgeDismissed] = useState(false)
-  const [input, setInput]               = useState('')
-  const [messages, setMessages]         = useState([WELCOME_MESSAGE])
-  const [typing, setTyping]             = useState(false)
-  const bottomRef = useRef()
-  const inputRef  = useRef()
+  const [chatLang, setChatLang]             = useState(() => {
+    return localStorage.getItem('sar_chat_lang') || (['en', 'hi', 'sat'].includes(globalLang) ? globalLang : 'en')
+  })
+  const [input, setInput]                   = useState('')
+  const [messages, setMessages]             = useState(() => [WELCOME_MESSAGES[chatLang] || WELCOME_MESSAGES.en])
+  const [typing, setTyping]                 = useState(false)
+  const [isListening, setIsListening]       = useState(false)
+  const [speakingMsgId, setSpeakingMsgId]   = useState(null)
+  const [voiceNotice, setVoiceNotice]       = useState(null)
 
+  const bottomRef       = useRef(null)
+  const inputRef        = useRef(null)
+  const recognitionRef  = useRef(null)
+
+  // Sync initial welcome message if user switches chatLang and chat is empty/welcome
+  function handleLanguageChange(newLang) {
+    if (newLang === chatLang) return
+    setChatLang(newLang)
+    localStorage.setItem('sar_chat_lang', newLang)
+
+    // Stop ongoing speech & listening
+    stopSpeech()
+    setSpeakingMsgId(null)
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    }
+
+    // Add a stylish system notification in the chat
+    const langObj = CHAT_LANGUAGES.find(l => l.code === newLang)
+    const noticeText = {
+      en: '🌐 Language switched to English (Voice enabled 🎙️)',
+      hi: '🌐 भाषा हिंदी में बदल दी गई (आवाज़ सक्रिय 🎙️)',
+      hinglish: '🌐 Switched to Hinglish (Voice enabled 🎙️)',
+      sat: '🌐 ᱯᱟᱹᱨᱥᱤ ᱥᱟᱱᱛᱟᱲᱤ ᱛᱮ ᱵᱚᱫᱚᱞᱮᱱᱟ 🌿',
+    }[newLang] || `Switched to ${langObj?.name}`
+
+    // If chat only has 1 message (welcome), swap it directly
+    if (messages.length <= 1) {
+      setMessages([WELCOME_MESSAGES[newLang] || WELCOME_MESSAGES.en])
+    } else {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          role: 'system',
+          text: noticeText,
+        },
+      ])
+    }
+    scrollBottom()
+  }
 
   function scrollBottom() {
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
@@ -37,8 +150,18 @@ export default function SafetyChatbot() {
     setTimeout(() => inputRef.current?.focus(), 200)
   }
 
-  async function handleSend() {
-    const query = input.trim()
+  function handleClose() {
+    setOpen(false)
+    stopSpeech()
+    setSpeakingMsgId(null)
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      setIsListening(false)
+    }
+  }
+
+  async function processQuery(queryText) {
+    const query = (queryText ?? input).trim()
     if (!query) return
     setInput('')
 
@@ -47,10 +170,10 @@ export default function SafetyChatbot() {
     scrollBottom()
     setTyping(true)
 
-    // Simulate a short thinking delay (realistic UX)
-    await new Promise(r => setTimeout(r, 600 + Math.random() * 400))
+    // Thinking delay for natural dialogue
+    await new Promise(r => setTimeout(r, 450 + Math.random() * 350))
 
-    const result = queryKnowledgeBase(query, lang, null)
+    const result = queryKnowledgeBase(query, chatLang, null)
     const text = typeof result === 'string' ? result : (result?.answer || "I'm your safety assistant. Please ask any industrial safety question.")
     const source = typeof result === 'object' && result?.source ? result.source : 'Safety Knowledge Base'
     const botMsg = {
@@ -66,16 +189,96 @@ export default function SafetyChatbot() {
   }
 
   function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      processQuery()
+    }
   }
 
-  function handleListen(text) {
-    speak(text, lang)
+  // Voice Readout (TTS)
+  function handleToggleSpeech(msg) {
+    if (speakingMsgId === msg.id) {
+      stopSpeech()
+      setSpeakingMsgId(null)
+      return
+    }
+    stopSpeech()
+    setSpeakingMsgId(msg.id)
+    speak(msg.text, chatLang, () => {
+      setSpeakingMsgId(null)
+    })
   }
+
+  // Voice Input (STT)
+  function toggleVoiceInput() {
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop()
+      }
+      setIsListening(false)
+      return
+    }
+
+    // Voice recognition supported in 3 languages: en, hi, hinglish
+    if (chatLang === 'sat') {
+      setVoiceNotice('🎙️ Voice recognition is supported in 3 languages: English, Hindi, and Hinglish. Please switch language tab to speak.')
+      setTimeout(() => setVoiceNotice(null), 4000)
+      return
+    }
+
+    setVoiceNotice(null)
+    const controller = startListening(
+      chatLang,
+      (recognizedText) => {
+        setIsListening(false)
+        if (recognizedText) {
+          setInput(recognizedText)
+          processQuery(recognizedText)
+        }
+      },
+      (error) => {
+        setIsListening(false)
+        console.warn('[SafetyChatbot] Voice recognition error:', error)
+        setVoiceNotice('Could not recognize voice. Please check mic permission or speak clearly.')
+        setTimeout(() => setVoiceNotice(null), 4000)
+      }
+    )
+
+    if (controller) {
+      recognitionRef.current = controller
+      setIsListening(true)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      stopSpeech()
+      if (recognitionRef.current) recognitionRef.current.stop()
+    }
+  }, [])
+
+  const currentSuggestions = QUICK_SUGGESTIONS[chatLang] || QUICK_SUGGESTIONS.en
+  const hasVoice = isVoiceSupported(chatLang)
 
   return (
     <>
-      {/* Floating button stylish speech badge with dismiss (×) option */}
+      <style>{`
+        @keyframes slideUpFade {
+          from { opacity: 0; transform: translateY(14px) scale(0.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes micPulseGlow {
+          0% { box-shadow: 0 0 0 0 rgba(224, 90, 0, 0.7); transform: scale(1); }
+          50% { box-shadow: 0 0 0 8px rgba(224, 90, 0, 0); transform: scale(1.06); }
+          100% { box-shadow: 0 0 0 0 rgba(224, 90, 0, 0); transform: scale(1); }
+        }
+        @keyframes typingBounce {
+          0%, 80%, 100% { transform: translateY(0); }
+          40% { transform: translateY(-6px); }
+        }
+      `}</style>
+
+      {/* Floating button speech badge */}
       {!open && !badgeDismissed && (
         <div
           onClick={handleOpen}
@@ -101,7 +304,6 @@ export default function SafetyChatbot() {
             whiteSpace: 'nowrap',
           }}
         >
-          {/* Bot icon in subtle brand tint */}
           <div style={{
             width: 22, height: 22,
             borderRadius: '50%',
@@ -112,36 +314,21 @@ export default function SafetyChatbot() {
             <Bot size={13} style={{ color: 'var(--color-brand)' }} />
           </div>
 
-          {/* Styled Typography */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, lineHeight: 1 }}>
-            <span style={{
-              color: 'var(--color-text-secondary)',
-              fontSize: '0.78rem',
-              fontWeight: 500,
-            }}>
+            <span style={{ color: 'var(--color-text-secondary)', fontSize: '0.78rem', fontWeight: 500 }}>
               Aapka Apna
             </span>
-            <span style={{
-              color: 'var(--color-brand)',
-              fontSize: '0.84rem',
-              fontWeight: 800,
-              letterSpacing: '-0.01em',
-            }}>
+            <span style={{ color: 'var(--color-brand)', fontSize: '0.84rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
               Suraksha Saathi
             </span>
           </div>
 
-          {/* Active online dot */}
           <span style={{
-            width: 7, height: 7,
-            borderRadius: '50%',
-            background: '#2ECC71',
-            boxShadow: '0 0 6px #2ECC71',
-            flexShrink: 0,
-            marginLeft: 2,
+            width: 7, height: 7, borderRadius: '50%',
+            background: '#2ECC71', boxShadow: '0 0 6px #2ECC71',
+            flexShrink: 0, marginLeft: 2,
           }} />
 
-          {/* Small, clearly visible dismiss (×) button */}
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -150,17 +337,10 @@ export default function SafetyChatbot() {
             aria-label="Close notification"
             title="Dismiss label"
             style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '2px 4px',
-              marginLeft: 4,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--color-text-muted)',
-              borderRadius: '50%',
-              flexShrink: 0,
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              padding: '2px 4px', marginLeft: 4, display: 'inline-flex',
+              alignItems: 'center', justifyContent: 'center',
+              color: 'var(--color-text-muted)', borderRadius: '50%', flexShrink: 0,
             }}
           >
             <X size={14} />
@@ -168,9 +348,9 @@ export default function SafetyChatbot() {
         </div>
       )}
 
-      {/* Floating button */}
+      {/* Floating launcher button */}
       <button
-        onClick={open ? () => setOpen(false) : handleOpen}
+        onClick={open ? handleClose : handleOpen}
         aria-label="Aapka Apna Suraksha Saathi"
         style={{
           position: 'fixed', bottom: 24, right: 24,
@@ -187,15 +367,15 @@ export default function SafetyChatbot() {
         {open ? <X size={24} color="white" /> : <MessageCircle size={24} color="white" />}
       </button>
 
-      {/* Chat panel */}
+      {/* Chat dialog panel */}
       {open && (
         <div
           role="dialog"
           aria-label="Suraksha Saathi"
           style={{
             position: 'fixed', bottom: 92, right: 24,
-            width: 'min(380px, calc(100vw - 48px))',
-            height: 'min(520px, calc(100vh - 120px))',
+            width: 'min(410px, calc(100vw - 32px))',
+            height: 'min(560px, calc(100vh - 110px))',
             background: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-xl)',
@@ -209,98 +389,317 @@ export default function SafetyChatbot() {
           {/* Header */}
           <div style={{
             background: 'var(--color-brand)',
-            padding: '14px 16px',
+            padding: '12px 14px',
             display: 'flex', alignItems: 'center', gap: 10,
             flexShrink: 0,
           }}>
             <div style={{
               width: 34, height: 34, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.2)',
+              background: 'rgba(255,255,255,0.22)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Bot size={18} color="white" />
+              <Bot size={19} color="white" />
             </div>
             <div>
-              <p style={{ color: 'white', fontWeight: 700, fontSize: 'var(--text-sm)', lineHeight: 1.2 }}>
+              <p style={{ color: 'white', fontWeight: 800, fontSize: '0.92rem', lineHeight: 1.2 }}>
                 Suraksha Saathi
               </p>
-              <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 'var(--text-xs)' }}>
-                Curated Knowledge Base
+              <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.68rem', fontWeight: 500 }}>
+                Curated Safety Knowledge Base
               </p>
             </div>
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#4AFF91' }} />
-              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.65rem', fontWeight: 600 }}>ONLINE</span>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                background: 'rgba(0,0,0,0.18)', padding: '2px 8px', borderRadius: '12px',
+              }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#4AFF91' }} />
+                <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.04em' }}>
+                  ONLINE
+                </span>
+              </div>
+              <button
+                onClick={handleClose}
+                aria-label="Close chat"
+                style={{
+                  background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%',
+                  width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'white',
+                }}
+              >
+                <X size={15} />
+              </button>
             </div>
           </div>
 
-          {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 4px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {messages.map(msg => (
-              <div key={msg.id} style={{
-                display: 'flex',
-                justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                gap: 8, alignItems: 'flex-end',
-              }}>
-                {msg.role === 'bot' && (
-                  <div style={{
-                    width: 26, height: 26, borderRadius: '50%', background: 'var(--color-brand-50)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  }}>
-                    <Bot size={14} style={{ color: 'var(--color-brand)' }} />
-                  </div>
-                )}
-                <div style={{ maxWidth: '82%' }}>
-                  <div style={{
-                    padding: '10px 13px',
-                    background: msg.role === 'user' ? 'var(--color-brand)' : 'var(--color-surface-alt)',
-                    color: msg.role === 'user' ? 'white' : 'var(--color-text-primary)',
-                    borderRadius: msg.role === 'user' ? '18px 18px 4px 18px' : '4px 18px 18px 18px',
-                    fontSize: 'var(--text-sm)', lineHeight: 1.55,
-                    border: msg.role === 'bot' ? '1px solid var(--color-border)' : 'none',
+          {/* 4-Language Selector Bar (English, Hindi, Hinglish, Santali) */}
+          <div style={{
+            background: 'var(--color-surface-alt, #F8F6F2)',
+            padding: '7px 10px',
+            borderBottom: '1px solid var(--color-border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            flexShrink: 0,
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
+          }}>
+            <span style={{
+              fontSize: '0.68rem', fontWeight: 700,
+              color: 'var(--color-text-muted)',
+              display: 'flex', alignItems: 'center', gap: 3,
+              marginRight: 2, flexShrink: 0,
+            }}>
+              🌐 Lang:
+            </span>
+
+            {CHAT_LANGUAGES.map(item => {
+              const isSelected = chatLang === item.code
+              return (
+                <button
+                  key={item.code}
+                  onClick={() => handleLanguageChange(item.code)}
+                  title={item.voice ? `${item.name} (${item.voiceBadge})` : `${item.name} (Ol Chiki Text)`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '4px 9px',
+                    borderRadius: '16px',
+                    fontSize: '0.72rem',
+                    fontWeight: isSelected ? 700 : 500,
+                    border: isSelected ? '1.5px solid var(--color-brand)' : '1px solid var(--color-border)',
+                    background: isSelected ? 'var(--color-brand)' : 'var(--color-surface)',
+                    color: isSelected ? '#ffffff' : 'var(--color-text-primary)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    transition: 'all 0.15s ease',
+                    boxShadow: isSelected ? '0 2px 6px rgba(224,90,0,0.25)' : 'none',
+                  }}
+                >
+                  <span>{item.native}</span>
+                  {item.voice ? (
+                    <span style={{
+                      fontSize: '0.62rem',
+                      opacity: isSelected ? 0.95 : 0.7,
+                      background: isSelected ? 'rgba(255,255,255,0.22)' : 'rgba(224,90,0,0.1)',
+                      color: isSelected ? '#ffffff' : 'var(--color-brand)',
+                      padding: '1px 4px',
+                      borderRadius: '8px',
+                      lineHeight: 1.1,
+                    }}>
+                      🎙️
+                    </span>
+                  ) : (
+                    <span style={{
+                      fontSize: '0.62rem',
+                      opacity: isSelected ? 0.95 : 0.6,
+                      background: isSelected ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.06)',
+                      padding: '1px 4px',
+                      borderRadius: '8px',
+                      lineHeight: 1.1,
+                    }}>
+                      📝
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Voice status notice if any */}
+          {voiceNotice && (
+            <div style={{
+              background: '#FFF3CD', color: '#856404',
+              padding: '6px 12px', fontSize: '0.72rem',
+              borderBottom: '1px solid #FFEEBA',
+              display: 'flex', alignItems: 'center', gap: 6,
+              lineHeight: 1.3, flexShrink: 0,
+            }}>
+              <span>ℹ️</span>
+              <span style={{ flex: 1 }}>{voiceNotice}</span>
+              <button
+                onClick={() => setVoiceNotice(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#856404', padding: 0 }}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
+          {/* Live Voice Listening Pulse Bar */}
+          {isListening && (
+            <div style={{
+              background: 'linear-gradient(90deg, rgba(224,90,0,0.12), rgba(224,90,0,0.25), rgba(224,90,0,0.12))',
+              borderBottom: '1.5px solid var(--color-brand)',
+              padding: '6px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: '0.75rem',
+              color: 'var(--color-brand)',
+              fontWeight: 700,
+              flexShrink: 0,
+            }}>
+              <span style={{
+                width: 10, height: 10, borderRadius: '50%',
+                background: '#E05A00', animation: 'micPulseGlow 1.2s infinite ease-in-out',
+              }} />
+              <span>
+                {chatLang === 'hi' ? '🎙️ सुन रहा हूँ... बोलिए' :
+                 chatLang === 'hinglish' ? '🎙️ Listening... Bol rahe hain...' :
+                 '🎙️ Listening... Speak now'}
+              </span>
+              <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: 'var(--color-text-muted)', fontWeight: 500 }}>
+                Click Mic to Stop
+              </span>
+            </div>
+          )}
+
+          {/* Messages Area */}
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '12px 14px 6px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}>
+            {messages.map(msg => {
+              if (msg.role === 'system') {
+                return (
+                  <div key={msg.id} style={{
+                    alignSelf: 'center',
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    color: 'var(--color-text-muted)',
+                    background: 'var(--color-surface-alt)',
+                    border: '1px solid var(--color-border)',
+                    padding: '3px 10px',
+                    borderRadius: '12px',
                   }}>
                     {msg.text}
                   </div>
-                  {/* Source tag + TTS for bot messages */}
-                  {msg.role === 'bot' && (
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center' }}>
-                      {msg.source && (
-                        <span style={{
-                          fontSize: '0.65rem', fontWeight: 600,
-                          color: 'var(--color-text-muted)',
-                          background: 'var(--color-surface-alt)',
-                          border: '1px solid var(--color-border)',
-                          borderRadius: 'var(--radius-pill)',
-                          padding: '1px 6px',
-                        }}>
-                          📚 {msg.source}
-                        </span>
-                      )}
-                      {isTTSSupported(lang) && (
-                        <button
-                          onClick={() => handleListen(msg.text)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
-                          aria-label="Listen"
-                        >
-                          <Volume2 size={12} style={{ color: 'var(--color-text-muted)' }} />
-                        </button>
-                      )}
+                )
+              }
+
+              const isBot = msg.role === 'bot'
+              const isSpeaking = speakingMsgId === msg.id
+
+              return (
+                <div key={msg.id} style={{
+                  display: 'flex',
+                  justifyContent: isBot ? 'flex-start' : 'flex-end',
+                  gap: 8,
+                  alignItems: 'flex-end',
+                }}>
+                  {isBot && (
+                    <div style={{
+                      width: 28, height: 28, borderRadius: '50%',
+                      background: 'rgba(224, 90, 0, 0.12)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <Bot size={15} style={{ color: 'var(--color-brand)' }} />
                     </div>
                   )}
+
+                  <div style={{ maxWidth: '84%' }}>
+                    <div style={{
+                      padding: '10px 13px',
+                      background: isBot ? 'var(--color-surface-alt)' : 'var(--color-brand)',
+                      color: isBot ? 'var(--color-text-primary)' : 'white',
+                      borderRadius: isBot ? '4px 18px 18px 18px' : '18px 18px 4px 18px',
+                      fontSize: 'var(--text-sm)',
+                      lineHeight: 1.55,
+                      border: isBot ? '1px solid var(--color-border)' : 'none',
+                      whiteSpace: 'pre-line',
+                    }}>
+                      {msg.text}
+                    </div>
+
+                    {/* Source tag + Voice Readout button */}
+                    {isBot && (
+                      <div style={{
+                        display: 'flex', gap: 6, marginTop: 4,
+                        alignItems: 'center', flexWrap: 'wrap',
+                      }}>
+                        {msg.source && (
+                          <span style={{
+                            fontSize: '0.65rem', fontWeight: 600,
+                            color: 'var(--color-text-muted)',
+                            background: 'var(--color-surface)',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-pill)',
+                            padding: '1px 6px',
+                          }}>
+                            📚 {msg.source}
+                          </span>
+                        )}
+
+                        {isTTSSupported(chatLang) && (
+                          <button
+                            onClick={() => handleToggleSpeech(msg)}
+                            title={isSpeaking ? 'Stop speaking' : 'Listen with Voice'}
+                            style={{
+                              background: isSpeaking ? 'var(--color-brand)' : 'var(--color-surface)',
+                              border: isSpeaking ? '1px solid var(--color-brand)' : '1px solid var(--color-border)',
+                              borderRadius: '12px',
+                              cursor: 'pointer',
+                              padding: '2px 7px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              color: isSpeaking ? 'white' : 'var(--color-text-secondary)',
+                              fontSize: '0.65rem',
+                              fontWeight: 600,
+                              transition: 'all 0.15s ease',
+                            }}
+                            aria-label={isSpeaking ? 'Stop speech' : 'Play speech'}
+                          >
+                            {isSpeaking ? (
+                              <>
+                                <VolumeX size={12} />
+                                <span>Playing…</span>
+                              </>
+                            ) : (
+                              <>
+                                <Volume2 size={12} />
+                                <span>Voice 🔊</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
 
             {/* Typing indicator */}
             {typing && (
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
-                <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--color-brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Bot size={14} style={{ color: 'var(--color-brand)' }} />
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: 'rgba(224, 90, 0, 0.12)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <Bot size={15} style={{ color: 'var(--color-brand)' }} />
                 </div>
-                <div style={{ padding: '10px 14px', background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', borderRadius: '4px 18px 18px 18px', display: 'flex', gap: 4 }}>
+                <div style={{
+                  padding: '9px 13px',
+                  background: 'var(--color-surface-alt)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '4px 18px 18px 18px',
+                  display: 'flex', gap: 4,
+                }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{
-                      width: 6, height: 6, borderRadius: '50%', background: 'var(--color-text-muted)',
+                      width: 6, height: 6, borderRadius: '50%',
+                      background: 'var(--color-text-muted)',
                       animation: `typingBounce 1s ease ${i * 0.15}s infinite`,
                     }} />
                   ))}
@@ -310,56 +709,140 @@ export default function SafetyChatbot() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
+          {/* Quick Suggested Prompt Pills */}
           <div style={{
-            padding: '10px 12px',
-            borderTop: '1px solid var(--color-border)',
-            display: 'flex', gap: 8, alignItems: 'flex-end',
+            padding: '4px 12px 6px',
+            display: 'flex',
+            gap: 6,
+            overflowX: 'auto',
+            scrollbarWidth: 'none',
             flexShrink: 0,
+            background: 'var(--color-surface)',
+          }}>
+            {currentSuggestions.map((item, idx) => (
+              <button
+                key={idx}
+                onClick={() => processQuery(item.query)}
+                disabled={typing || isListening}
+                style={{
+                  background: 'var(--color-surface-alt)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '14px',
+                  padding: '4px 9px',
+                  fontSize: '0.68rem',
+                  color: 'var(--color-text-secondary)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 600,
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'rgba(224, 90, 0, 0.12)'
+                  e.currentTarget.style.color = 'var(--color-brand)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'var(--color-surface-alt)'
+                  e.currentTarget.style.color = 'var(--color-text-secondary)'
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Input & Voice Controls */}
+          <div style={{
+            padding: '8px 12px 10px',
+            borderTop: '1px solid var(--color-border)',
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+            flexShrink: 0,
+            background: 'var(--color-surface)',
           }}>
             <textarea
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about fire, gas leak, PPE…"
+              placeholder={PLACEHOLDERS[chatLang] || PLACEHOLDERS.en}
               rows={1}
               style={{
-                flex: 1, border: '1.5px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)', padding: '8px 12px',
-                fontSize: 'var(--text-sm)', resize: 'none', outline: 'none',
-                background: 'var(--color-surface)', color: 'var(--color-text-primary)',
-                fontFamily: 'var(--font-sans)',
-                lineHeight: 1.5,
-                maxHeight: 80, overflowY: 'auto',
+                flex: 1,
+                border: isListening ? '1.5px solid var(--color-brand)' : '1.5px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                padding: '8px 12px',
+                fontSize: '0.84rem',
+                resize: 'none',
+                outline: 'none',
+                background: 'var(--color-surface)',
+                color: 'var(--color-text-primary)',
+                fontFamily: chatLang === 'sat' ? 'var(--font-santali), var(--font-sans)' : 'var(--font-sans)',
+                lineHeight: 1.45,
+                maxHeight: 72,
+                overflowY: 'auto',
+                boxShadow: isListening ? '0 0 0 3px rgba(224, 90, 0, 0.15)' : 'none',
+                transition: 'border-color 0.15s, box-shadow 0.15s',
               }}
             />
+
+            {/* Voice Input (Microphone) Button */}
             <button
-              onClick={handleSend}
+              onClick={toggleVoiceInput}
+              title={
+                isListening ? 'Stop listening' :
+                hasVoice ? `Speak in ${CHAT_LANGUAGES.find(l => l.code === chatLang)?.name}` :
+                'Voice available in English, Hindi & Hinglish'
+              }
+              style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: isListening ? '#E05A00' : 'var(--color-surface-alt)',
+                border: isListening ? '2px solid #C0392B' : '1px solid var(--color-border)',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+                color: isListening ? '#ffffff' : 'var(--color-text-primary)',
+                animation: isListening ? 'micPulseGlow 1.2s infinite' : 'none',
+                transition: 'all 0.15s ease',
+              }}
+              aria-label={isListening ? 'Stop voice recording' : 'Start voice input'}
+            >
+              {isListening ? <MicOff size={17} /> : <Mic size={17} />}
+            </button>
+
+            {/* Send Button */}
+            <button
+              onClick={() => processQuery()}
               disabled={!input.trim() || typing}
               style={{
                 width: 38, height: 38, borderRadius: '50%',
                 background: input.trim() ? 'var(--color-brand)' : 'var(--color-border)',
-                border: 'none', cursor: input.trim() ? 'pointer' : 'default',
+                border: 'none',
+                cursor: input.trim() ? 'pointer' : 'default',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, transition: 'background 0.15s',
+                flexShrink: 0,
+                transition: 'background 0.15s',
               }}
-              aria-label="Send"
+              aria-label="Send query"
             >
               <Send size={16} color="white" />
             </button>
           </div>
 
-          {/* Disclaimer */}
+          {/* Footer note */}
           <div style={{
-            padding: '6px 12px 10px',
-            fontSize: '0.62rem', color: 'var(--color-text-muted)',
-            textAlign: 'center', flexShrink: 0,
+            padding: '4px 12px 8px',
+            fontSize: '0.62rem',
+            color: 'var(--color-text-muted)',
+            textAlign: 'center',
+            flexShrink: 0,
+            background: 'var(--color-surface)',
           }}>
-            Curated safety KB · Not AI-generated · In an emergency call your Safety Officer
+            Curated Safety KB • 4 Languages • 3 Voice Modes (EN, HI, Hinglish)
           </div>
         </div>
       )}
     </>
   )
 }
+
