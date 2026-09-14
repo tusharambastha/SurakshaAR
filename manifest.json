@@ -1,0 +1,13 @@
+{
+  "name": "SurakshaAR",
+  "short_name": "SurakshaAR",
+  "description": "AR-Based Industrial Safety Training",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F5F1",
+  "theme_color": "#E05A00",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/shield.svg", "type": "image/svg+xml", "sizes": "any" }
+  ]
+}
