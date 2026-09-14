@@ -62,9 +62,11 @@ export default function FireDetectionOverlay({
           if (!fireSoundPlayedRef.current) {
             fireSoundPlayedRef.current = true
             speak(
-              lang === 'hi'
-                ? 'आग का खतरा पाया गया! सुरक्षित दूरी बनाए रखें।'
-                : 'Fire hazard detected! Maintain safe distance.',
+              lang === 'sat'
+                ? 'ᱥᱮᱸᱜᱮᱞ ᱵᱚᱛᱚᱨ ᱧᱟᱢ ᱮᱱᱟ! ᱥᱟᱺᱜᱤᱧ ᱨᱮ ᱛᱟᱦᱮᱸᱱ ᱢᱮ᱾'
+                : lang === 'hi'
+                  ? 'आग का खतरा पाया गया! सुरक्षित दूरी बनाए रखें।'
+                  : 'Fire hazard detected! Maintain safe distance.',
               lang
             )
           }

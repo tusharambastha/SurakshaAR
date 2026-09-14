@@ -164,6 +164,13 @@ export default function Scenario() {
 
   const isFireScenario = scenario?.hazard_type === 'fire'
 
+  const getStepText = useCallback((s, field) => {
+    if (!s) return ''
+    if (lang === 'sat' && s[`${field}_sat`]) return s[`${field}_sat`]
+    if (lang === 'hi' && s[`${field}_hi`]) return s[`${field}_hi`]
+    return s[field] ?? ''
+  }, [lang])
+
   // Helper to open real camera stream across mobile & desktop webcams
   const requestCameraStream = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) return null
@@ -255,8 +262,10 @@ export default function Scenario() {
       is_ppe_step: step?.is_ppe_step ?? false,
     }
 
-    setStepFeedback({ correct: true, label: step?.label ?? `Step ${stepIndex + 1}` })
-    speak(step?.instruction ?? 'Correct! Proceed to the next step.', lang)
+    const stepLabel = getStepText(step, 'label') || `Step ${stepIndex + 1}`
+    const stepInst = getStepText(step, 'instruction') || (lang === 'sat' ? 'ᱥᱟᱹᱨᱤ! ᱫᱚᱥᱟᱨ ᱫᱷᱟᱯ ᱛᱮ ᱞᱟᱦᱟᱭ ᱢᱮ᱾' : lang === 'hi' ? 'सही! अगले चरण पर जाएं।' : 'Correct! Proceed to the next step.')
+    setStepFeedback({ correct: true, label: stepLabel })
+    speak(stepInst, lang)
     setTimeout(() => setStepFeedback(null), 2200)
 
     const newLogs = [...stepLogs, log]
@@ -1178,25 +1187,25 @@ export default function Scenario() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ color: 'var(--color-brand)', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  STEP {currentStep + 1} OF {steps.length}
+                  {T('step')} {currentStep + 1} / {steps.length}
                 </span>
                 <button
-                  onClick={() => speak(activeStep.instruction, lang)}
+                  onClick={() => speak(getStepText(activeStep, 'instruction'), lang)}
                   style={{
                     background: 'transparent', border: 'none', color: '#9CA3AF',
                     cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
                   }}
                 >
-                  <Volume2 size={14} /> Listen
+                  <Volume2 size={14} /> {T('listen')}
                 </button>
               </div>
 
               <h2 style={{ color: 'white', fontSize: 'clamp(1.1rem, 2.5vw, 1.35rem)', fontWeight: 800, marginBottom: 6 }}>
-                {activeStep.label}
+                {getStepText(activeStep, 'label')}
               </h2>
 
               <p style={{ color: '#D1D5DB', fontSize: 14, lineHeight: 1.5, marginBottom: 14 }}>
-                {activeStep.instruction}
+                {getStepText(activeStep, 'instruction')}
               </p>
 
               {/* Direct Action Completion Button (Guarantees 100% usability!) */}

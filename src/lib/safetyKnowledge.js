@@ -20,7 +20,7 @@ export const MODULES = {
 export const SAFE_FALLBACK = {
   en: "I don't have verified guidance for this specific situation. Please follow your site's emergency procedure and contact your supervisor or the emergency response team immediately.",
   hi: "इस विशेष स्थिति के लिए मेरे पास सत्यापित मार्गदर्शन नहीं है। कृपया अपनी साइट की आपातकालीन प्रक्रिया का पालन करें और तुरंत अपने सुपरवाइज़र या आपातकालीन प्रतिक्रिया टीम से संपर्क करें।",
-  sat: "ᱤᱠᱤ ᱵᱮᱢ ᱯᱟᱛᱟᱣ — ᱟᱯᱮᱨ ᱥᱟᱭᱛ ᱨᱮᱭᱟᱜ ᱤᱢᱚᱨᱡᱮᱱᱥᱤ ᱨᱩᱴᱤᱱ ᱠᱷᱚᱱ ᱠᱟᱹᱢᱤ ᱠᱟᱱᱟ।",
+  sat: "ᱱᱚᱶᱟ ᱵᱤᱥᱮᱥ ᱦᱟᱞᱚᱛ ᱞᱟᱹᱜᱤᱫ ᱥᱟᱹᱨᱤ ᱩᱫᱩᱜ ᱵᱟᱹᱱᱩᱜᱼᱟ᱾ ᱫᱟᱭᱟᱠᱟᱛᱮ ᱟᱢᱟᱜ ᱥᱟᱭᱤᱴ ᱨᱮᱱᱟᱜ ᱟᱯᱟᱛᱠᱟᱞᱤᱱ ᱱᱤᱭᱟᱹᱢ ᱯᱟᱸᱡᱟᱭ ᱢᱮ ᱟᱨ ᱥᱩᱯᱚᱨᱵᱷᱟᱭᱤᱡᱚᱨ ᱥᱟᱶ ᱡᱚᱯᱲᱟᱣ ᱢᱮ᱾",
 }
 
 export const KNOWLEDGE_BASE = [
@@ -28,9 +28,10 @@ export const KNOWLEDGE_BASE = [
   {
     id: 'greeting',
     module: MODULES.GLOBAL,
-    keywords: ['hi', 'hii', 'hiii', 'hello', 'hey', 'namaste', 'namaskar', 'good morning', 'good afternoon', 'good evening', 'help', 'start', 'नमस्ते', 'नमस्कार', 'मदद', 'हॅलो'],
+    keywords: ['hi', 'hii', 'hiii', 'hello', 'hey', 'namaste', 'namaskar', 'good morning', 'good afternoon', 'good evening', 'help', 'start', 'नमस्ते', 'नमस्कार', 'मदद', 'हॅलो', 'ᱡᱚᱦᱟᱨ', 'ᱜᱚᱲᱚ'],
     answer_en: "👷 Hello! I am your SurakshaAR Safety Knowledge Assistant.\n\nYou can ask me anything about:\n• 🔴 Fire extinguishers & PASS rules\n• ⚡ Electrical fire procedures\n• 🦺 Mandatory PPE safety gear\n• 💨 Gas leak detection & Buddy System\n• 🚪 Evacuation routes & Muster Points\n• 📞 Emergency helpline numbers\n\nWhat safety topic can I help you with?",
     answer_hi: "👷 नमस्ते! मैं आपका SurakshaAR सुरक्षा ज्ञान सहायक हूँ।\n\nआप मुझसे निम्न के बारे में पूछ सकते हैं:\n• 🔴 अग्निशामक और PASS नियम\n• ⚡ बिजली की आग से निपटने के तरीके\n• 🦺 अनिवार्य PPE सुरक्षा उपकरण\n• 💨 गैस रिसाव और बडी सिस्टम\n• 🚪 निकासी मार्ग और मस्टर पॉइंट\n• 📞 आपातकालीन हेल्पलाइन नंबर\n\nआज मैं आपकी क्या सहायता कर सकता हूँ?",
+    answer_sat: "👷 ᱡᱚᱦᱟᱨ! ᱤᱧ SurakshaAR ᱥᱩᱨᱠᱷᱟ ᱜᱮᱭᱟᱱ ᱜᱚᱲᱚᱭᱤᱡ ᱠᱟᱹᱱᱟᱹᱧ᱾\n\nᱟᱢ ᱤᱧ ᱱᱚᱶᱟ ᱠᱚ ᱵᱟᱵᱚᱛ ᱠᱩᱞᱤ ᱫᱟᱲᱮᱭᱟᱹᱧᱟ:\n• 🔴 ᱥᱮᱸᱜᱮᱞ ᱤᱬᱤᱡᱤᱡ ᱟᱨ PASS ᱱᱤᱭᱟᱹᱢ\n• ⚡ ᱵᱤᱡᱽᱞᱤ ᱥᱮᱸᱜᱮᱞ ᱨᱩᱠᱷᱤᱭᱟᱹ\n• 🦺 ᱞᱟᱹᱠᱛᱤᱭᱟᱱ PPE ᱥᱩᱨᱠᱷᱟ ᱥᱟᱢᱟᱱ\n• 💨 ᱜᱮᱥ ᱞᱤᱠ ᱟᱨ ᱵᱟᱰᱤ ᱥᱤᱥᱴᱚᱢ\n• 🚪 ᱱᱤᱠᱟᱥ ᱰᱟᱦᱟᱨ ᱟᱨ ᱢᱟᱥᱴᱟᱨ ᱯᱚᱭᱮᱱᱴ\n• 📞 ᱟᱯᱟᱛᱠᱟᱞᱤᱱ ᱦᱮᱞᱯᱞᱟᱭᱤᱱ ᱱᱚᱢᱵᱚᱨ\n\nᱛᱮᱦᱮᱧ ᱟᱢᱟᱜ ᱪᱮᱫ ᱜᱚᱲᱚᱧ ᱮᱢ ᱫᱟᱲᱮᱭᱟᱜᱼᱟ?",
   },
   // ─── FIRE & EXPLOSION ───────────────────────────────────────
   {
@@ -151,7 +152,7 @@ export function queryKnowledgeBase(input, lang = 'en', currentModule = MODULES.G
     }
   }
 
-  const ans = (lang === 'hi' ? best.entry.answer_hi : best.entry.answer_en) ?? (SAFE_FALLBACK[lang] ?? SAFE_FALLBACK.en)
+  const ans = (lang === 'sat' && best.entry.answer_sat ? best.entry.answer_sat : lang === 'hi' ? best.entry.answer_hi : best.entry.answer_en) ?? (SAFE_FALLBACK[lang] ?? SAFE_FALLBACK.en)
   return {
     answer: ans,
     source: 'National Industrial Safety Protocol',
@@ -165,14 +166,17 @@ export function getSuggestedQuestions(module, lang = 'en') {
     FIRE_EXPLOSION: {
       en: ['How do I use a fire extinguisher?', 'What PPE should I wear during a fire?', 'What is the fire evacuation sequence?', 'Which extinguisher for electrical fire?'],
       hi: ['अग्निशामक का उपयोग कैसे करें?', 'आग के दौरान कौन सा PPE पहनें?', 'अग्नि निकासी क्रम क्या है?', 'बिजली की आग के लिए कौन सा अग्निशामक?'],
+      sat: ['ᱥᱮᱸᱜᱮᱞ ᱤᱬᱤᱡᱤᱡ ᱪᱮᱫ ᱞᱮᱠᱟ ᱵᱮᱵᱷᱟᱨᱟ?', 'ᱥᱮᱸᱜᱮᱞ ᱚᱠᱛᱚ ᱪᱮᱫ PPE ᱦᱚᱨᱚᱜ ᱞᱟᱹᱠᱛᱤ?', 'ᱥᱮᱸᱜᱮᱞ ᱱᱤᱠᱟᱥ ᱫᱷᱟᱯ ᱪᱮᱫ?', 'ᱵᱤᱡᱽᱞᱤ ᱥᱮᱸᱜᱮᱞ ᱞᱟᱹᱜᱤᱫ ᱚᱠᱟ ᱤᱬᱤᱡᱤᱡ?'],
     },
     GAS_LEAK: {
       en: ['How do I detect a gas leak?', 'What is the buddy system?', 'What PPE for gas leak?', 'What are gas emergency steps?'],
       hi: ['गैस रिसाव कैसे पहचानें?', 'बडी सिस्टम क्या है?', 'गैस रिसाव के लिए कौन सा PPE?', 'गैस आपातकाल के कदम क्या हैं?'],
+      sat: ['ᱜᱮᱥ ᱞᱤᱠ ᱪᱮᱫ ᱞᱮᱠᱟ ᱪᱤᱱᱦᱟᱹᱣᱟ?', 'ᱵᱟᱰᱤ ᱥᱤᱥᱴᱚᱢ ᱫᱚ ᱪᱮᱫ?', 'ᱜᱮᱥ ᱞᱤᱠ ᱞᱟᱹᱜᱤᱫ ᱪᱮᱫ PPE?', 'ᱜᱮᱥ ᱟᱯᱟᱛᱠᱟᱞ ᱫᱷᱟᱯ ᱠᱚ ᱪᱮᱫ?'],
     },
     GLOBAL: {
       en: ['What are emergency numbers?', 'How to identify a hazard?', 'What is first aid for burns?', 'Where is the muster point?'],
       hi: ['आपातकालीन नंबर क्या हैं?', 'खतरे की पहचान कैसे करें?', 'जलने पर प्राथमिक उपचार?', 'मस्टर पॉइंट कहाँ है?'],
+      sat: ['ᱟᱯᱟᱛᱠᱟᱞᱤᱱ ᱱᱚᱢᱵᱚᱨ ᱠᱚ ᱪᱮᱫ?', 'ᱵᱚᱛᱚᱨ ᱪᱮᱫ ᱞᱮᱠᱟ ᱪᱤᱱᱦᱟᱹᱣᱟ?', 'ᱞᱚ ᱞᱮᱱᱠᱷᱟᱱ ᱯᱟᱹᱦᱤᱞ ᱨᱟᱱ?', 'ᱢᱟᱥᱴᱟᱨ ᱯᱚᱭᱮᱱᱴ ᱫᱚ ᱚᱠᱟᱨᱮ?'],
     },
   }
   const moduleQuestions = questions[module] ?? questions.GLOBAL

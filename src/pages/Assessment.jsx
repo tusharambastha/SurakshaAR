@@ -147,7 +147,15 @@ export default function Assessment() {
 
   function getOptions(q) {
     if (assessLang === 'hi' && q.options_hi) return q.options_hi
+    if (assessLang === 'sat' && q.options_sat) return q.options_sat
     return q.options_en ?? []
+  }
+
+  function getExplanation(q) {
+    if (!q) return ''
+    if (assessLang === 'sat' && q.explanation_sat) return q.explanation_sat
+    if (assessLang === 'hi' && q.explanation_hi) return q.explanation_hi
+    return q.explanation_en ?? ''
   }
 
   function handleListen() {
@@ -240,11 +248,9 @@ export default function Assessment() {
                   <span style={{ fontSize: 24 }}>{l.flag}</span>
                   <div style={{ textAlign: 'left' }}>
                     <div>{l.nativeLabel}</div>
-                    {l.code === 'sat' && (
-                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontWeight: 400, marginTop: 2 }}>
-                        Text only — voice not available
-                      </div>
-                    )}
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', fontWeight: 400, marginTop: 2 }}>
+                      {l.code === 'sat' ? 'ᱚᱞ ᱪᱤᱠᱤ • ᱟᱲᱟᱝ ᱥᱟᱶᱛᱮ (Voice & Text)' : l.label}
+                    </div>
                   </div>
                   {assessLang === l.code && <CheckCircle size={20} style={{ marginLeft: 'auto', color: 'var(--color-brand)' }} />}
                 </button>
@@ -408,7 +414,7 @@ export default function Assessment() {
               )}
               <p style={{ fontSize: 'var(--text-sm)' }}>
                 <strong>{T('explanation')}:</strong>{' '}
-                {(assessLang === 'hi' && currentQ.explanation_hi) ? currentQ.explanation_hi : currentQ.explanation_en}
+                {getExplanation(currentQ)}
               </p>
             </div>
           )}
