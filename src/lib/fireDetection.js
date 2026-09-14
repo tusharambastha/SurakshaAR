@@ -2,45 +2,38 @@
  * SurakshaAR — Robust Computer Vision Fire & Flame Detection Engine
  *
  * Exclusively detects active luminous combustion flames (match, candle, lighter).
- * Rejects: human skin/faces, yellow/orange clothing, warm walls, lamps, and screens.
+ * Absolutely rejects:
+ * - White t-shirts / clothes (saturation < 0.15, blue > 150)
+ * - Human faces and skin tones ((R - B) < 100, blue > 70)
+ * - Yellow / orange clothing (R - G < 35 when G is high)
+ * - Warm room walls and lighting (diffuse reflections, blue > 70)
+ * - Ceiling lights / tube lights (high blue, saturation < 0.10)
  *
  * 5-Stage Verification Pipeline:
- * 1. Optical Combustion Pixel Filter (Incandescent blowout core or orange flame body)
- * 2. Spatial Scale & Geometry (Candle/lighter scale <= 22% width, <= 28% height, compact cluster)
- * 3. Temporal Flicker Analysis (True combustion turbulence: frame-to-frame delta >= 16 on >= 20% pixels)
+ * 1. Optical Combustion Pixel Filter (Saturation >= 0.40, Blue <= 65, R-B >= 120, R-G >= 20)
+ * 2. Spatial Scale & Geometry (Candle/lighter scale <= 20% width, <= 25% height, compact cluster)
+ * 3. Temporal Flicker Analysis (Convection turbulence: frame-to-frame delta >= 16 on >= 18% pixels)
  * 4. Temporal State Machine ('none' -> 'verifying' -> 'confirmed' with quick decay on absence)
  * 5. Dynamic Evidence-Based Confidence (78% - 98%, only reported on 'confirmed')
  */
 
-const SAMPLE_WIDTH = 160
+const SAMPLE_WIDTH  = 160
 const SAMPLE_HEIGHT = 120
-
-// Pixel thresholds
-const FLAME_R_MIN          = 240
-const INCANDESCENT_G_MIN   = 225
-const INCANDESCENT_B_MIN   = 160
-const INCANDESCENT_SUM_MIN = 645
-
-const ORANGE_G_MIN  = 50
-const ORANGE_G_MAX  = 160  // Yellow clothing has G > 175 -> rejected
-const ORANGE_B_MAX  = 48   // Skin has B > 80, fabric B > 60 -> rejected
-const ORANGE_RG_MIN = 80   // Red dominance over green
-const ORANGE_RB_MIN = 165  // Skin has (R-B) < 100 -> rejected
 
 // Spatial constraints (Candle / lighter scale)
 const MIN_FLAME_PIXELS    = 8
-const MAX_BOX_W_RATIO     = 0.22  // Flame width <= 22% of frame
-const MAX_BOX_H_RATIO     = 0.28  // Flame height <= 28% of frame
-const MAX_FRAME_RATIO     = 0.05  // Flame pixels <= 5% of total frame (rejects large shirts)
-const MIN_CLUSTER_DENSITY = 0.22  // Flame pixels / bounding box area
+const MAX_BOX_W_RATIO     = 0.20  // Flame width <= 20% of frame
+const MAX_BOX_H_RATIO     = 0.25  // Flame height <= 25% of frame
+const MAX_FRAME_RATIO     = 0.04  // Flame pixels <= 4% of total frame (rejects shirts)
+const MIN_CLUSTER_DENSITY = 0.20  // Flame pixels / bounding box area
 
-// Temporal flicker
+// Temporal flicker (combustion turbulence)
 const FLICKER_LUMA_DELTA = 16
 const MIN_FLICKER_RATIO  = 0.18
 
 // Confirmation frames (~15-20 FPS)
 const VERIFYING_FRAMES = 4   // ~200ms of consistent candidate
-const CONFIRMED_FRAMES = 12  // ~600ms of sustained temporal & optical evidence
+const CONFIRMED_FRAMES = 10  // ~500ms of sustained temporal & optical evidence
 const DECAY_RATE       = 3   // Fast clearance when flame leaves frame (~100ms)
 
 /**
@@ -48,22 +41,29 @@ const DECAY_RATE       = 3   // Fast clearance when flame leaves frame (~100ms)
  * Returns true ONLY if pixel exhibits active flame radiation characteristics.
  */
 export function isFlamePixel(r, g, b) {
-  if (r < FLAME_R_MIN) return false
+  // 1. Red must be bright (active light emitter)
+  if (r < 235) return false
+
+  // 2. Flame has very little blue (combustion emission spectrum)
+  // White shirts have B > 150, skin has B > 80. Real flames have B < 65.
+  if (b > 65) return false
+
+  // 3. Red must strongly dominate green and blue
+  if (r <= g || (r - g) < 20) return false
+  if ((r - b) < 120) return false
+
+  // 4. HSI Saturation: Saturation = 1 - 3 * min(r,g,b) / (r+g+b)
+  // White shirts have sat < 0.15. Skin has sat < 0.35. Real flames have sat >= 0.40.
   const sum = r + g + b
+  const min = Math.min(r, g, b)
+  const sat = 1 - (3 * min / sum)
+  if (sat < 0.40) return false
 
-  // Signature A: Direct incandescent blowout core (saturates all 3 channels)
-  const isBlowout = (g >= INCANDESCENT_G_MIN && b >= INCANDESCENT_B_MIN && sum >= INCANDESCENT_SUM_MIN)
+  // 5. If green is high (yellowish flame, e.g. candle tip), require stronger red dominance
+  // to eliminate yellow fabrics under bright lights
+  if (g > 170 && (r - g) < 35) return false
 
-  // Signature B: Saturated combustion flame body
-  const isOrangeFlame = (
-    g >= ORANGE_G_MIN &&
-    g <= ORANGE_G_MAX &&
-    b <= ORANGE_B_MAX &&
-    (r - g) >= ORANGE_RG_MIN &&
-    (r - b) >= ORANGE_RB_MIN
-  )
-
-  return isBlowout || isOrangeFlame
+  return true
 }
 
 /**
@@ -105,7 +105,7 @@ export class FireDetector {
   reset() {
     this.counter        = 0
     this.state          = 'none'
-    this.hasPrev         = false
+    this.hasPrev        = false
     this.lastBbox       = null
     this.lastConfidence = 0
     this.simulated      = false
@@ -199,7 +199,7 @@ export class FireDetector {
     const hRatio    = boxH / sampleHeight
     const frameRatio = flameCount / total
 
-    // Reject if too large (shirt, wall) or too scattered (ambient noise)
+    // Reject if too large (shirt, wall, face) or too scattered (ambient noise)
     if (
       wRatio > MAX_BOX_W_RATIO ||
       hRatio > MAX_BOX_H_RATIO ||

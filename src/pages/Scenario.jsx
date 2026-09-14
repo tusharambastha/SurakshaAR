@@ -441,8 +441,8 @@ export default function Scenario() {
     console.log('[FireDetection] Real-time flame detected with confidence:', result.confidence)
   }, [])
 
-  // Interactive fire safety training response handler (Phase 4 & 5)
-  const handleFireTaskCompleted = useCallback(async ({ wasCorrect, responseTimeMs, selectedAnswer }) => {
+  // Interactive fire safety training response handler
+  const handleFireTaskCompleted = useCallback(async ({ wasCorrect, responseTimeMs }) => {
     // Record feedback log in mockDb / Supabase
     if (!isSupabaseConfigured) {
       await mockInsertFeedbackLog({
@@ -450,7 +450,7 @@ export default function Scenario() {
         userId: user?.id,
         stepIndex: 0,
         feedbackType: wasCorrect ? 'correct' : 'incorrect',
-        message: `AR Fire Extinguisher Protocol: Selected Option ${selectedAnswer} (${wasCorrect ? 'Correct' : 'Incorrect'}) in ${(responseTimeMs / 1000).toFixed(1)}s`,
+        message: `AR Fire Hazard Detection: Real-time flame confirmed in camera feed in ${(responseTimeMs / 1000).toFixed(1)}s`,
       })
     }
 
@@ -469,7 +469,7 @@ export default function Scenario() {
       setCompletedSteps(prev => (prev.includes(0) ? prev : [...prev, 0]))
       setCurrentStep(1)
       setStepStartTime(Date.now())
-      setStepFeedback({ correct: wasCorrect, label: 'Fire Hazard Identified & Extinguisher Protocol Verified! ✓' })
+      setStepFeedback({ correct: wasCorrect, label: 'Fire Hazard Identified via AR Camera! ✓' })
       setTimeout(() => setStepFeedback(null), 2500)
     }
   }, [sessionId, user, currentStep, scenario])
