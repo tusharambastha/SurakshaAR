@@ -126,9 +126,9 @@ export default function GasLeakDetectionOverlay({
 
   if (!isActive) return null
 
-  const isConfirmed = detection.state === 'confirmed' && (detection.isGasHazard || hazardConfirmed)
+  const isConfirmed = detection.state === 'confirmed' && detection.isGasHazard
   const isVerifying = detection.state === 'verifying'
-  const isNone      = detection.state === 'none' && !hazardConfirmed
+  const isNone      = detection.state === 'none'
 
   return (
     <div
