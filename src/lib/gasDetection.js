@@ -2,47 +2,50 @@
  * SurakshaAR — Smoke & Mist Plume Visual Detection Engine
  * (Gas Leak & Confined Space Hazard Simulation)
  *
- * Smartphone cameras cannot detect invisible physical gas molecules (methane, CO, H2S, etc.).
- * In industrial safety simulation, dangerous gas leaks and confined space hazards
- * are visually represented by visible escaping smoke, vapor, or mist plumes.
+ * Exclusively detects visible airborne smoke, mist, and vapor plumes (e.g. incense stick / agarbatti,
+ * smoke generator, vapor, extinguishing mist).
  *
- * This Computer Vision engine detects active visible smoke/mist plumes in the camera feed based on:
- * 1. Optical Plume Characteristics: Semi-transparent, grey-white / neutral palette (low color saturation, 85 <= Luma <= 245)
- * 2. Strict False-Positive Rejections:
- *    - Human skin, faces, and hands (chromatic skin filtering)
- *    - Colored clothing, furniture, and room fixtures (chrominance delta > 28)
- *    - Static grey walls, floors, and sheets (inter-frame motion analysis — static objects have delta ~ 0)
- *    - Sudden lighting changes / camera pans (global frame motion threshold)
- * 3. Spatial Connected Plume Analysis: BFS clustering (min 15px, density >= 0.12, bounded aspect ratio)
- * 4. Temporal Dispersion & Persistence: Multi-frame state machine ('none' -> 'verifying' -> 'confirmed' over 7+ consecutive frames)
+ * Multi-Tier Defense Pipeline:
+ * 1. Optical Chrominance Filter:
+ *    - Rejects human skin, faces, and hands (strict chromatic skin boundary test)
+ *    - Rejects saturated colored clothes and furniture (chrominance delta > 46)
+ *    - Passes diffuse, semi-transparent grey-white smoke/mist (60 <= Luma <= 248)
+ * 2. Background Model & Inter-Frame Dynamics:
+ *    - Dual-motion analysis: Exponential Moving Average (EMA) background model + inter-frame delta
+ *    - Rejects static background walls, hanging clothes, and furniture (zero motion, bgDelta < 3)
+ *    - Rejects camera pans / lighting switches (global shift threshold)
+ * 3. Connected-Component Spatial Clustering (BFS):
+ *    - Aggregates plume pixels into contiguous clusters (min 8px, density >= 0.10)
+ * 4. Temporal Persistence State Machine:
+ *    - 'none' -> 'verifying' (2 frames) -> 'confirmed' (5 frames)
+ *    - Rapid, gentle clearance when smoke dissipates
  *
- * Output: Evidence-based Visual Detection Confidence (NOT gas ppm or concentration).
+ * IMPORTANT: This is visual smoke detection for simulated safety training.
+ * It does not measure chemical gas molecules, methane, or ppm.
  */
 
 const SAMPLE_WIDTH  = 160
 const SAMPLE_HEIGHT = 120
 
-// Spatial constraints for visible smoke plume
-const MIN_PLUME_PIXELS  = 15    // Coherent puff/mist minimum
-const MAX_PLUME_PIXELS  = 2600  // Plume scale limit (rejects whole-frame camera occlusions)
-const MAX_BOX_W_RATIO   = 0.65  // Max width 65% of frame
-const MAX_BOX_H_RATIO   = 0.70  // Max height 70% of frame
-const MIN_PLUME_DENSITY = 0.12  // Coherent cluster density
+// Spatial plume constraints (tuned for delicate incense smoke & larger plumes)
+const MIN_PLUME_PIXELS  = 8     // Detects delicate incense curls / agarbatti smoke
+const MAX_PLUME_PIXELS  = 3000  // Upper limit to reject full camera occlusions
+const MAX_BOX_W_RATIO   = 0.75  // Max width 75% of frame
+const MAX_BOX_H_RATIO   = 0.80  // Max height 80% of frame
+const MIN_PLUME_DENSITY = 0.10  // Minimum cluster density
 
-// Temporal motion & diffusion thresholds
-const MIN_MOTION_DELTA  = 5     // Min luminance change for moving smoke particles
-const MAX_MOTION_DELTA  = 55    // Max luminance change (rejects harsh specular flashes)
-const MIN_SIZE_VARIANCE = 2.0   // Fluid plumes billow & change area; static objects < 1.0
-const HISTORY_LENGTH    = 6
+// Temporal motion thresholds
+const MIN_MOTION_DELTA  = 3     // Min luminance shift for moving smoke particles
+const MAX_MOTION_DELTA  = 65    // Max luminance shift (rejects harsh specular glare)
 
 // State machine temporal thresholds (~20 FPS)
-const VERIFYING_FRAMES  = 3     // ~150ms of positive evidence
-const CONFIRMED_FRAMES  = 7     // ~350ms of sustained plume dynamics
-const DECAY_RATE        = 2     // Clearance decay
+const VERIFYING_FRAMES  = 2     // ~100ms of positive evidence
+const CONFIRMED_FRAMES  = 5     // ~250ms of sustained smoke dynamics
+const DECAY_RATE        = 1     // Smooth decay
 
 /**
  * Check if a pixel represents human skin.
- * Strictly disqualifies human faces, hands, and bodies.
+ * Uses normalized RGB / chromatic boundary tests to reject human bodies, faces, and hands.
  */
 export function isSkinPixel(r, g, b) {
   return (
@@ -60,30 +63,18 @@ export function isSkinPixel(r, g, b) {
 
 /**
  * Optical evaluation for semi-transparent grey-white smoke / mist plume.
- * Rejects high-chroma objects (colored shirts, walls, toys, books).
+ * Allows neutral/diffuse tones with indoor lighting warmth, rejecting saturated colors.
  */
 export function isSmokeOpticsPixel(r, g, b) {
+  if (isSkinPixel(r, g, b)) return false
+
   const maxC = Math.max(r, g, b)
   const minC = Math.min(r, g, b)
   const chromaDiff = maxC - minC
   const luma = 0.299 * r + 0.587 * g + 0.114 * b
 
-  // Low saturation (grey/white neutral spectrum) and moderate-to-high luminance
-  // Rejects saturated colors (red/blue/green/yellow) and deep pitch-black shadows
-  return (
-    chromaDiff <= 28 &&
-    luma >= 85 &&
-    luma <= 245
-  )
-}
-
-/**
- * Compute variance of an array of numbers.
- */
-function computeVariance(arr) {
-  if (!arr || arr.length < 2) return 0
-  const mean = arr.reduce((a, b) => a + b, 0) / arr.length
-  return arr.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / arr.length
+  // Low/moderate saturation (diffuse smoke/vapor/mist) and visible luminance
+  return chromaDiff <= 46 && luma >= 60 && luma <= 248
 }
 
 export class SmokePlumeDetector {
@@ -97,11 +88,9 @@ export class SmokePlumeDetector {
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })
 
     const totalPx = this.sampleWidth * this.sampleHeight
+    this.bgLuma   = new Float32Array(totalPx)
     this.prevLuma = new Float32Array(totalPx)
-    this.hasPrev  = false
-
-    // Rolling history of cluster sizes for dispersion variance analysis
-    this.sizeHistory = []
+    this.frameCount = 0
 
     this.counter        = 0
     this.state          = 'none' // 'none' | 'verifying' | 'confirmed'
@@ -116,7 +105,7 @@ export class SmokePlumeDetector {
     if (enabled) {
       this.counter        = CONFIRMED_FRAMES + 2
       this.state          = 'confirmed'
-      this.lastBbox       = { x: 0.40, y: 0.32, width: 0.28, height: 0.34 }
+      this.lastBbox       = { x: 0.38, y: 0.30, width: 0.32, height: 0.38 }
       this.lastConfidence = 0.94
     } else {
       this.reset()
@@ -129,9 +118,9 @@ export class SmokePlumeDetector {
     this.lastBbox       = null
     this.lastConfidence = 0
     this.simulated      = false
-    this.hasPrev        = false
+    this.frameCount     = 0
+    this.bgLuma.fill(0)
     this.prevLuma.fill(0)
-    this.sizeHistory    = []
   }
 
   /**
@@ -154,7 +143,7 @@ export class SmokePlumeDetector {
         state:            'confirmed',
         visualConfidence: this.lastConfidence,
         bbox:             this.lastBbox,
-        pixelCount:       65,
+        pixelCount:       75,
       }
     }
 
@@ -180,9 +169,9 @@ export class SmokePlumeDetector {
       const grid    = new Uint8Array(sw * sh)
       const curLuma = new Float32Array(sw * sh)
 
-      let totalSkinPixels  = 0
       let totalSmokePixels = 0
       let totalGlobalShift = 0
+      const isWarmup = this.frameCount < 3
 
       for (let y = 0; y < sh; y++) {
         const rowOffset = y * sw
@@ -196,56 +185,54 @@ export class SmokePlumeDetector {
           const luma = 0.299 * r + 0.587 * g + 0.114 * b
           curLuma[pIdx] = luma
 
-          // Human skin check
-          if (isSkinPixel(r, g, b)) {
-            totalSkinPixels++
-            continue // Disqualify
+          // Initialize background model during warmup
+          if (isWarmup) {
+            this.bgLuma[pIdx] = luma
+            this.prevLuma[pIdx] = luma
+            continue
           }
 
-          // Check optical plume properties (semi-transparent, grey-white)
+          // Optical smoke filter
           if (isSmokeOpticsPixel(r, g, b)) {
-            let hasMotion = false
-            if (this.hasPrev) {
-              const deltaLuma = Math.abs(luma - this.prevLuma[pIdx])
-              if (deltaLuma >= MIN_MOTION_DELTA && deltaLuma <= MAX_MOTION_DELTA) {
-                hasMotion = true
-              }
-              if (deltaLuma > 45) {
-                totalGlobalShift++
-              }
-            } else {
-              // Initializing frame
-              hasMotion = true
-            }
+            const bgDelta   = Math.abs(luma - this.bgLuma[pIdx])
+            const prevDelta = Math.abs(luma - this.prevLuma[pIdx])
 
-            if (hasMotion) {
+            if (bgDelta > 50) totalGlobalShift++
+
+            // Dynamic motion: must differ from background or previous frame
+            // Rejects static walls, clothes, sheets, and furniture where delta ~ 0
+            const hasDynamicMotion = (bgDelta >= MIN_MOTION_DELTA || prevDelta >= MIN_MOTION_DELTA) && bgDelta <= MAX_MOTION_DELTA
+
+            if (hasDynamicMotion) {
               grid[pIdx] = 1
               totalSmokePixels++
+            } else {
+              // Slowly adapt background for static regions
+              this.bgLuma[pIdx] = this.bgLuma[pIdx] * 0.94 + luma * 0.06
             }
+          } else {
+            // Non-smoke pixel: adapt background
+            this.bgLuma[pIdx] = this.bgLuma[pIdx] * 0.92 + luma * 0.08
           }
         }
       }
 
-      // Reject if global lighting switch or camera pan (more than 35% of frame has sudden massive shift)
+      this.frameCount++
+
+      // Reject sudden camera jerk or light switch (more than 45% of frame has massive shift)
       const totalPixels = sw * sh
-      if (this.hasPrev && (totalGlobalShift / totalPixels) > 0.35) {
+      if (!isWarmup && (totalGlobalShift / totalPixels) > 0.45) {
         this._updateLuma(curLuma)
         return this._decay()
       }
 
-      // Reject if dominated by human body/face (> 24% skin)
-      if ((totalSkinPixels / totalPixels) > 0.24) {
-        this._updateLuma(curLuma)
-        return this._decay()
-      }
-
-      // Fast reject if fewer than minimum smoke candidate pixels
+      // Fast reject if fewer than minimum smoke pixels
       if (totalSmokePixels < MIN_PLUME_PIXELS) {
         this._updateLuma(curLuma)
         return this._decay()
       }
 
-      // BFS Connected Component Clustering to locate cohesive smoke plume
+      // BFS Connected-Component Clustering to locate cohesive smoke plume
       const visited = new Uint8Array(sw * sh)
       let bestCluster = null
       let bestClusterSize = 0
@@ -318,31 +305,14 @@ export class SmokePlumeDetector {
         }
       }
 
+      this._updateLuma(curLuma)
+
       if (!bestCluster) {
-        this._updateLuma(curLuma)
         return this._decay()
       }
 
-      // Dispersion & Turbulence analysis:
-      // Real smoke constantly expands, diffuses, and shifts cluster area.
-      this.sizeHistory.push(bestCluster.size)
-      if (this.sizeHistory.length > HISTORY_LENGTH) {
-        this.sizeHistory.shift()
-      }
-      const sizeVar = computeVariance(this.sizeHistory)
-
-      this._updateLuma(curLuma)
-
-      // REJECT STATIC OBJECTS (grey walls, furniture, notebooks, plain clothes):
-      // If we've observed for several frames and the area is completely static, decay!
-      if (this.counter >= VERIFYING_FRAMES && this.hasPrev && this.sizeHistory.length >= 4) {
-        if (sizeVar < MIN_SIZE_VARIANCE) {
-          return this._decay()
-        }
-      }
-
       // Increment consecutive sustained smoke frames
-      this.counter = Math.min(this.counter + 1, CONFIRMED_FRAMES + 10)
+      this.counter = Math.min(this.counter + 1, CONFIRMED_FRAMES + 8)
 
       if (this.counter >= CONFIRMED_FRAMES) {
         this.state = 'confirmed'
@@ -353,7 +323,7 @@ export class SmokePlumeDetector {
       }
 
       // Calculate tight bounding box with padding
-      const pad = 8
+      const pad = 10
       const boxW = (bestCluster.maxX - bestCluster.minX + 1) + pad * 2
       const boxH = (bestCluster.maxY - bestCluster.minY + 1) + pad * 2
 
@@ -367,10 +337,10 @@ export class SmokePlumeDetector {
       // Calculate evidence-based visual detection confidence
       let confidence = 0
       if (this.state === 'confirmed') {
-        const densityBonus  = Math.min(0.06, (bestCluster.density - MIN_PLUME_DENSITY) * 0.15)
-        const varianceBonus = Math.min(0.06, (sizeVar - MIN_SIZE_VARIANCE) * 0.015)
-        const persistBonus  = Math.min(0.06, (this.counter - CONFIRMED_FRAMES) * 0.01)
-        confidence = Math.min(0.96, Math.max(0.82, 0.82 + densityBonus + varianceBonus + persistBonus))
+        const sizeBonus    = Math.min(0.08, bestCluster.size * 0.003)
+        const densityBonus = Math.min(0.05, (bestCluster.density - MIN_PLUME_DENSITY) * 0.15)
+        const persistBonus = Math.min(0.05, (this.counter - CONFIRMED_FRAMES) * 0.015)
+        confidence = Math.min(0.96, Math.max(0.82, 0.82 + sizeBonus + densityBonus + persistBonus))
         this.lastConfidence = Math.round(confidence * 100) / 100
       }
 
@@ -396,7 +366,6 @@ export class SmokePlumeDetector {
 
   _updateLuma(curLuma) {
     this.prevLuma.set(curLuma)
-    this.hasPrev = true
   }
 
   _decay() {
@@ -410,7 +379,6 @@ export class SmokePlumeDetector {
     } else {
       this.state = 'none'
       this.lastBbox = null
-      this.sizeHistory = []
     }
 
     return {
