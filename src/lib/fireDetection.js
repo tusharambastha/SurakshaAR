@@ -2,11 +2,17 @@
  * SurakshaAR — Robust Computer Vision Fire & Flame Detection Engine
  *
  * Exclusively detects active combustion flames (match, candle, lighter).
- * Verified against live webcam feeds to:
- * - Detect small candle/lighter/matchstick flames
- * - Reject human skin & faces ((R - B) < 40, (R - G) < 25)
- * - Reject white t-shirts & reflections ((R - B) < 25, (R - G) < 10)
- * - Reject walls, lamps, and background objects
+ * Absolutely rejects:
+ * - Human faces, skin, and hair ((R - B) < 40, (R - G) < 22)
+ * - White t-shirts and reflections ((R - B) < 25)
+ * - Static background shelves, walls, and furniture (Zero temporal flicker, variance < 1.0)
+ * - Ceiling lights / tube lights (B > 180, diffuse)
+ *
+ * 4-Tier Defense Architecture:
+ * 1. Optical Combustion Filter (Warm spectrum, R >= 218, R-B >= 65, R-G >= 22, B <= 145)
+ * 2. BFS Spatial Cluster Extraction (Small compact cluster: 6-100px, w <= 22%, h <= 28%, density >= 0.18)
+ * 3. Temporal Flicker & Convection Variance (Real flame vibrates at 8-20 Hz; static objects have delta ~ 0)
+ * 4. Multi-Frame State Machine ('none' -> 'verifying' -> 'confirmed' with rapid decay on absence)
  */
 
 const SAMPLE_WIDTH  = 160
@@ -14,30 +20,51 @@ const SAMPLE_HEIGHT = 120
 
 // Spatial constraints (Candle / match / lighter scale)
 const MIN_CLUSTER_PIXELS  = 6     // Minimum flame pixels in cluster
-const MAX_CLUSTER_PIXELS  = 120   // Real candle/match is small (not a whole shirt)
-const MAX_BOX_W_RATIO     = 0.25  // Max width 25% of frame
-const MAX_BOX_H_RATIO     = 0.32  // Max height 32% of frame
-const MIN_CLUSTER_DENSITY = 0.16  // Cluster pixels / bounding box area
+const MAX_CLUSTER_PIXELS  = 100   // Real flame is compact (rejects large shirts/walls)
+const MAX_BOX_W_RATIO     = 0.22  // Max width 22% of frame
+const MAX_BOX_H_RATIO     = 0.28  // Max height 28% of frame
+const MIN_CLUSTER_DENSITY = 0.18  // Cluster pixels / bounding box area
 
-// Temporal thresholds (responsive ~20 FPS)
-const VERIFYING_FRAMES = 2   // ~100ms to enter verifying state
-const CONFIRMED_FRAMES = 5   // ~250ms of sustained flame to confirm
-const DECAY_RATE       = 2   // Clearance within ~100ms when flame removed
+// Temporal flicker & variance
+const FLICKER_LUMA_DELTA  = 12    // Min luminance shift for flickering pixel
+const MIN_FLICKER_RATIO   = 0.15  // At least 15% of flame pixels must flicker dynamically
+const MIN_SIZE_VARIANCE   = 2.0   // Real flame size oscillates due to air convection; static objects < 1.0
+const HISTORY_LENGTH      = 6     // Frames to compute temporal variance
+
+// State machine thresholds (~20 FPS)
+const VERIFYING_FRAMES    = 3     // ~150ms to enter verifying state
+const CONFIRMED_FRAMES    = 8     // ~400ms of sustained flickering evidence
+const DECAY_RATE          = 3     // Fast clearance within ~100ms when flame removed
 
 /**
- * Evaluates whether a pixel belongs to an active flame mantle.
- * A real combustion flame has high red, low-to-medium blue, and red dominance:
- * - R >= 210
- * - (R - B) >= 55  (White shirts have R-B < 25; Skin has R-B < 40)
- * - (R - G) >= 20  (Warm flame chromaticity; Yellow fabric has R-G < 18 when G is high)
- * - B <= 165       (Combustion emits predominantly warm spectrum)
+ * Optical combustion pixel evaluation.
+ * Returns true ONLY if pixel exhibits active flame radiation characteristics:
+ * - High luminous red intensity (R >= 218)
+ * - Red strongly dominates Blue ((R - B) >= 65) — rejects white shirts & skin
+ * - Red dominates Green ((R - G) >= 22) — warm flame spectrum
+ * - Blue is suppressed (B <= 145) — rejects walls and lamps
  */
 export function isFlamePixel(r, g, b) {
-  return r >= 210 && (r - b) >= 55 && (r - g) >= 20 && b <= 165
+  return (
+    r >= 218 &&
+    (r - b) >= 65 &&
+    (r - g) >= 22 &&
+    b <= 145 &&
+    (r + g + b) >= 420
+  )
 }
 
 /**
- * Stateful FireDetector with spatial cluster extraction and temporal verification.
+ * Compute variance of an array of numbers.
+ */
+function computeVariance(arr) {
+  if (!arr || arr.length < 2) return 0
+  const mean = arr.reduce((a, b) => a + b, 0) / arr.length
+  return arr.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / arr.length
+}
+
+/**
+ * Stateful FireDetector with BFS clustering and temporal flicker analysis.
  */
 export class FireDetector {
   constructor(options = {}) {
@@ -48,6 +75,13 @@ export class FireDetector {
     this.canvas.width  = this.sampleWidth
     this.canvas.height = this.sampleHeight
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })
+
+    const totalPx = this.sampleWidth * this.sampleHeight
+    this.prevLuma = new Float32Array(totalPx)
+    this.hasPrev  = false
+
+    // Rolling history of cluster sizes for convection variance analysis
+    this.sizeHistory = []
 
     this.counter        = 0
     this.state          = 'none' // 'none' | 'verifying' | 'confirmed'
@@ -72,6 +106,9 @@ export class FireDetector {
     this.lastBbox       = null
     this.lastConfidence = 0
     this.simulated      = false
+    this.hasPrev        = false
+    this.prevLuma.fill(0)
+    this.sizeHistory    = []
   }
 
   /**
@@ -105,31 +142,36 @@ export class FireDetector {
     const imgData = ctx.getImageData(0, 0, sampleWidth, sampleHeight)
     const data    = imgData.data
 
-    // Grid of flame pixels for connected component analysis
+    // Grid of flame pixels and current frame luminance map
     const grid = new Uint8Array(sampleWidth * sampleHeight)
+    const curLuma = new Float32Array(sampleWidth * sampleHeight)
     let totalFlamePixels = 0
 
     for (let y = 0; y < sampleHeight; y++) {
       const rowOffset = y * sampleWidth
       for (let x = 0; x < sampleWidth; x++) {
-        const idx = (rowOffset + x) * 4
-        const r   = data[idx]
-        const g   = data[idx + 1]
-        const b   = data[idx + 2]
+        const pIdx = rowOffset + x
+        const idx  = pIdx * 4
+        const r    = data[idx]
+        const g    = data[idx + 1]
+        const b    = data[idx + 2]
+        const luma = 0.299 * r + 0.587 * g + 0.114 * b
+        curLuma[pIdx] = luma
 
         if (isFlamePixel(r, g, b)) {
-          grid[rowOffset + x] = 1
+          grid[pIdx] = 1
           totalFlamePixels++
         }
       }
     }
 
-    // Fast check: if not enough total pixels, decay
+    // Fast reject: if fewer than minimum flame pixels
     if (totalFlamePixels < MIN_CLUSTER_PIXELS) {
+      this._updateLuma(curLuma)
       return this._decay()
     }
 
-    // Find the largest connected flame cluster (BFS flood fill)
+    // BFS Connected-Component Analysis to find true flame cluster
     const visited = new Uint8Array(sampleWidth * sampleHeight)
     let bestCluster = null
     let bestClusterSize = 0
@@ -139,10 +181,10 @@ export class FireDetector {
       for (let x = 0; x < sampleWidth; x++) {
         const pIdx = rowOffset + x
         if (grid[pIdx] === 1 && visited[pIdx] === 0) {
-          // BFS flood fill for this cluster
           let clusterSize = 0
           let cMinX = x, cMaxX = x
           let cMinY = y, cMaxY = y
+          const clusterPoints = []
 
           const queue = [x, y]
           visited[pIdx] = 1
@@ -152,13 +194,13 @@ export class FireDetector {
             const cx = queue[head++]
             const cy = queue[head++]
             clusterSize++
+            clusterPoints.push(cy * sampleWidth + cx)
 
             if (cx < cMinX) cMinX = cx
             if (cx > cMaxX) cMaxX = cx
             if (cy < cMinY) cMinY = cy
             if (cy > cMaxY) cMaxY = cy
 
-            // 4-neighborhood
             const neighbors = [
               cx - 1, cy,
               cx + 1, cy,
@@ -178,7 +220,7 @@ export class FireDetector {
             }
           }
 
-          // Evaluate cluster against flame scale constraints
+          // Evaluate spatial geometry
           const bw = cMaxX - cMinX + 1
           const bh = cMaxY - cMinY + 1
           const wRatio = bw / sampleWidth
@@ -194,7 +236,10 @@ export class FireDetector {
           ) {
             if (clusterSize > bestClusterSize) {
               bestClusterSize = clusterSize
-              bestCluster = { minX: cMinX, maxX: cMaxX, minY: cMinY, maxY: cMaxY, size: clusterSize, density }
+              bestCluster = {
+                minX: cMinX, maxX: cMaxX, minY: cMinY, maxY: cMaxY,
+                size: clusterSize, density, points: clusterPoints,
+              }
             }
           }
         }
@@ -202,10 +247,41 @@ export class FireDetector {
     }
 
     if (!bestCluster) {
+      this._updateLuma(curLuma)
       return this._decay()
     }
 
-    // Valid flame cluster detected in this frame -> increment consecutive counter
+    // ── Temporal Flicker & Variance Analysis ──
+    let flickerCount = 0
+    if (this.hasPrev) {
+      for (const ptIdx of bestCluster.points) {
+        const delta = Math.abs(curLuma[ptIdx] - this.prevLuma[ptIdx])
+        if (delta >= FLICKER_LUMA_DELTA) {
+          flickerCount++
+        }
+      }
+    }
+    const flickerRatio = bestCluster.size > 0 ? flickerCount / bestCluster.size : 0
+
+    // Track size history for convection turbulence variance
+    this.sizeHistory.push(bestCluster.size)
+    if (this.sizeHistory.length > HISTORY_LENGTH) {
+      this.sizeHistory.shift()
+    }
+    const sizeVar = computeVariance(this.sizeHistory)
+
+    this._updateLuma(curLuma)
+
+    // REJECT STATIC OBJECTS (Shelf, wall, lamp, human sitting still):
+    // If we have history and the object has zero flicker AND zero variance, it is NOT fire!
+    if (this.counter >= VERIFYING_FRAMES && this.hasPrev) {
+      if (flickerRatio < MIN_FLICKER_RATIO && sizeVar < MIN_SIZE_VARIANCE) {
+        // Static surface detected -> decay immediately!
+        return this._decay()
+      }
+    }
+
+    // Increment consecutive valid flame frames
     this.counter = Math.min(this.counter + 1, CONFIRMED_FRAMES + 10)
 
     if (this.counter >= CONFIRMED_FRAMES) {
@@ -216,7 +292,7 @@ export class FireDetector {
       this.state = 'none'
     }
 
-    // Pad bounding box for AR overlay
+    // Bounding box padding for HUD reticle
     const pad = 6
     const boxW = (bestCluster.maxX - bestCluster.minX + 1) + pad * 2
     const boxH = (bestCluster.maxY - bestCluster.minY + 1) + pad * 2
@@ -228,13 +304,13 @@ export class FireDetector {
       height: Math.min(sampleHeight, boxH) / sampleHeight,
     }
 
-    // Compute evidence-based confidence
+    // Calculated confidence based on actual visual evidence
     let confidence = 0
     if (this.state === 'confirmed') {
-      const sizeBonus     = Math.min(0.08, (bestCluster.size / 40) * 0.08)
       const densityBonus  = Math.min(0.08, (bestCluster.density - MIN_CLUSTER_DENSITY) * 0.2)
+      const flickerBonus  = Math.min(0.08, (flickerRatio - MIN_FLICKER_RATIO) * 0.25)
       const persistBonus  = Math.min(0.06, (this.counter - CONFIRMED_FRAMES) * 0.008)
-      confidence = Math.min(0.96, Math.max(0.78, 0.78 + sizeBonus + densityBonus + persistBonus))
+      confidence = Math.min(0.96, Math.max(0.78, 0.78 + densityBonus + flickerBonus + persistBonus))
       this.lastConfidence = Math.round(confidence * 100) / 100
     }
 
@@ -245,6 +321,11 @@ export class FireDetector {
       bbox:       this.state === 'confirmed' ? this.lastBbox : null,
       pixelCount: bestCluster.size,
     }
+  }
+
+  _updateLuma(curLuma) {
+    this.prevLuma.set(curLuma)
+    this.hasPrev = true
   }
 
   _decay() {
@@ -258,6 +339,7 @@ export class FireDetector {
     } else {
       this.state = 'none'
       this.lastBbox = null
+      this.sizeHistory = []
     }
 
     return {
