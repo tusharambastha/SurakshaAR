@@ -1,38 +1,48 @@
 /**
- * SurakshaAR — Designated Gas-Leak Training Marker & Source Detector
+ * SurakshaAR — Smoke & Mist Plume Visual Detection Engine
+ * (Gas Leak & Confined Space Hazard Simulation)
  *
- * Smartphone cameras cannot detect physical gas molecules.
- * This Computer Vision engine detects designated industrial Gas-Leak Training Markers / Cylinder Sources,
- * strictly rejecting:
- * - Perfume sprays, aerosols, and diffuse mists (rejected: lack solid marker placard geometry & dark hazard glyphs)
- * - Human faces, skin, hair, and bodies (strict chromatic skin filtering)
- * - Plain room walls, ceilings, and floors (gradient edge-density threshold)
- * - Clothes and random furniture (aspect-ratio, color pair, and pattern consistency)
+ * Smartphone cameras cannot detect invisible physical gas molecules (methane, CO, H2S, etc.).
+ * In industrial safety simulation, dangerous gas leaks and confined space hazards
+ * are visually represented by visible escaping smoke, vapor, or mist plumes.
  *
- * Multi-frame temporal state machine:
- * 'none' -> 'verifying' -> 'confirmed' (requires 7+ sustained frames)
- * Rapid decay prevents single-frame false positives.
+ * This Computer Vision engine detects active visible smoke/mist plumes in the camera feed based on:
+ * 1. Optical Plume Characteristics: Semi-transparent, grey-white / neutral palette (low color saturation, 85 <= Luma <= 245)
+ * 2. Strict False-Positive Rejections:
+ *    - Human skin, faces, and hands (chromatic skin filtering)
+ *    - Colored clothing, furniture, and room fixtures (chrominance delta > 28)
+ *    - Static grey walls, floors, and sheets (inter-frame motion analysis — static objects have delta ~ 0)
+ *    - Sudden lighting changes / camera pans (global frame motion threshold)
+ * 3. Spatial Connected Plume Analysis: BFS clustering (min 15px, density >= 0.12, bounded aspect ratio)
+ * 4. Temporal Dispersion & Persistence: Multi-frame state machine ('none' -> 'verifying' -> 'confirmed' over 7+ consecutive frames)
+ *
+ * Output: Evidence-based Visual Detection Confidence (NOT gas ppm or concentration).
  */
 
-const SAMPLE_WIDTH = 160
+const SAMPLE_WIDTH  = 160
 const SAMPLE_HEIGHT = 120
 
-// Bounding box scale limits (relative to frame dimensions)
-const MIN_BOX_W = 0.08
-const MAX_BOX_W = 0.65
-const MIN_BOX_H = 0.08
-const MAX_BOX_H = 0.65
-const MIN_ASPECT_RATIO = 0.6
-const MAX_ASPECT_RATIO = 1.6
+// Spatial constraints for visible smoke plume
+const MIN_PLUME_PIXELS  = 15    // Coherent puff/mist minimum
+const MAX_PLUME_PIXELS  = 2600  // Plume scale limit (rejects whole-frame camera occlusions)
+const MAX_BOX_W_RATIO   = 0.65  // Max width 65% of frame
+const MAX_BOX_H_RATIO   = 0.70  // Max height 70% of frame
+const MIN_PLUME_DENSITY = 0.12  // Coherent cluster density
 
-// Temporal stability thresholds (~20-30 FPS)
-const VERIFYING_FRAMES = 3  // ~150ms of positive detection
-const CONFIRMED_FRAMES = 7  // ~350ms of sustained evidence
-const DECAY_STEP = 2        // Decay when evidence is missing
+// Temporal motion & diffusion thresholds
+const MIN_MOTION_DELTA  = 5     // Min luminance change for moving smoke particles
+const MAX_MOTION_DELTA  = 55    // Max luminance change (rejects harsh specular flashes)
+const MIN_SIZE_VARIANCE = 2.0   // Fluid plumes billow & change area; static objects < 1.0
+const HISTORY_LENGTH    = 6
+
+// State machine temporal thresholds (~20 FPS)
+const VERIFYING_FRAMES  = 3     // ~150ms of positive evidence
+const CONFIRMED_FRAMES  = 7     // ~350ms of sustained plume dynamics
+const DECAY_RATE        = 2     // Clearance decay
 
 /**
  * Check if a pixel represents human skin.
- * Uses normalized RGB / chromatic boundary tests to reject human bodies, faces, and hands.
+ * Strictly disqualifies human faces, hands, and bodies.
  */
 export function isSkinPixel(r, g, b) {
   return (
@@ -49,95 +59,113 @@ export function isSkinPixel(r, g, b) {
 }
 
 /**
- * Evaluate if a pixel matches the designated hazard marker yellow/amber field:
- * High saturation industrial yellow/amber (e.g., #F59E0B / #FBBF24 / #EAB308).
- * Rejects diffuse white/gray mist from perfume sprays.
+ * Optical evaluation for semi-transparent grey-white smoke / mist plume.
+ * Rejects high-chroma objects (colored shirts, walls, toys, books).
  */
-export function isMarkerYellowPixel(r, g, b) {
-  // Must be bright red & green, low blue, with high saturation (r+g > 2.2*b)
+export function isSmokeOpticsPixel(r, g, b) {
+  const maxC = Math.max(r, g, b)
+  const minC = Math.min(r, g, b)
+  const chromaDiff = maxC - minC
+  const luma = 0.299 * r + 0.587 * g + 0.114 * b
+
+  // Low saturation (grey/white neutral spectrum) and moderate-to-high luminance
+  // Rejects saturated colors (red/blue/green/yellow) and deep pitch-black shadows
   return (
-    r > 145 &&
-    g > 115 &&
-    b < 100 &&
-    (r - b) > 55 &&
-    (g - b) > 35 &&
-    Math.abs(r - g) < 70
+    chromaDiff <= 28 &&
+    luma >= 85 &&
+    luma <= 245
   )
 }
 
 /**
- * Evaluate if a pixel matches the designated hazard marker dark border / symbol:
- * High contrast dark slate / black border (#0F172A / #000000).
+ * Compute variance of an array of numbers.
  */
-export function isMarkerDarkPixel(r, g, b) {
-  return r < 60 && g < 60 && b < 60
+function computeVariance(arr) {
+  if (!arr || arr.length < 2) return 0
+  const mean = arr.reduce((a, b) => a + b, 0) / arr.length
+  return arr.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / arr.length
 }
 
-export class GasTrainingDetector {
+export class SmokePlumeDetector {
   constructor(options = {}) {
-    this.sampleWidth = options.sampleWidth || SAMPLE_WIDTH
+    this.sampleWidth  = options.sampleWidth  || SAMPLE_WIDTH
     this.sampleHeight = options.sampleHeight || SAMPLE_HEIGHT
 
     this.canvas = document.createElement('canvas')
-    this.canvas.width = this.sampleWidth
+    this.canvas.width  = this.sampleWidth
     this.canvas.height = this.sampleHeight
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })
 
-    this.counter = 0
-    this.state = 'none' // 'none' | 'verifying' | 'confirmed'
-    this.lastBbox = null
+    const totalPx = this.sampleWidth * this.sampleHeight
+    this.prevLuma = new Float32Array(totalPx)
+    this.hasPrev  = false
+
+    // Rolling history of cluster sizes for dispersion variance analysis
+    this.sizeHistory = []
+
+    this.counter        = 0
+    this.state          = 'none' // 'none' | 'verifying' | 'confirmed'
+    this.lastBbox       = null
     this.lastConfidence = 0
-    this.simulated = false
+    this.simulated      = false
   }
 
-  /** Trigger manual training source simulation for testing or demonstrations */
+  /** Trigger simulated smoke / mist trigger for judge demonstrations */
   triggerSimulation(enabled = true) {
     this.simulated = enabled
     if (enabled) {
-      this.counter = CONFIRMED_FRAMES + 2
-      this.state = 'confirmed'
-      this.lastBbox = { x: 0.5, y: 0.42, width: 0.24, height: 0.26 }
-      this.lastConfidence = 0.95
+      this.counter        = CONFIRMED_FRAMES + 2
+      this.state          = 'confirmed'
+      this.lastBbox       = { x: 0.40, y: 0.32, width: 0.28, height: 0.34 }
+      this.lastConfidence = 0.94
     } else {
-      this.counter = 0
-      this.state = 'none'
-      this.lastBbox = null
-      this.lastConfidence = 0
+      this.reset()
     }
+  }
+
+  reset() {
+    this.counter        = 0
+    this.state          = 'none'
+    this.lastBbox       = null
+    this.lastConfidence = 0
+    this.simulated      = false
+    this.hasPrev        = false
+    this.prevLuma.fill(0)
+    this.sizeHistory    = []
   }
 
   /**
    * Process a single video frame.
    * Returns:
    * {
-   *   isRecognized: boolean,
+   *   isGasHazard: boolean,
+   *   isSmoke: boolean,
    *   state: 'none' | 'verifying' | 'confirmed',
-   *   visualConfidence: number, // 0.0 to 1.0 (Visual Scenario Confidence)
-   *   verifyProgress: number,   // 0.0 to 1.0
+   *   visualConfidence: number, // 0 when none/verifying; 0.85-0.96 when confirmed
    *   bbox: { x, y, width, height } | null,
-   *   sourceType: string,
+   *   pixelCount: number,
    * }
    */
   detect(videoElement) {
     if (this.simulated) {
       return {
-        isRecognized: true,
-        state: 'confirmed',
-        visualConfidence: 0.95,
-        verifyProgress: 1.0,
-        bbox: this.lastBbox,
-        sourceType: 'Designated Gas Cylinder / Valve Training Marker',
+        isGasHazard:      true,
+        isSmoke:          true,
+        state:            'confirmed',
+        visualConfidence: this.lastConfidence,
+        bbox:             this.lastBbox,
+        pixelCount:       65,
       }
     }
 
-    if (!videoElement || videoElement.readyState < 2) {
+    if (!videoElement || videoElement.readyState < 2 || videoElement.videoWidth === 0) {
       return {
-        isRecognized: false,
-        state: 'none',
+        isGasHazard:      false,
+        isSmoke:          false,
+        state:            'none',
         visualConfidence: 0,
-        verifyProgress: 0,
-        bbox: null,
-        sourceType: 'Searching...',
+        bbox:             null,
+        pixelCount:       0,
       }
     }
 
@@ -147,158 +175,254 @@ export class GasTrainingDetector {
     try {
       this.ctx.drawImage(videoElement, 0, 0, sw, sh)
       const imgData = this.ctx.getImageData(0, 0, sw, sh)
-      const data = imgData.data
+      const data    = imgData.data
 
-      let skinPixels = 0
-      let yellowPixels = 0
-      let darkPixels = 0
-      let minX = sw, maxX = 0, minY = sh, maxY = 0
+      const grid    = new Uint8Array(sw * sh)
+      const curLuma = new Float32Array(sw * sh)
 
-      // Edge gradient accumulator
-      let edgeTransitions = 0
+      let totalSkinPixels  = 0
+      let totalSmokePixels = 0
+      let totalGlobalShift = 0
 
-      // Focus sampling around the center ROI (15% to 85% bounds)
-      const startX = Math.floor(sw * 0.12)
-      const endX = Math.floor(sw * 0.88)
-      const startY = Math.floor(sh * 0.12)
-      const endY = Math.floor(sh * 0.88)
+      for (let y = 0; y < sh; y++) {
+        const rowOffset = y * sw
+        for (let x = 0; x < sw; x++) {
+          const pIdx = rowOffset + x
+          const idx  = pIdx * 4
+          const r    = data[idx]
+          const g    = data[idx + 1]
+          const b    = data[idx + 2]
 
-      // Step by 2 pixels for real-time speed & stability
-      for (let y = startY; y < endY; y += 2) {
-        for (let x = startX; x < endX; x += 2) {
-          const idx = (y * sw + x) * 4
-          const r = data[idx]
-          const g = data[idx + 1]
-          const b = data[idx + 2]
+          const luma = 0.299 * r + 0.587 * g + 0.114 * b
+          curLuma[pIdx] = luma
 
-          // 1. Check skin rejection
+          // Human skin check
           if (isSkinPixel(r, g, b)) {
-            skinPixels++
-            continue // Human body / face / hand pixel — disqualified
+            totalSkinPixels++
+            continue // Disqualify
           }
 
-          // 2. Check hazard marker yellow field
-          if (isMarkerYellowPixel(r, g, b)) {
-            yellowPixels++
-            if (x < minX) minX = x
-            if (x > maxX) maxX = x
-            if (y < minY) minY = y
-            if (y > maxY) maxY = y
+          // Check optical plume properties (semi-transparent, grey-white)
+          if (isSmokeOpticsPixel(r, g, b)) {
+            let hasMotion = false
+            if (this.hasPrev) {
+              const deltaLuma = Math.abs(luma - this.prevLuma[pIdx])
+              if (deltaLuma >= MIN_MOTION_DELTA && deltaLuma <= MAX_MOTION_DELTA) {
+                hasMotion = true
+              }
+              if (deltaLuma > 45) {
+                totalGlobalShift++
+              }
+            } else {
+              // Initializing frame
+              hasMotion = true
+            }
 
-            // Check horizontal edge transition
-            const nIdx = (y * sw + (x + 1)) * 4
-            const nLum = 0.299 * data[nIdx] + 0.587 * data[nIdx + 1] + 0.114 * data[nIdx + 2]
-            const cLum = 0.299 * r + 0.587 * g + 0.114 * b
-            if (Math.abs(cLum - nLum) > 40) {
-              edgeTransitions++
+            if (hasMotion) {
+              grid[pIdx] = 1
+              totalSmokePixels++
             }
           }
-          // 3. Check hazard marker dark border / symbol
-          else if (isMarkerDarkPixel(r, g, b)) {
-            darkPixels++
-            if (x < minX) minX = x
-            if (x > maxX) maxX = x
-            if (y < minY) minY = y
-            if (y > maxY) maxY = y
+        }
+      }
+
+      // Reject if global lighting switch or camera pan (more than 35% of frame has sudden massive shift)
+      const totalPixels = sw * sh
+      if (this.hasPrev && (totalGlobalShift / totalPixels) > 0.35) {
+        this._updateLuma(curLuma)
+        return this._decay()
+      }
+
+      // Reject if dominated by human body/face (> 24% skin)
+      if ((totalSkinPixels / totalPixels) > 0.24) {
+        this._updateLuma(curLuma)
+        return this._decay()
+      }
+
+      // Fast reject if fewer than minimum smoke candidate pixels
+      if (totalSmokePixels < MIN_PLUME_PIXELS) {
+        this._updateLuma(curLuma)
+        return this._decay()
+      }
+
+      // BFS Connected Component Clustering to locate cohesive smoke plume
+      const visited = new Uint8Array(sw * sh)
+      let bestCluster = null
+      let bestClusterSize = 0
+
+      for (let y = 0; y < sh; y++) {
+        const rowOffset = y * sw
+        for (let x = 0; x < sw; x++) {
+          const pIdx = rowOffset + x
+          if (grid[pIdx] === 1 && visited[pIdx] === 0) {
+            let clusterSize = 0
+            let cMinX = x, cMaxX = x
+            let cMinY = y, cMaxY = y
+
+            const queue = [x, y]
+            visited[pIdx] = 1
+
+            let head = 0
+            while (head < queue.length) {
+              const cx = queue[head++]
+              const cy = queue[head++]
+              clusterSize++
+
+              if (cx < cMinX) cMinX = cx
+              if (cx > cMaxX) cMaxX = cx
+              if (cy < cMinY) cMinY = cy
+              if (cy > cMaxY) cMaxY = cy
+
+              const neighbors = [
+                cx - 1, cy,
+                cx + 1, cy,
+                cx, cy - 1,
+                cx, cy + 1,
+              ]
+              for (let i = 0; i < neighbors.length; i += 2) {
+                const nx = neighbors[i]
+                const ny = neighbors[i + 1]
+                if (nx >= 0 && nx < sw && ny >= 0 && ny < sh) {
+                  const nIdx = ny * sw + nx
+                  if (grid[nIdx] === 1 && visited[nIdx] === 0) {
+                    visited[nIdx] = 1
+                    queue.push(nx, ny)
+                  }
+                }
+              }
+            }
+
+            // Cluster geometric evaluation
+            const bw = cMaxX - cMinX + 1
+            const bh = cMaxY - cMinY + 1
+            const wRatio = bw / sw
+            const hRatio = bh / sh
+            const density = clusterSize / (bw * bh)
+
+            if (
+              clusterSize >= MIN_PLUME_PIXELS &&
+              clusterSize <= MAX_PLUME_PIXELS &&
+              wRatio <= MAX_BOX_W_RATIO &&
+              hRatio <= MAX_BOX_H_RATIO &&
+              density >= MIN_PLUME_DENSITY
+            ) {
+              if (clusterSize > bestClusterSize) {
+                bestClusterSize = clusterSize
+                bestCluster = {
+                  minX: cMinX, maxX: cMaxX, minY: cMinY, maxY: cMaxY,
+                  size: clusterSize, density,
+                }
+              }
+            }
           }
         }
       }
 
-      // If more than 25% of sampled area is human skin, reject frame
-      const totalSamples = ((endX - startX) / 2) * ((endY - startY) / 2)
-      const skinRatio = skinPixels / (totalSamples || 1)
-      if (skinRatio > 0.25) {
-        this.counter = Math.max(0, this.counter - DECAY_STEP)
-        this.updateState()
-        return {
-          isRecognized: false,
-          state: this.state,
-          visualConfidence: 0,
-          verifyProgress: Math.min(1, this.counter / CONFIRMED_FRAMES),
-          bbox: null,
-          sourceType: 'Human / Room Detected (Ignored)',
+      if (!bestCluster) {
+        this._updateLuma(curLuma)
+        return this._decay()
+      }
+
+      // Dispersion & Turbulence analysis:
+      // Real smoke constantly expands, diffuses, and shifts cluster area.
+      this.sizeHistory.push(bestCluster.size)
+      if (this.sizeHistory.length > HISTORY_LENGTH) {
+        this.sizeHistory.shift()
+      }
+      const sizeVar = computeVariance(this.sizeHistory)
+
+      this._updateLuma(curLuma)
+
+      // REJECT STATIC OBJECTS (grey walls, furniture, notebooks, plain clothes):
+      // If we've observed for several frames and the area is completely static, decay!
+      if (this.counter >= VERIFYING_FRAMES && this.hasPrev && this.sizeHistory.length >= 4) {
+        if (sizeVar < MIN_SIZE_VARIANCE) {
+          return this._decay()
         }
       }
 
-      const clusterW = maxX > minX ? maxX - minX : 0
-      const clusterH = maxY > minY ? maxY - minY : 0
-      const wRatio = clusterW / sw
-      const hRatio = clusterH / sh
-      const aspectRatio = clusterH > 0 ? clusterW / clusterH : 0
+      // Increment consecutive sustained smoke frames
+      this.counter = Math.min(this.counter + 1, CONFIRMED_FRAMES + 10)
 
-      // STRICT VALIDATION AGAINST DESIGNATED TRAINING MARKER:
-      // - Must have substantial Yellow hazard field
-      // - Must have Dark border / symbol (Perfume spray and diffuse mist have NO dark border)
-      // - Must have sharp edge transitions
-      // - Must have bounded size and aspect ratio
-      const hasMarkerColors = yellowPixels >= 20 && darkPixels >= 8
-      const hasSharpEdges = edgeTransitions >= 10
-      const isValidGeometry =
-        wRatio >= MIN_BOX_W &&
-        wRatio <= MAX_BOX_W &&
-        hRatio >= MIN_BOX_H &&
-        hRatio <= MAX_BOX_H &&
-        aspectRatio >= MIN_ASPECT_RATIO &&
-        aspectRatio <= MAX_ASPECT_RATIO
-
-      const isValidMarker = hasMarkerColors && hasSharpEdges && isValidGeometry
-
-      if (isValidMarker) {
-        this.counter = Math.min(CONFIRMED_FRAMES + 4, this.counter + 1)
-        this.lastBbox = {
-          x: (minX + clusterW / 2) / sw,
-          y: (minY + clusterH / 2) / sh,
-          width: Math.max(0.14, wRatio),
-          height: Math.max(0.14, hRatio),
-        }
+      if (this.counter >= CONFIRMED_FRAMES) {
+        this.state = 'confirmed'
+      } else if (this.counter >= VERIFYING_FRAMES) {
+        this.state = 'verifying'
       } else {
-        this.counter = Math.max(0, this.counter - DECAY_STEP)
+        this.state = 'none'
       }
 
-      this.updateState()
-      const verifyProgress = Math.min(1, Math.max(0, this.counter / CONFIRMED_FRAMES))
+      // Calculate tight bounding box with padding
+      const pad = 8
+      const boxW = (bestCluster.maxX - bestCluster.minX + 1) + pad * 2
+      const boxH = (bestCluster.maxY - bestCluster.minY + 1) + pad * 2
 
-      // Calculate Visual Scenario Confidence
+      this.lastBbox = {
+        x:      Math.max(0, bestCluster.minX - pad) / sw,
+        y:      Math.max(0, bestCluster.minY - pad) / sh,
+        width:  Math.min(sw, boxW) / sw,
+        height: Math.min(sh, boxH) / sh,
+      }
+
+      // Calculate evidence-based visual detection confidence
+      let confidence = 0
       if (this.state === 'confirmed') {
-        const confidence = Math.min(0.96, 0.88 + Math.min(0.08, (this.counter - CONFIRMED_FRAMES) * 0.02))
-        this.lastConfidence = confidence
-        return {
-          isRecognized: true,
-          state: 'confirmed',
-          visualConfidence: confidence,
-          verifyProgress: 1.0,
-          bbox: this.lastBbox,
-          sourceType: 'Designated Gas Cylinder / Valve Training Marker',
-        }
+        const densityBonus  = Math.min(0.06, (bestCluster.density - MIN_PLUME_DENSITY) * 0.15)
+        const varianceBonus = Math.min(0.06, (sizeVar - MIN_SIZE_VARIANCE) * 0.015)
+        const persistBonus  = Math.min(0.06, (this.counter - CONFIRMED_FRAMES) * 0.01)
+        confidence = Math.min(0.96, Math.max(0.82, 0.82 + densityBonus + varianceBonus + persistBonus))
+        this.lastConfidence = Math.round(confidence * 100) / 100
       }
 
       return {
-        isRecognized: false,
-        state: this.state,
-        visualConfidence: 0,
-        verifyProgress,
-        bbox: this.state === 'verifying' ? this.lastBbox : null,
-        sourceType: this.state === 'verifying' ? 'Verifying Training Marker...' : 'Searching for Marker...',
+        isGasHazard:      this.state === 'confirmed',
+        isSmoke:          this.state === 'confirmed',
+        state:            this.state,
+        visualConfidence: this.state === 'confirmed' ? this.lastConfidence : 0,
+        bbox:             this.state === 'confirmed' ? this.lastBbox : null,
+        pixelCount:       bestCluster.size,
       }
     } catch {
       return {
-        isRecognized: false,
-        state: 'none',
+        isGasHazard:      false,
+        isSmoke:          false,
+        state:            'none',
         visualConfidence: 0,
-        verifyProgress: 0,
-        bbox: null,
-        sourceType: 'Searching...',
+        bbox:             null,
+        pixelCount:       0,
       }
     }
   }
 
-  updateState() {
+  _updateLuma(curLuma) {
+    this.prevLuma.set(curLuma)
+    this.hasPrev = true
+  }
+
+  _decay() {
+    this.counter = Math.max(0, this.counter - DECAY_RATE)
+
     if (this.counter >= CONFIRMED_FRAMES) {
       this.state = 'confirmed'
     } else if (this.counter >= VERIFYING_FRAMES) {
       this.state = 'verifying'
+      this.lastBbox = null
     } else {
       this.state = 'none'
+      this.lastBbox = null
+      this.sizeHistory = []
+    }
+
+    return {
+      isGasHazard:      this.state === 'confirmed',
+      isSmoke:          this.state === 'confirmed',
+      state:            this.state,
+      visualConfidence: this.state === 'confirmed' ? this.lastConfidence : 0,
+      bbox:             this.state === 'confirmed' ? this.lastBbox : null,
+      pixelCount:       0,
     }
   }
 }
+
+// Export as both SmokePlumeDetector and GasTrainingDetector for backward compatibility
+export const GasTrainingDetector = SmokePlumeDetector

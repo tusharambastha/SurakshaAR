@@ -485,9 +485,9 @@ export default function Scenario() {
     }
   }, [sessionId, user, currentStep, scenario])
 
-  // Real-time camera designated gas training source listener
+  // Real-time camera gas leak / smoke plume listener
   const handleGasDetected = useCallback((result) => {
-    console.log('[GasDetection] Designated gas training source recognized with visual confidence:', result.visualConfidence)
+    console.log('[GasDetection] Gas leak / smoke plume detected with visual confidence:', result.visualConfidence)
   }, [])
 
   // Interactive gas leak safety training response handler
@@ -499,7 +499,7 @@ export default function Scenario() {
         userId: user?.id,
         stepIndex: 0,
         feedbackType: wasCorrect ? 'correct' : 'incorrect',
-        message: `AR Gas Leak Hazard: Designated training source recognized via computer vision in ${(responseTimeMs / 1000).toFixed(1)}s`,
+        message: `AR Gas Leak Hazard: Visible smoke plume recognized via computer vision in ${(responseTimeMs / 1000).toFixed(1)}s`,
       })
     }
 

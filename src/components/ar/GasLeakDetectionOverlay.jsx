@@ -1,18 +1,22 @@
 /**
- * SurakshaAR — Gas Leak AR Detection Overlay
+ * SurakshaAR — Gas Leak & Smoke Hazard AR Detection Overlay
  *
- * Real-time camera HUD for Gas Leak training module:
- * - Recognizes designated industrial training markers / cylinder sources
- * - Explicitly rejects human bodies, room walls, and clothes
- * - Displays Visual Scenario Confidence (never gas concentration or ppm)
- * - Renders AR Virtual Gas Leak Plume, 10m Danger Zone, Warning, and Evacuation Guidance
- * - Announces multilingual voice protocol alert
+ * Real-time camera HUD for Gas Leak & Confined Space module (works like Fire module):
+ * - Detects visible smoke/mist plumes in the live camera feed
+ * - Rejects human faces/skin, static walls, clothes, and lighting shifts
+ * - 3 Validated States:
+ *   1. NO HAZARD DETECTED (ambient monitoring, NO confidence % displayed)
+ *   2. VERIFYING SMOKE / MIST PLUME... (temporal motion & diffusion analysis in progress)
+ *   3. ⚠️ GAS LEAK / SMOKE HAZARD DETECTED (evidence-based visual detection confidence %, AR plume, 10m danger zone)
+ * - Highlights the detected smoke plume region with bounding reticle
+ * - Clear disclaimer: Visual smoke detection for simulated training; does not measure gas ppm
+ * - Multilingual spoken evacuation warning (English, Hindi, Santali)
  * - Auto-advances Step 0 (Identify Gas Leak Warning)
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { AlertTriangle, ShieldAlert, CheckCircle2, RotateCcw, FileText, Wind, Eye, Users } from 'lucide-react'
-import { GasTrainingDetector } from '../../lib/gasDetection'
+import { AlertTriangle, ShieldAlert, CheckCircle2, RotateCcw, Wind, Users, CloudFog } from 'lucide-react'
+import { SmokePlumeDetector } from '../../lib/gasDetection'
 import { speak } from '../../lib/voice'
 
 export default function GasLeakDetectionOverlay({
@@ -23,24 +27,24 @@ export default function GasLeakDetectionOverlay({
   onTaskCompleted,
 }) {
   const [detection, setDetection] = useState({
-    isRecognized:     false,
+    isGasHazard:      false,
+    isSmoke:          false,
     state:            'none', // 'none' | 'verifying' | 'confirmed'
     visualConfidence: 0,
     bbox:             null,
-    sourceType:       'Searching...',
+    pixelCount:       0,
   })
 
-  const [sourceConfirmed, setSourceConfirmed] = useState(false)
+  const [hazardConfirmed, setHazardConfirmed] = useState(false)
   const [taskState, setTaskState]             = useState('scanning') // scanning | completed
-  const [showMarkerModal, setShowMarkerModal] = useState(false)
 
-  const detectorRef         = useRef(null)
-  const animRef             = useRef(null)
-  const soundPlayedRef      = useRef(false)
+  const detectorRef    = useRef(null)
+  const animRef        = useRef(null)
+  const soundPlayedRef = useRef(false)
 
   // Initialize detector
   useEffect(() => {
-    detectorRef.current = new GasTrainingDetector({
+    detectorRef.current = new SmokePlumeDetector({
       sampleWidth:  160,
       sampleHeight: 120,
     })
@@ -49,7 +53,7 @@ export default function GasLeakDetectionOverlay({
     }
   }, [])
 
-  // Frame analysis loop
+  // Live frame analysis loop
   useEffect(() => {
     if (!isActive) return
 
@@ -58,25 +62,25 @@ export default function GasLeakDetectionOverlay({
         const result = detectorRef.current.detect(videoRef.current)
         setDetection(result)
 
-        // When training source is confirmed across consecutive frames
-        if (result.isRecognized && result.state === 'confirmed' && !sourceConfirmed) {
-          setSourceConfirmed(true)
+        // When smoke/gas hazard is confirmed across sustained consecutive frames
+        if (result.isGasHazard && result.state === 'confirmed' && !hazardConfirmed) {
+          setHazardConfirmed(true)
 
           if (!soundPlayedRef.current) {
             soundPlayedRef.current = true
             speak(
               lang === 'sat'
-                ? 'ᱜᱮᱥ ᱞᱤᱠ ᱵᱚᱛᱚᱨ ᱧᱟᱢ ᱮᱱᱟ! ᱩᱞᱴᱟᱹ ᱦᱚᱭ ᱥᱮᱫ ᱚᱰᱚᱠᱚᱜ ᱢᱮ ᱟᱨ ᱵᱟᱰᱤ ᱥᱤᱥᱴᱚᱢ ᱯᱟᱸᱡᱟᱭ ᱢᱮ᱾'
+                ? 'ᱜᱮᱥ ᱞᱤᱠ ᱫᱷᱩᱶᱟ ᱵᱚᱛᱚᱨ ᱧᱟᱢ ᱮᱱᱟ! ᱩᱞᱴᱟᱹ ᱦᱚᱭ ᱥᱮᱫ ᱚᱰᱚᱠᱚᱜ ᱢᱮ ᱟᱨ ᱵᱟᱰᱤ ᱥᱤᱥᱴᱚᱢ ᱯᱟᱸᱡᱟᱭ ᱢᱮ᱾'
                 : lang === 'hi'
-                  ? 'गैस रिसाव प्रशिक्षण स्रोत की पहचान हुई! तुरंत हवा के विपरीत दिशा में निकलें और बडी सिस्टम का पालन करें।'
-                  : 'Gas leak training source recognized! Evacuate upwind immediately and follow buddy system.',
+                  ? 'गैस रिसाव धुआं खतरा पाया गया! तुरंत हवा के विपरीत दिशा में निकलें और बडी सिस्टम का पालन करें।'
+                  : 'Gas leak smoke hazard detected! Evacuate upwind immediately and follow buddy system.',
               lang
             )
           }
 
           if (onSourceDetected) onSourceDetected(result)
 
-          // Auto-advance Step 0 after 1.2s confirmation
+          // Auto-advance Step 0 after 1.2s of confirmed hazard
           setTimeout(() => {
             setTaskState('completed')
             if (onTaskCompleted) {
@@ -97,32 +101,34 @@ export default function GasLeakDetectionOverlay({
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current)
     }
-  }, [isActive, videoRef, sourceConfirmed, lang, onSourceDetected, onTaskCompleted])
+  }, [isActive, videoRef, hazardConfirmed, lang, onSourceDetected, onTaskCompleted])
 
-  function handleSimulateSource() {
+  function handleSimulateSmoke() {
     if (detectorRef.current) {
       detectorRef.current.triggerSimulation(true)
     }
   }
 
   function handleReset() {
-    if (detectorRef.current) {
-      detectorRef.current.triggerSimulation(false)
-    }
-    setSourceConfirmed(false)
-    setTaskState('scanning')
+    if (detectorRef.current) detectorRef.current.reset()
+    setHazardConfirmed(false)
     soundPlayedRef.current = false
+    setTaskState('scanning')
     setDetection({
-      isRecognized:     false,
+      isGasHazard:      false,
+      isSmoke:          false,
       state:            'none',
       visualConfidence: 0,
       bbox:             null,
-      sourceType:       'Searching...',
+      pixelCount:       0,
     })
   }
 
+  if (!isActive) return null
+
+  const isConfirmed = detection.state === 'confirmed' && (detection.isGasHazard || hazardConfirmed)
   const isVerifying = detection.state === 'verifying'
-  const isConfirmed = detection.state === 'confirmed' || sourceConfirmed
+  const isNone      = detection.state === 'none' && !hazardConfirmed
 
   return (
     <div
@@ -132,247 +138,264 @@ export default function GasLeakDetectionOverlay({
         pointerEvents: 'none',
         zIndex:        10,
         fontFamily:    'var(--font-sans, system-ui)',
+        overflow:      'hidden',
       }}
     >
       <style>{`
         @keyframes plumePuff1 {
-          0% { transform: translate(-50%, 0) scale(0.6); opacity: 0.8; }
-          50% { transform: translate(-45%, -40px) scale(1.1); opacity: 0.6; }
-          100% { transform: translate(-55%, -85px) scale(1.6); opacity: 0; }
+          0% { transform: translate(-50%, 0) scale(0.6); opacity: 0.85; }
+          50% { transform: translate(-45%, -45px) scale(1.15); opacity: 0.65; }
+          100% { transform: translate(-55%, -95px) scale(1.7); opacity: 0; }
         }
         @keyframes plumePuff2 {
           0% { transform: translate(-50%, 0) scale(0.5); opacity: 0.9; }
-          50% { transform: translate(-58%, -50px) scale(1.2); opacity: 0.55; }
-          100% { transform: translate(-42%, -100px) scale(1.8); opacity: 0; }
+          50% { transform: translate(-58%, -55px) scale(1.25); opacity: 0.6; }
+          100% { transform: translate(-42%, -110px) scale(1.9); opacity: 0; }
         }
         @keyframes dangerZonePulse {
-          0% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.65; }
+          0% { transform: translate(-50%, -50%) scale(0.96); opacity: 0.65; }
           50% { transform: translate(-50%, -50%) scale(1.03); opacity: 0.95; }
-          100% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.65; }
+          100% { transform: translate(-50%, -50%) scale(0.96); opacity: 0.65; }
         }
-        @keyframes warningBannerPulse {
-          0%, 100% { box-shadow: 0 0 15px rgba(220, 38, 38, 0.4); }
-          50% { box-shadow: 0 0 30px rgba(220, 38, 38, 0.85); }
+        @keyframes pulseGlow {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 1; }
         }
       `}</style>
 
-      {/* ── TOP HUD BANNER ────────────────────────────────────────────── */}
+      {/* ── 1. TOP SCANNING STATUS BAR (3 DISTINCT STATES) ── */}
       <div
         style={{
-          position:       'absolute',
-          top:            16,
-          left:           '50%',
-          transform:      'translateX(-50%)',
-          display:        'flex',
-          flexDirection:  'column',
-          alignItems:     'center',
-          gap:            6,
-          pointerEvents:  'auto',
-          maxWidth:       '92vw',
+          margin:        '68px auto 0',
+          display:       'flex',
+          flexDirection: 'column',
+          alignItems:    'center',
+          gap:           6,
+          pointerEvents: 'all',
+          maxWidth:      '94vw',
         }}
       >
-        {/* Status Chip */}
-        <div
-          style={{
-            display:      'inline-flex',
-            alignItems:   'center',
-            gap:          8,
-            padding:      '6px 14px',
-            borderRadius: '24px',
-            background:   isConfirmed ? 'rgba(220, 38, 38, 0.92)' : isVerifying ? 'rgba(217, 119, 6, 0.90)' : 'rgba(15, 23, 42, 0.82)',
-            backdropFilter: 'blur(8px)',
-            border:       isConfirmed ? '1.5px solid #EF4444' : isVerifying ? '1.5px solid #F59E0B' : '1.5px solid rgba(255, 255, 255, 0.25)',
-            color:        '#ffffff',
-            fontSize:     '0.78rem',
-            fontWeight:   700,
-            boxShadow:    isConfirmed ? '0 0 20px rgba(239, 68, 68, 0.5)' : '0 4px 12px rgba(0,0,0,0.3)',
-            transition:   'all 0.25s ease',
-          }}
-        >
-          {isConfirmed ? (
-            <>
-              <ShieldAlert size={15} color="#FEE2E2" />
-              <span>⚠️ HAZARD CONFIRMED: VIRTUAL GAS LEAK SCENARIO</span>
-            </>
-          ) : isVerifying ? (
-            <>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#FDE047', animation: 'ping 1s infinite' }} />
-              <span>VERIFYING TRAINING SOURCE (MULTI-FRAME)…</span>
-            </>
-          ) : (
-            <>
-              <Eye size={14} color="#38BDF8" />
-              <span>SEARCHING FOR DESIGNATED GAS TRAINING SOURCE / MARKER</span>
-            </>
-          )}
-        </div>
-
-        {/* Confidence display — STRICTLY ONLY ON RECOGNITION, CLEARLY 'Visual Scenario Confidence' */}
-        {isConfirmed && (
+        {/* STATE A: NO HAZARD DETECTED (NO confidence percentage shown) */}
+        {isNone && (
           <div
             style={{
-              background:     'rgba(0, 0, 0, 0.85)',
-              border:         '1.5px solid #10B981',
-              borderRadius:   '14px',
-              padding:        '4px 12px',
-              color:          '#34D399',
-              fontSize:       '0.72rem',
-              fontWeight:     800,
+              background:     'rgba(15, 23, 42, 0.88)',
+              backdropFilter: 'blur(8px)',
+              border:         '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius:   20,
+              padding:        '7px 18px',
+              color:          'white',
+              fontSize:       '0.82rem',
+              fontWeight:     600,
               display:        'flex',
               alignItems:     'center',
-              gap:            6,
-              letterSpacing:  '0.02em',
+              gap:            9,
+              boxShadow:      '0 4px 16px rgba(0,0,0,0.3)',
             }}
           >
-            <CheckCircle2 size={13} color="#10B981" />
-            <span>Visual Scenario Confidence: {Math.round(detection.visualConfidence * 100)}%</span>
-            <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: 500 }}>• Marker Verified</span>
-          </div>
-        )}
-
-        {/* Helper Note for Reality Calibration */}
-        {!isConfirmed && (
-          <div
-            style={{
-              background:   'rgba(0, 0, 0, 0.65)',
-              borderRadius: '8px',
-              padding:      '3px 10px',
-              color:        'rgba(255, 255, 255, 0.8)',
-              fontSize:     '0.65rem',
-              textAlign:    'center',
-            }}
-          >
-            ℹ️ Camera CV recognizes designated training markers • Human bodies & walls rejected
-          </div>
-        )}
-      </div>
-
-      {/* ── AR RETICLE & VIRTUAL GAS SCENARIO VISUALIZATION ────────────── */}
-      {/* ── AR RETICLE / TARGETING GUIDE & VIRTUAL GAS SCENARIO VISUALIZATION ────────────── */}
-      <div
-        style={{
-          position:  'absolute',
-          top:       detection.bbox ? `${detection.bbox.y * 100}%` : '44%',
-          left:      detection.bbox ? `${detection.bbox.x * 100}%` : '50%',
-          transform: 'translate(-50%, -50%)',
-          width:     detection.bbox ? `${Math.max(170, detection.bbox.width * window.innerWidth * 0.9)}px` : '240px',
-          height:    detection.bbox ? `${Math.max(170, detection.bbox.height * window.innerHeight * 0.9)}px` : '240px',
-          transition: 'all 0.15s ease-out',
-          pointerEvents: !isConfirmed ? 'auto' : 'none',
-          cursor: !isConfirmed ? 'pointer' : 'default',
-        }}
-        onClick={() => {
-          if (!isConfirmed) handleSimulateSource()
-        }}
-        title={!isConfirmed ? 'Tap to trigger marker simulation' : ''}
-      >
-        {/* On-Screen Targeting Guide Frame when searching */}
-        {!isConfirmed && (
-          <>
-            {/* Corner Brackets */}
-            <div style={{ position: 'absolute', top: -3, left: -3, width: 26, height: 26, borderTop: '3.5px solid #F59E0B', borderLeft: '3.5px solid #F59E0B', borderRadius: '4px 0 0 0' }} />
-            <div style={{ position: 'absolute', top: -3, right: -3, width: 26, height: 26, borderTop: '3.5px solid #F59E0B', borderRight: '3.5px solid #F59E0B', borderRadius: '0 4px 0 0' }} />
-            <div style={{ position: 'absolute', bottom: -3, left: -3, width: 26, height: 26, borderBottom: '3.5px solid #F59E0B', borderLeft: '3.5px solid #F59E0B', borderRadius: '0 0 0 4px' }} />
-            <div style={{ position: 'absolute', bottom: -3, right: -3, width: 26, height: 26, borderBottom: '3.5px solid #F59E0B', borderRight: '3.5px solid #F59E0B', borderRadius: '0 0 4px 0' }} />
-
-            {/* Inner dashed guide */}
-            <div
+            <span
               style={{
-                position:     'absolute',
-                inset:        8,
-                borderRadius: '16px',
-                border:       isVerifying ? '2px solid #10B981' : '1.5px dashed rgba(255, 255, 255, 0.45)',
-                background:   isVerifying ? 'rgba(16, 185, 129, 0.08)' : 'rgba(0, 0, 0, 0.15)',
-                display:      'flex',
-                flexDirection:'column',
-                alignItems:   'center',
-                justifyContent:'center',
-                gap:          6,
-                padding:      10,
-                textAlign:    'center',
-                boxShadow:    isVerifying ? '0 0 20px rgba(16, 185, 129, 0.4)' : 'none',
+                width:        9,
+                height:       9,
+                borderRadius: '50%',
+                background:   '#10B981',
+                boxShadow:    '0 0 10px #10B981',
+                flexShrink:   0,
+              }}
+            />
+            <span>AI Camera Active · <strong>NO HAZARD DETECTED</strong></span>
+            <span
+              style={{
+                color:       '#94A3B8',
+                fontSize:    '0.74rem',
+                borderLeft:  '1px solid rgba(255,255,255,0.2)',
+                paddingLeft: 8,
               }}
             >
-              {/* Ghost marker diamond icon */}
-              <div
-                style={{
-                  width:        '44px',
-                  height:       '44px',
-                  background:   isVerifying ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)',
-                  border:       isVerifying ? '2px solid #10B981' : '2px solid #F59E0B',
-                  borderRadius: '6px',
-                  transform:    'rotate(45deg)',
-                  display:      'flex',
-                  alignItems:   'center',
-                  justifyContent:'center',
-                  transition:   'all 0.2s ease',
-                }}
-              >
-                <div style={{ transform: 'rotate(-45deg)', fontSize: '1.2rem', lineHeight: 1 }}>⚠️</div>
-              </div>
-
-              {/* Target Instruction Label */}
-              <span
-                style={{
-                  color:      isVerifying ? '#34D399' : '#FDE047',
-                  fontSize:   '0.68rem',
-                  fontWeight: 800,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  textShadow: '0 1px 3px rgba(0,0,0,0.8)',
-                }}
-              >
-                {isVerifying ? 'Verifying Marker...' : 'Align Marker Here'}
-              </span>
-
-              {/* Verification Progress Bar */}
-              {isVerifying && (
-                <div style={{ width: '80%', height: '5px', background: 'rgba(255,255,255,0.2)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${Math.round((detection.verifyProgress || 0.5) * 100)}%`,
-                      background: '#10B981',
-                      transition: 'width 0.1s ease',
-                    }}
-                  />
-                </div>
-              )}
-
-              <span
-                style={{
-                  color:      'rgba(255, 255, 255, 0.7)',
-                  fontSize:   '0.58rem',
-                  fontWeight: 500,
-                  lineHeight: 1.2,
-                }}
-              >
-                {isVerifying ? 'Keep steady inside frame' : 'Normal objects & sprays rejected'}
-              </span>
-            </div>
-          </>
+              Point camera at visible smoke / mist
+            </span>
+            <button
+              onClick={handleSimulateSmoke}
+              title="Test simulation"
+              style={{
+                background:   'rgba(234, 88, 12, 0.25)',
+                border:       '1px solid rgba(234, 88, 12, 0.55)',
+                color:        '#FFB347',
+                borderRadius: 8,
+                padding:      '2px 8px',
+                fontSize:     '0.68rem',
+                fontWeight:   700,
+                cursor:       'pointer',
+                display:      'flex',
+                alignItems:   'center',
+                gap:          3,
+                marginLeft:   4,
+              }}
+            >
+              <CloudFog size={12} color="#FFB347" /> Simulate
+            </button>
+          </div>
         )}
 
-        {/* Reticle Boundary when Confirmed */}
+        {/* STATE B: VERIFYING SMOKE / MIST PLUME... */}
+        {isVerifying && (
+          <div
+            style={{
+              background:     'rgba(120, 85, 0, 0.92)',
+              backdropFilter: 'blur(8px)',
+              border:         '1.5px solid #FCD34D',
+              borderRadius:   14,
+              padding:        '8px 18px',
+              color:          'white',
+              fontSize:       '0.84rem',
+              fontWeight:     700,
+              display:        'flex',
+              alignItems:     'center',
+              gap:            8,
+              boxShadow:      '0 4px 16px rgba(0,0,0,0.4)',
+            }}
+          >
+            <span
+              style={{
+                width:        10,
+                height:       10,
+                borderRadius: '50%',
+                background:   '#FCD34D',
+                boxShadow:    '0 0 10px #FCD34D',
+                flexShrink:   0,
+                animation:    'pulse 0.8s ease-in-out infinite',
+              }}
+            />
+            <span>🟡 VERIFYING SMOKE / MIST PLUME... (Analyzing plume motion & diffusion)</span>
+          </div>
+        )}
+
+        {/* STATE C: ⚠️ GAS LEAK / SMOKE HAZARD DETECTED */}
         {isConfirmed && (
           <div
             style={{
-              position:     'absolute',
-              inset:        0,
-              borderRadius: '18px',
-              border:       '3px solid #10B981',
-              boxShadow:    '0 0 25px rgba(16, 185, 129, 0.7), inset 0 0 15px rgba(16, 185, 129, 0.35)',
-              transition:   'all 0.2s ease',
+              background:   'linear-gradient(90deg, rgba(220, 38, 38, 0.96), rgba(234, 88, 12, 0.96))',
+              border:       '1.5px solid #FCA5A5',
+              borderRadius: 14,
+              padding:      '10px 20px',
+              color:        'white',
+              display:      'flex',
+              flexDirection:'column',
+              alignItems:   'center',
+              gap:          4,
+              boxShadow:    '0 6px 24px rgba(220, 38, 38, 0.55)',
+              animation:    'slideDownFade 0.25s ease-out',
             }}
-          />
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.94rem', fontWeight: 800, letterSpacing: '0.03em' }}>
+              <AlertTriangle size={18} color="#FEF08A" />
+              <span>⚠️ GAS LEAK / SMOKE HAZARD DETECTED</span>
+              <span
+                style={{
+                  background: 'rgba(0,0,0,0.35)',
+                  padding:    '2px 9px',
+                  borderRadius: 6,
+                  fontSize:   '0.74rem',
+                  fontWeight: 800,
+                  color:      '#34D399',
+                  border:     '1px solid rgba(52, 211, 153, 0.4)',
+                }}
+              >
+                {Math.round(detection.visualConfidence * 100)}% VISUAL CONFIDENCE
+              </span>
+              <button
+                onClick={handleReset}
+                title="Reset detection"
+                style={{
+                  background: 'rgba(0,0,0,0.3)',
+                  border:     '1px solid rgba(255,255,255,0.25)',
+                  color:      'white',
+                  borderRadius: 6,
+                  padding:    '2px 7px',
+                  fontSize:   '0.68rem',
+                  cursor:     'pointer',
+                  display:    'flex',
+                  alignItems: 'center',
+                  gap:        3,
+                }}
+              >
+                <RotateCcw size={11} /> Reset
+              </button>
+            </div>
+            <div style={{ fontSize: '0.80rem', fontWeight: 700, color: '#FEF08A', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ShieldAlert size={14} /> <span>EVACUATE UPWIND IMMEDIATELY • BUDDY SYSTEM MANDATORY</span>
+            </div>
+          </div>
         )}
 
-        {/* ── AR VIRTUAL GAS LEAK PLUME (Shown on Recognition) ────────── */}
-        {isConfirmed && (
+        {/* Reality Disclaimer: Visual smoke detection for simulated training */}
+        <div
+          style={{
+            background:   'rgba(0, 0, 0, 0.65)',
+            borderRadius: '8px',
+            padding:      '3px 10px',
+            color:        'rgba(255, 255, 255, 0.75)',
+            fontSize:     '0.64rem',
+            textAlign:    'center',
+          }}
+        >
+          ℹ️ Visual smoke detection for simulated training scenario • Smartphone cameras do not measure gas ppm
+        </div>
+      </div>
+
+      {/* ── 2. HIGHLIGHT DETECTED SMOKE REGION & AR GAS PLUME SCENARIO ── */}
+      {isConfirmed && detection.bbox && (
+        <div
+          style={{
+            position:   'absolute',
+            left:       `${Math.max(2, Math.min(90, detection.bbox.x * 100))}%`,
+            top:        `${Math.max(4, Math.min(84, detection.bbox.y * 100))}%`,
+            width:      `${Math.max(12, Math.min(60, detection.bbox.width * 100))}%`,
+            height:     `${Math.max(12, Math.min(58, detection.bbox.height * 100))}%`,
+            border:     '2.5px solid #F59E0B',
+            borderRadius: 10,
+            boxShadow:  '0 0 24px rgba(245, 158, 11, 0.75), inset 0 0 16px rgba(245, 158, 11, 0.3)',
+            transition: 'all 0.12s ease-out',
+            pointerEvents: 'none',
+          }}
+        >
+          {/* Corner brackets */}
+          <div style={{ position: 'absolute', top: -4, left: -4, width: 12, height: 12, borderTop: '3px solid #10B981', borderLeft: '3px solid #10B981' }} />
+          <div style={{ position: 'absolute', top: -4, right: -4, width: 12, height: 12, borderTop: '3px solid #10B981', borderRight: '3px solid #10B981' }} />
+          <div style={{ position: 'absolute', bottom: -4, left: -4, width: 12, height: 12, borderBottom: '3px solid #10B981', borderLeft: '3px solid #10B981' }} />
+          <div style={{ position: 'absolute', bottom: -4, right: -4, width: 12, height: 12, borderBottom: '3px solid #10B981', borderRight: '3px solid #10B981' }} />
+
+          {/* Floating Smoke Target Label */}
+          <div
+            style={{
+              position:       'absolute',
+              top:            -28,
+              left:           '50%',
+              transform:      'translateX(-50%)',
+              background:     'rgba(217, 119, 6, 0.95)',
+              backdropFilter: 'blur(4px)',
+              color:          'white',
+              padding:        '3px 10px',
+              borderRadius:   6,
+              fontSize:       '0.74rem',
+              fontWeight:     800,
+              letterSpacing:  '0.04em',
+              whiteSpace:     'nowrap',
+              display:        'flex',
+              alignItems:     'center',
+              gap:            5,
+              boxShadow:      '0 2px 8px rgba(0,0,0,0.4)',
+            }}
+          >
+            <CloudFog size={13} color="#FDE047" />
+            <span>SMOKE / MIST PLUME ({Math.round(detection.visualConfidence * 100)}%)</span>
+          </div>
+
+          {/* AR VIRTUAL GAS LEAK PLUME (Emitting from detected smoke) */}
           <div
             style={{
               position: 'absolute',
-              bottom:   '30%',
+              bottom:   '10%',
               left:     '50%',
               width:    '160px',
               height:   '220px',
@@ -414,26 +437,24 @@ export default function GasLeakDetectionOverlay({
                 bottom:       -5,
                 left:         '50%',
                 transform:    'translateX(-50%)',
-                width:        26,
-                height:       26,
+                width:        24,
+                height:       24,
                 borderRadius: '50%',
                 background:   '#FACC15',
                 boxShadow:    '0 0 20px #84CC16',
               }}
             />
           </div>
-        )}
 
-        {/* ── AR DANGER ZONE PERIMETER (Shown on Recognition) ─────────── */}
-        {isConfirmed && (
+          {/* AR DANGER ZONE PERIMETER (Ground perimeter around source) */}
           <div
             style={{
               position:     'absolute',
               top:          '50%',
               left:         '50%',
               transform:    'translate(-50%, -50%)',
-              width:        '340px',
-              height:       '340px',
+              width:        '320px',
+              height:       '320px',
               borderRadius: '50%',
               border:       '3px dashed #EF4444',
               boxShadow:    '0 0 30px rgba(239, 68, 68, 0.55), inset 0 0 25px rgba(239, 68, 68, 0.25)',
@@ -458,10 +479,10 @@ export default function GasLeakDetectionOverlay({
               ⚠️ DANGER ZONE: 10m RADIUS
             </span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* ── EVACUATION GUIDANCE HUD (When Hazard is Confirmed) ─────────── */}
+      {/* ── 3. EVACUATION GUIDANCE HUD (When Hazard is Confirmed) ── */}
       {isConfirmed && (
         <div
           style={{
@@ -504,192 +525,29 @@ export default function GasLeakDetectionOverlay({
         </div>
       )}
 
-      {/* ── DEMO / TESTING CONTROLS (Top Right) ───────────────────────── */}
-      <div
-        style={{
-          position:      'absolute',
-          top:           68,
-          right:         14,
-          display:       'flex',
-          flexDirection: 'column',
-          gap:           6,
-          pointerEvents: 'auto',
-          zIndex:        20,
-        }}
-      >
-        {/* Judge Demo / Fallback Trigger button */}
-        {!isConfirmed ? (
-          <button
-            onClick={handleSimulateSource}
-            style={{
-              background:     'linear-gradient(135deg, #E05A00 0%, #EA580C 100%)',
-              border:         '1.5px solid #FDBA74',
-              borderRadius:   '20px',
-              padding:        '7px 14px',
-              color:          '#ffffff',
-              fontSize:       '0.75rem',
-              fontWeight:     800,
-              cursor:         'pointer',
-              display:        'inline-flex',
-              alignItems:     'center',
-              gap:            6,
-              boxShadow:      '0 4px 14px rgba(224, 90, 0, 0.55)',
-              letterSpacing:  '0.02em',
-            }}
-          >
-            <span>⚡ Judge Demo Trigger</span>
-          </button>
-        ) : (
-          <button
-            onClick={handleReset}
-            style={{
-              background:     'rgba(71, 85, 105, 0.9)',
-              border:         '1px solid rgba(255, 255, 255, 0.3)',
-              borderRadius:   '20px',
-              padding:        '6px 12px',
-              color:          '#ffffff',
-              fontSize:       '0.72rem',
-              fontWeight:     600,
-              cursor:         'pointer',
-              display:        'inline-flex',
-              alignItems:     'center',
-              gap:            5,
-            }}
-          >
-            <RotateCcw size={12} />
-            <span>Reset Source</span>
-          </button>
-        )}
-
-        {/* Toggle Training Marker Card Modal */}
-        <button
-          onClick={() => setShowMarkerModal(true)}
-          style={{
-            background:     'rgba(15, 23, 42, 0.88)',
-            border:         '1px solid rgba(255, 255, 255, 0.3)',
-            borderRadius:   '20px',
-            padding:        '6px 12px',
-            color:          '#ffffff',
-            fontSize:       '0.72rem',
-            fontWeight:     600,
-            cursor:         'pointer',
-            display:        'inline-flex',
-            alignItems:     'center',
-            gap:            6,
-            backdropFilter: 'blur(6px)',
-          }}
-        >
-          <FileText size={13} color="#FBBF24" />
-          <span>📄 View Training Marker</span>
-        </button>
-      </div>
-
-      {/* ── DESIGNATED TRAINING MARKER POPUP MODAL ────────────────────── */}
-      {showMarkerModal && (
+      {/* ── 4. STEP COMPLETION BADGE (WHEN CONFIRMED) ── */}
+      {taskState === 'completed' && (
         <div
           style={{
-            position:       'fixed',
-            inset:          0,
-            background:     'rgba(0, 0, 0, 0.85)',
-            backdropFilter: 'blur(8px)',
+            position:       'absolute',
+            bottom:         110,
+            left:           '50%',
+            transform:      'translateX(-50%)',
+            pointerEvents:  'all',
+            background:     'rgba(16, 185, 129, 0.95)',
+            color:          'white',
+            borderRadius:   14,
+            padding:        '10px 24px',
             display:        'flex',
             alignItems:     'center',
-            justifyContent: 'center',
-            padding:        20,
-            zIndex:         999,
-            pointerEvents:  'auto',
+            gap:            10,
+            fontWeight:     800,
+            fontSize:       '0.88rem',
+            boxShadow:      '0 4px 16px rgba(0,0,0,0.4)',
           }}
         >
-          <div
-            style={{
-              background:   '#ffffff',
-              borderRadius: '16px',
-              padding:      '20px',
-              maxWidth:     '360px',
-              width:        '100%',
-              color:        '#0F172A',
-              textAlign:    'center',
-              boxShadow:    '0 10px 40px rgba(0,0,0,0.5)',
-            }}
-          >
-            <h3 style={{ margin: '0 0 6px', fontSize: '1rem', fontWeight: 800 }}>
-              Designated Gas Training Marker
-            </h3>
-            <p style={{ margin: '0 0 14px', fontSize: '0.74rem', color: '#64748B' }}>
-              Aim your camera at this high-contrast industrial training marker or use the demo button below.
-            </p>
-
-            {/* Industrial Hazard Diamond Pattern SVG */}
-            <div
-              style={{
-                width:        '170px',
-                height:       '170px',
-                margin:       '0 auto 16px',
-                background:   '#FBBF24',
-                border:       '10px solid #0F172A',
-                borderRadius: '8px',
-                transform:    'rotate(45deg)',
-                display:      'flex',
-                alignItems:   'center',
-                justifyContent: 'center',
-                boxShadow:    '0 6px 20px rgba(0,0,0,0.2)',
-              }}
-            >
-              <div style={{ transform: 'rotate(-45deg)', textAlign: 'center' }}>
-                <div style={{ fontSize: '2rem' }}>⚠️</div>
-                <div style={{ fontSize: '0.78rem', fontWeight: 900, color: '#0F172A' }}>
-                  GAS LEAK
-                </div>
-                <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#0F172A' }}>
-                  SOURCE #01
-                </div>
-              </div>
-            </div>
-
-            {/* Instant Demo Trigger button for Judges */}
-            <button
-              onClick={() => {
-                setShowMarkerModal(false)
-                handleSimulateSource()
-              }}
-              style={{
-                background:   'linear-gradient(135deg, #E05A00 0%, #EA580C 100%)',
-                color:        '#ffffff',
-                border:       'none',
-                borderRadius: '10px',
-                padding:      '10px 20px',
-                fontSize:     '0.84rem',
-                fontWeight:   800,
-                cursor:       'pointer',
-                width:        '100%',
-                marginBottom: '8px',
-                boxShadow:    '0 4px 14px rgba(224, 90, 0, 0.4)',
-                display:      'flex',
-                alignItems:   'center',
-                justifyContent:'center',
-                gap:          6,
-              }}
-            >
-              <span>⚡ Activate AR Scenario with this Marker</span>
-            </button>
-
-            <button
-              onClick={() => setShowMarkerModal(false)}
-              style={{
-                background:   '#F1F5F9',
-                color:        '#475569',
-                border:       'none',
-                borderRadius: '10px',
-                padding:      '8px 20px',
-                fontSize:     '0.78rem',
-                fontWeight:   600,
-                cursor:       'pointer',
-                width:        '100%',
-              }}
-            >
-              Close & Aim Camera
-            </button>
-          </div>
+          <CheckCircle2 size={18} />
+          <span>Gas Leak / Smoke Hazard Identified ✓ — Proceeding to Step 2</span>
         </div>
       )}
     </div>
