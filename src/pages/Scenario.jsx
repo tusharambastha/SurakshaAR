@@ -38,6 +38,7 @@ import { calculateScore } from '../lib/scoring'
 import { queueOfflineAction } from '../lib/indexeddb'
 import { speak } from '../lib/voice'
 import FireDetectionOverlay from '../components/ar/FireDetectionOverlay'
+import GasLeakDetectionOverlay from '../components/ar/GasLeakDetectionOverlay'
 
 // ─── Floating Canvas Text Sprite Helper ────────────────────────────────────────
 function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
@@ -163,6 +164,7 @@ export default function Scenario() {
   })
 
   const isFireScenario = scenario?.hazard_type === 'fire'
+  const isGasScenario  = scenario?.hazard_type === 'gas_leak'
 
   const getStepText = useCallback((s, field) => {
     if (!s) return ''
@@ -479,6 +481,44 @@ export default function Scenario() {
       setCurrentStep(1)
       setStepStartTime(Date.now())
       setStepFeedback({ correct: wasCorrect, label: 'Fire Hazard Identified via AR Camera! ✓' })
+      setTimeout(() => setStepFeedback(null), 2500)
+    }
+  }, [sessionId, user, currentStep, scenario])
+
+  // Real-time camera designated gas training source listener
+  const handleGasDetected = useCallback((result) => {
+    console.log('[GasDetection] Designated gas training source recognized with visual confidence:', result.visualConfidence)
+  }, [])
+
+  // Interactive gas leak safety training response handler
+  const handleGasTaskCompleted = useCallback(async ({ wasCorrect, responseTimeMs }) => {
+    // Record feedback log in mockDb / Supabase
+    if (!isSupabaseConfigured) {
+      await mockInsertFeedbackLog({
+        sessionId,
+        userId: user?.id,
+        stepIndex: 0,
+        feedbackType: wasCorrect ? 'correct' : 'incorrect',
+        message: `AR Gas Leak Hazard: Designated training source recognized via computer vision in ${(responseTimeMs / 1000).toFixed(1)}s`,
+      })
+    }
+
+    // If currently on Step 0 (Identify Gas Leak Warning), automatically complete it
+    if (currentStep === 0) {
+      const step = scenario?.steps?.[0]
+      const log = {
+        id: crypto.randomUUID(),
+        session_id: sessionId,
+        step_index: 0,
+        was_correct: wasCorrect,
+        time_taken_ms: responseTimeMs,
+        is_ppe_step: step?.is_ppe_step ?? false,
+      }
+      setStepLogs(prev => [...prev, log])
+      setCompletedSteps(prev => (prev.includes(0) ? prev : [...prev, 0]))
+      setCurrentStep(1)
+      setStepStartTime(Date.now())
+      setStepFeedback({ correct: wasCorrect, label: 'Gas Leak Training Source Recognized via AR Camera! ✓' })
       setTimeout(() => setStepFeedback(null), 2500)
     }
   }, [sessionId, user, currentStep, scenario])
@@ -928,6 +968,15 @@ export default function Scenario() {
               onTaskCompleted={handleFireTaskCompleted}
             />
           )}
+          {isGasScenario && (
+            <GasLeakDetectionOverlay
+              videoRef={cameraVideoRef}
+              isActive={arMode}
+              lang={lang}
+              onSourceDetected={handleGasDetected}
+              onTaskCompleted={handleGasTaskCompleted}
+            />
+          )}
         </>
       )}
 
@@ -1107,7 +1156,11 @@ export default function Scenario() {
           }}>
             {arMode ? <Camera size={14} color="var(--color-brand)" /> : <Monitor size={14} color="#0E7C7B" />}
             {arMode
-              ? (isFireScenario ? '🔥 Camera AR · Real-Time Fire Detection' : '📷 Camera AR Mode')
+              ? (isFireScenario
+                  ? '🔥 Camera AR · Real-Time Fire Detection'
+                  : isGasScenario
+                    ? '💨 Camera AR · Training Marker Recognition'
+                    : '📷 Camera AR Mode')
               : '🖥️ 3D Simulation Mode'}
           </div>
 
