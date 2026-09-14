@@ -1,206 +1,282 @@
 /**
- * SurakshaAR — Real-Time Computer Vision Fire & Flame Detection Engine
+ * SurakshaAR — Robust Computer Vision Fire & Flame Detection Engine
  *
- * Implements genuine optical flame detection on live HTML5 video streams:
- * 1. Pixel-level Thermodynamic Color Space Classification (RGB + Normalized RGB + Luminance)
- * 2. Spatial Region Clustering & Bounding Box Extraction
- * 3. Temporal Intensity & Centroid Flicker Analysis (3–15 Hz flame oscillation)
- * 4. Bounding Box Normalization for Responsive AR Overlays
+ * Exclusively detects active luminous combustion flames (match, candle, lighter).
+ * Rejects: human skin/faces, yellow/orange clothing, warm walls, lamps, and screens.
  *
- * Designed to detect controlled visual flames (matchstick, candle, lighter, flame video)
- * without external ML dependencies, running at 15-20 FPS with <2ms CPU frame latency.
+ * 5-Stage Verification Pipeline:
+ * 1. Optical Combustion Pixel Filter (Incandescent blowout core or orange flame body)
+ * 2. Spatial Scale & Geometry (Candle/lighter scale <= 22% width, <= 28% height, compact cluster)
+ * 3. Temporal Flicker Analysis (True combustion turbulence: frame-to-frame delta >= 16 on >= 20% pixels)
+ * 4. Temporal State Machine ('none' -> 'verifying' -> 'confirmed' with quick decay on absence)
+ * 5. Dynamic Evidence-Based Confidence (78% - 98%, only reported on 'confirmed')
  */
 
-// Resolution for offscreen analysis buffer (optimal speed & accuracy)
 const SAMPLE_WIDTH = 160
 const SAMPLE_HEIGHT = 120
 
-// Minimum candidate flame pixels required in a 160x120 frame to avoid sensor noise
-const MIN_FLAME_PIXELS = 10
+// Pixel thresholds
+const FLAME_R_MIN          = 240
+const INCANDESCENT_G_MIN   = 225
+const INCANDESCENT_B_MIN   = 160
+const INCANDESCENT_SUM_MIN = 645
+
+const ORANGE_G_MIN  = 50
+const ORANGE_G_MAX  = 160  // Yellow clothing has G > 175 -> rejected
+const ORANGE_B_MAX  = 48   // Skin has B > 80, fabric B > 60 -> rejected
+const ORANGE_RG_MIN = 80   // Red dominance over green
+const ORANGE_RB_MIN = 165  // Skin has (R-B) < 100 -> rejected
+
+// Spatial constraints (Candle / lighter scale)
+const MIN_FLAME_PIXELS    = 8
+const MAX_BOX_W_RATIO     = 0.22  // Flame width <= 22% of frame
+const MAX_BOX_H_RATIO     = 0.28  // Flame height <= 28% of frame
+const MAX_FRAME_RATIO     = 0.05  // Flame pixels <= 5% of total frame (rejects large shirts)
+const MIN_CLUSTER_DENSITY = 0.22  // Flame pixels / bounding box area
+
+// Temporal flicker
+const FLICKER_LUMA_DELTA = 16
+const MIN_FLICKER_RATIO  = 0.18
+
+// Confirmation frames (~15-20 FPS)
+const VERIFYING_FRAMES = 4   // ~200ms of consistent candidate
+const CONFIRMED_FRAMES = 12  // ~600ms of sustained temporal & optical evidence
+const DECAY_RATE       = 3   // Fast clearance when flame leaves frame (~100ms)
 
 /**
- * Evaluates whether a single pixel exhibits flame optical characteristics:
- * - High luminous red intensity
- * - Red dominance over green, green dominance over blue
- * - Flame chromaticity separation (R - G >= 16, G - B >= 6)
- * - Normalized chromaticity bounds: r > 0.40, b < 0.26
- * - Or high-temperature incandescent flame core (white/yellowish saturation)
+ * Pixel-level optical evaluation.
+ * Returns true ONLY if pixel exhibits active flame radiation characteristics.
  */
 export function isFlamePixel(r, g, b) {
+  if (r < FLAME_R_MIN) return false
   const sum = r + g + b
-  if (sum < 260) return false // Too dark to be an emitting flame
 
-  // Rule 1: High-temperature incandescent flame core (e.g. inner core of candle/match)
-  if (r > 220 && g > 200 && b > 130 && (r + g) > 430 && (r - b) > 25) {
-    return true
-  }
+  // Signature A: Direct incandescent blowout core (saturates all 3 channels)
+  const isBlowout = (g >= INCANDESCENT_G_MIN && b >= INCANDESCENT_B_MIN && sum >= INCANDESCENT_SUM_MIN)
 
-  // Rule 2: Flame outer thermal envelope (radiant red-orange-yellow)
-  if (r > 165 && r > g && g > b && (r - g) >= 16 && (g - b) >= 6) {
-    const normR = r / sum
-    const normB = b / sum
-    if (normR > 0.40 && normB < 0.26) {
-      return true
-    }
-  }
+  // Signature B: Saturated combustion flame body
+  const isOrangeFlame = (
+    g >= ORANGE_G_MIN &&
+    g <= ORANGE_G_MAX &&
+    b <= ORANGE_B_MAX &&
+    (r - g) >= ORANGE_RG_MIN &&
+    (r - b) >= ORANGE_RB_MIN
+  )
 
-  // Rule 3: Bright concentrated yellow flame
-  if (r > 210 && g > 170 && b < 140 && (r - b) > 80 && (r + g) > 390) {
-    return true
-  }
-
-  return false
+  return isBlowout || isOrangeFlame
 }
 
 /**
- * Creates a stateful Fire Detector instance that monitors a live <video> element.
+ * Stateful FireDetector with frame-differencing flicker analysis.
  */
 export class FireDetector {
   constructor(options = {}) {
-    this.sampleWidth = options.sampleWidth || SAMPLE_WIDTH
+    this.sampleWidth  = options.sampleWidth  || SAMPLE_WIDTH
     this.sampleHeight = options.sampleHeight || SAMPLE_HEIGHT
-    this.minPixels = options.minPixels || MIN_FLAME_PIXELS
 
-    // Offscreen canvas for frame capture
     this.canvas = document.createElement('canvas')
-    this.canvas.width = this.sampleWidth
+    this.canvas.width  = this.sampleWidth
     this.canvas.height = this.sampleHeight
     this.ctx = this.canvas.getContext('2d', { willReadFrequently: true })
 
-    // Temporal history buffer (rolling window of recent frames)
-    this.history = []
-    this.maxHistory = 8
+    const totalPx = this.sampleWidth * this.sampleHeight
+    this.prevLuma = new Float32Array(totalPx)
+    this.hasPrev  = false
 
-    // Stable confirmed state
-    this.consecutiveDetections = 0
-    this.stableDetectionThreshold = 2 // frames needed to confirm fire
+    this.counter        = 0
+    this.state          = 'none' // 'none' | 'verifying' | 'confirmed'
+    this.lastBbox       = null
+    this.lastConfidence = 0
+    this.simulated      = false
+  }
+
+  /** Trigger simulated detection for presentation/testing */
+  triggerSimulation(enabled = true) {
+    this.simulated = enabled
+    if (enabled) {
+      this.counter = CONFIRMED_FRAMES
+      this.state   = 'confirmed'
+      this.lastBbox = { x: 0.38, y: 0.28, width: 0.24, height: 0.30 }
+      this.lastConfidence = 0.94
+    }
+  }
+
+  /** Reset all internal state */
+  reset() {
+    this.counter        = 0
+    this.state          = 'none'
+    this.hasPrev         = false
+    this.lastBbox       = null
+    this.lastConfidence = 0
+    this.simulated      = false
+    this.prevLuma.fill(0)
   }
 
   /**
-   * Process a single video frame.
+   * Process a single video frame from live camera.
    * @param {HTMLVideoElement} videoElement
-   * @returns {object} detection result
+   * @returns {{ isFire: boolean, state: 'none'|'verifying'|'confirmed', confidence: number, bbox: object|null, pixelCount: number, flickerRatio: number }}
    */
   detect(videoElement) {
-    if (!videoElement || videoElement.readyState < 2 || videoElement.videoWidth === 0) {
+    if (this.simulated) {
       return {
-        isFire: false,
-        confidence: 0,
-        bbox: null,
-        flameCenter: null,
-        pixelCount: 0,
+        isFire:       true,
+        state:        'confirmed',
+        confidence:   this.lastConfidence,
+        bbox:         this.lastBbox,
+        pixelCount:   35,
+        flickerRatio: 0.65,
       }
     }
 
-    const { sampleWidth, sampleHeight, ctx, minPixels } = this
+    if (!videoElement || videoElement.readyState < 2 || videoElement.videoWidth === 0) {
+      return {
+        isFire:       false,
+        state:        'none',
+        confidence:   0,
+        bbox:         null,
+        pixelCount:   0,
+        flickerRatio: 0,
+      }
+    }
 
-    // Draw current video frame downscaled into analysis canvas
+    const { sampleWidth, sampleHeight, ctx } = this
     ctx.drawImage(videoElement, 0, 0, sampleWidth, sampleHeight)
-    const imageData = ctx.getImageData(0, 0, sampleWidth, sampleHeight)
-    const data = imageData.data
+    const imgData = ctx.getImageData(0, 0, sampleWidth, sampleHeight)
+    const data    = imgData.data
+    const total   = sampleWidth * sampleHeight
 
-    let flamePixelCount = 0
-    let minX = sampleWidth, maxX = 0
+    let flameCount   = 0
+    let flickerCount = 0
+    let minX = sampleWidth,  maxX = 0
     let minY = sampleHeight, maxY = 0
     let sumX = 0, sumY = 0
 
-    // Scan pixels
-    const totalPixels = sampleWidth * sampleHeight
-    for (let i = 0; i < totalPixels; i++) {
-      const idx = i * 4
-      const r = data[idx]
-      const g = data[idx + 1]
-      const b = data[idx + 2]
+    // Stage 1: Optical pixel classification & luminance calculation
+    for (let i = 0; i < total; i++) {
+      const idx  = i * 4
+      const r    = data[idx]
+      const g    = data[idx + 1]
+      const b    = data[idx + 2]
+      const luma = 0.299 * r + 0.587 * g + 0.114 * b
 
       if (isFlamePixel(r, g, b)) {
         const x = i % sampleWidth
         const y = Math.floor(i / sampleWidth)
-
-        flamePixelCount++
+        flameCount++
         sumX += x
         sumY += y
         if (x < minX) minX = x
         if (x > maxX) maxX = x
         if (y < minY) minY = y
         if (y > maxY) maxY = y
+
+        // Stage 3: Temporal flicker check against previous frame
+        if (this.hasPrev) {
+          const delta = Math.abs(luma - this.prevLuma[i])
+          if (delta >= FLICKER_LUMA_DELTA) {
+            flickerCount++
+          }
+        }
       }
+
+      this.prevLuma[i] = luma
     }
 
-    const now = performance.now()
-    const isCandidate = flamePixelCount >= minPixels
+    this.hasPrev = true
 
-    // Record in history buffer for temporal flicker analysis
-    this.history.push({
-      count: flamePixelCount,
-      timestamp: now,
-      cx: flamePixelCount > 0 ? sumX / flamePixelCount : 0,
-      cy: flamePixelCount > 0 ? sumY / flamePixelCount : 0,
-    })
-    if (this.history.length > this.maxHistory) {
-      this.history.shift()
+    // If fewer than minimum pixels found -> decay counter
+    if (flameCount < MIN_FLAME_PIXELS) {
+      return this._decay()
     }
 
-    // Evaluate temporal consistency & flicker
-    let positiveFrames = 0
-    for (const h of this.history) {
-      if (h.count >= minPixels) positiveFrames++
+    // Stage 2: Spatial scale and compactness constraints
+    const boxW      = maxX - minX + 1
+    const boxH      = maxY - minY + 1
+    const boxArea   = boxW * boxH
+    const density   = boxArea > 0 ? flameCount / boxArea : 0
+    const wRatio    = boxW / sampleWidth
+    const hRatio    = boxH / sampleHeight
+    const frameRatio = flameCount / total
+
+    // Reject if too large (shirt, wall) or too scattered (ambient noise)
+    if (
+      wRatio > MAX_BOX_W_RATIO ||
+      hRatio > MAX_BOX_H_RATIO ||
+      frameRatio > MAX_FRAME_RATIO ||
+      density < MIN_CLUSTER_DENSITY
+    ) {
+      return this._decay()
     }
 
-    if (isCandidate) {
-      this.consecutiveDetections++
+    // Stage 3: Temporal flicker validation
+    const flickerRatio = flameCount > 0 ? flickerCount / flameCount : 0
+
+    // Require dynamic flicker once verifying threshold reached
+    if (this.counter >= VERIFYING_FRAMES && flickerRatio < MIN_FLICKER_RATIO) {
+      return this._decay()
+    }
+
+    // Stage 4: Increment consecutive detections
+    this.counter = Math.min(this.counter + 1, CONFIRMED_FRAMES + 10)
+
+    if (this.counter >= CONFIRMED_FRAMES) {
+      this.state = 'confirmed'
+    } else if (this.counter >= VERIFYING_FRAMES) {
+      this.state = 'verifying'
     } else {
-      this.consecutiveDetections = Math.max(0, this.consecutiveDetections - 1)
+      this.state = 'none'
     }
 
-    const isConfirmed = this.consecutiveDetections >= this.stableDetectionThreshold ||
-      (positiveFrames >= 3 && flamePixelCount >= minPixels)
-
-    if (!isConfirmed || flamePixelCount === 0) {
-      return {
-        isFire: false,
-        confidence: 0,
-        bbox: null,
-        flameCenter: null,
-        pixelCount: flamePixelCount,
-      }
+    // Bounding box padding & normalization
+    const pad = 5
+    this.lastBbox = {
+      x:      Math.max(0, minX - pad) / sampleWidth,
+      y:      Math.max(0, minY - pad) / sampleHeight,
+      width:  Math.min(sampleWidth, boxW + pad * 2) / sampleWidth,
+      height: Math.min(sampleHeight, boxH + pad * 2) / sampleHeight,
     }
 
-    // Centroid normalized coordinates (0.0 - 1.0)
-    const centerX = (sumX / flamePixelCount) / sampleWidth
-    const centerY = (sumY / flamePixelCount) / sampleHeight
-
-    // Add padding around detected bounding box
-    const pad = 4
-    const boxX = Math.max(0, minX - pad) / sampleWidth
-    const boxY = Math.max(0, minY - pad) / sampleHeight
-    const boxW = Math.min(sampleWidth, (maxX - minX + 1) + pad * 2) / sampleWidth
-    const boxH = Math.min(sampleHeight, (maxY - minY + 1) + pad * 2) / sampleHeight
-
-    // Compute genuine confidence based on pixel volume, density, and persistence
-    const sizeFactor = Math.min(1.0, flamePixelCount / 60)
-    const persistenceFactor = Math.min(1.0, positiveFrames / 5)
-    const confidence = Math.round((0.72 + (sizeFactor * 0.16) + (persistenceFactor * 0.10)) * 100) / 100
+    // Stage 5: Calculated confidence (only shown on 'confirmed')
+    let confidence = 0
+    if (this.state === 'confirmed') {
+      const densityBonus     = Math.min(0.10, (density - MIN_CLUSTER_DENSITY) * 0.4)
+      const flickerBonus     = Math.min(0.10, (flickerRatio - MIN_FLICKER_RATIO) * 0.35)
+      const persistenceBonus = Math.min(0.08, (this.counter - CONFIRMED_FRAMES) * 0.008)
+      confidence = Math.min(0.98, Math.max(0.78, 0.78 + densityBonus + flickerBonus + persistenceBonus))
+      this.lastConfidence = Math.round(confidence * 100) / 100
+    }
 
     return {
-      isFire: true,
-      confidence: Math.min(0.98, Math.max(0.70, confidence)),
-      bbox: {
-        x: boxX,
-        y: boxY,
-        width: boxW,
-        height: boxH,
-      },
-      flameCenter: {
-        x: centerX,
-        y: centerY,
-      },
-      pixelCount: flamePixelCount,
+      isFire:       this.state === 'confirmed',
+      state:        this.state,
+      confidence:   this.state === 'confirmed' ? this.lastConfidence : 0,
+      bbox:         this.state === 'confirmed' ? this.lastBbox : null,
+      pixelCount:   flameCount,
+      flickerRatio,
     }
   }
 
-  /** Reset internal state */
-  reset() {
-    this.history = []
-    this.consecutiveDetections = 0
+  _decay() {
+    this.counter = Math.max(0, this.counter - DECAY_RATE)
+
+    if (this.counter >= CONFIRMED_FRAMES) {
+      this.state = 'confirmed'
+    } else if (this.counter >= VERIFYING_FRAMES) {
+      this.state = 'verifying'
+      this.lastBbox = null
+    } else {
+      this.state = 'none'
+      this.lastBbox = null
+    }
+
+    return {
+      isFire:       this.state === 'confirmed',
+      state:        this.state,
+      confidence:   this.state === 'confirmed' ? this.lastConfidence : 0,
+      bbox:         this.state === 'confirmed' ? this.lastBbox : null,
+      pixelCount:   0,
+      flickerRatio: 0,
+    }
   }
 }

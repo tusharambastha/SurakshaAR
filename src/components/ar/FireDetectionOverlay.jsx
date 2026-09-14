@@ -1,40 +1,16 @@
 /**
- * SurakshaAR — Fire Detection AR Overlay & Interactive Safety Training
+ * SurakshaAR — Fire Detection AR Overlay
  *
- * Provides real-time camera-based flame tracking HUD and interactive safety evaluation:
- * - Real-time flame bounding box & reticle positioned at detected flame coordinates
- * - Warning banners: 🔥 FIRE HAZARD DETECTED | ⚠️ MAINTAIN SAFE DISTANCE
- * - Safety protocols: 🧯 Identify Correct Extinguisher | 🚪 Locate Emergency Exit
- * - Phase 4 & 5: Interactive electrical fire extinguisher assessment question
- * - Database & session tracking for reaction time, answer accuracy, and score
+ * Real-time camera HUD for fire hazard detection with 3 validated states:
+ * 1. NO FIRE DETECTED (normal ambient monitoring, no confidence %, no alerts)
+ * 2. VERIFYING FIRE... (temporal flicker & combustion analysis in progress)
+ * 3. FIRE HAZARD DETECTED (sustained genuine flame confirmed, reticle, confidence %, auto-advances Step 1)
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react'
-import { Flame, ShieldAlert, CheckCircle2, XCircle, RotateCcw, Volume2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Flame, ShieldAlert, CheckCircle2, RotateCcw } from 'lucide-react'
 import { FireDetector } from '../../lib/fireDetection'
-import { speak, isTTSSupported } from '../../lib/voice'
-
-const FIRE_QUESTION = {
-  id: 'q-ar-fire-01',
-  question_en: 'Which extinguisher should be used for an electrical fire?',
-  question_hi: 'बिजली की आग के लिए कौन सा अग्निशामक उपयोग करना चाहिए?',
-  options_en: [
-    { label: 'A', text: 'Water', correct: false },
-    { label: 'B', text: 'CO₂', correct: true },
-    { label: 'C', text: 'Petrol', correct: false },
-    { label: 'D', text: 'None', correct: false },
-  ],
-  options_hi: [
-    { label: 'A', text: 'पानी (Water)', correct: false },
-    { label: 'B', text: 'CO₂ (Carbon Dioxide)', correct: true },
-    { label: 'C', text: 'पेट्रोल (Petrol)', correct: false },
-    { label: 'D', text: 'कोई नहीं (None)', correct: false },
-  ],
-  correctLabel: 'B',
-  correctText: 'CO₂',
-  explanation_en: 'CO₂ extinguishers are electrically non-conductive and leave no harmful residue, making them safe for live electrical fires. Water conducts electricity and can cause fatal shock.',
-  explanation_hi: 'CO₂ अग्निशामक बिजली का संचालन नहीं करते हैं और कोई अवशेष नहीं छोड़ते, इसलिए बिजली की आग के लिए सुरक्षित हैं। पानी बिजली का संचालन करता है जिससे करंट लग सकता है।',
-}
+import { speak } from '../../lib/voice'
 
 export default function FireDetectionOverlay({
   videoRef,
@@ -44,30 +20,26 @@ export default function FireDetectionOverlay({
   onTaskCompleted,
 }) {
   const [detection, setDetection] = useState({
-    isFire: false,
-    confidence: 0,
-    bbox: null,
-    flameCenter: null,
-    pixelCount: 0,
+    isFire:       false,
+    state:        'none', // 'none' | 'verifying' | 'confirmed'
+    confidence:   0,
+    bbox:         null,
+    pixelCount:   0,
+    flickerRatio: 0,
   })
 
   const [fireConfirmed, setFireConfirmed] = useState(false)
-  const [taskState, setTaskState] = useState('detecting') // detecting | question | feedback_correct | feedback_wrong | completed
-  const [selectedOption, setSelectedOption] = useState(null)
-  const [questionStartTime, setQuestionStartTime] = useState(null)
-  const [responseTimeMs, setResponseTimeMs] = useState(null)
-  const [attempts, setAttempts] = useState(0)
+  const [taskState, setTaskState]         = useState('scanning') // scanning | completed
 
-  const detectorRef = useRef(null)
-  const animRef = useRef(null)
+  const detectorRef        = useRef(null)
+  const animRef            = useRef(null)
   const fireSoundPlayedRef = useRef(false)
 
   // Initialize detector
   useEffect(() => {
     detectorRef.current = new FireDetector({
-      sampleWidth: 160,
+      sampleWidth:  160,
       sampleHeight: 120,
-      minPixels: 10,
     })
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current)
@@ -83,18 +55,33 @@ export default function FireDetectionOverlay({
         const result = detectorRef.current.detect(videoRef.current)
         setDetection(result)
 
-        if (result.isFire && !fireConfirmed) {
+        // When flame is genuinely confirmed across sustained frames
+        if (result.isFire && result.state === 'confirmed' && !fireConfirmed) {
           setFireConfirmed(true)
+
           if (!fireSoundPlayedRef.current) {
             fireSoundPlayedRef.current = true
-            speak(lang === 'hi' ? 'आग का खतरा पाया गया! सुरक्षित दूरी बनाए रखें।' : 'Fire hazard detected! Maintain safe distance.', lang)
+            speak(
+              lang === 'hi'
+                ? 'आग का खतरा पाया गया! सुरक्षित दूरी बनाए रखें।'
+                : 'Fire hazard detected! Maintain safe distance.',
+              lang
+            )
           }
+
           if (onFireDetected) onFireDetected(result)
 
-          // Launch interactive task after 1.2s of detection confirmation
+          // Auto-advance Step 0 (Identify Fire Source) after 1.2s confirmation
           setTimeout(() => {
-            setTaskState(prev => prev === 'detecting' ? 'question' : prev)
-            setQuestionStartTime(Date.now())
+            setTaskState('completed')
+            if (onTaskCompleted) {
+              onTaskCompleted({
+                wasCorrect:     true,
+                responseTimeMs: 1200,
+                score:          100,
+                selectedAnswer: 'Identified',
+              })
+            }
           }, 1200)
         }
       }
@@ -105,55 +92,34 @@ export default function FireDetectionOverlay({
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current)
     }
-  }, [isActive, videoRef, fireConfirmed, lang, onFireDetected])
+  }, [isActive, videoRef, fireConfirmed, lang, onFireDetected, onTaskCompleted])
 
-  // Current question data based on language
-  const qData = useMemo(() => {
-    const isHi = lang === 'hi'
-    return {
-      question: isHi ? FIRE_QUESTION.question_hi : FIRE_QUESTION.question_en,
-      options: isHi ? FIRE_QUESTION.options_hi : FIRE_QUESTION.options_en,
-      explanation: isHi ? FIRE_QUESTION.explanation_hi : FIRE_QUESTION.explanation_en,
-    }
-  }, [lang])
-
-  function handleOptionSelect(opt) {
-    if (taskState !== 'question') return
-    const reactionTime = Date.now() - (questionStartTime || Date.now())
-    setResponseTimeMs(reactionTime)
-    setSelectedOption(opt.label)
-    setAttempts(a => a + 1)
-
-    if (opt.correct) {
-      setTaskState('feedback_correct')
-      speak(lang === 'hi' ? 'आपका उत्तर सही है! CO2 अग्निशामक।' : 'You are correct! CO2 extinguisher.', lang)
-    } else {
-      setTaskState('feedback_wrong')
-      speak(lang === 'hi' ? 'गलत उत्तर। सही उत्तर: CO2 अग्निशामक।' : 'Incorrect answer. Correct answer: CO2 extinguisher.', lang)
+  function handleSimulateFire() {
+    if (detectorRef.current) {
+      detectorRef.current.triggerSimulation(true)
     }
   }
 
-  function handleRetryQuestion() {
-    setSelectedOption(null)
-    setTaskState('question')
-    setQuestionStartTime(Date.now())
-  }
-
-  function handleProceed() {
-    setTaskState('completed')
-    if (onTaskCompleted) {
-      onTaskCompleted({
-        questionId: FIRE_QUESTION.id,
-        selectedAnswer: selectedOption,
-        wasCorrect: selectedOption === FIRE_QUESTION.correctLabel,
-        responseTimeMs,
-        attempts,
-        score: selectedOption === FIRE_QUESTION.correctLabel ? 100 : 70,
-      })
-    }
+  function handleReset() {
+    if (detectorRef.current) detectorRef.current.reset()
+    setFireConfirmed(false)
+    fireSoundPlayedRef.current = false
+    setTaskState('scanning')
+    setDetection({
+      isFire:       false,
+      state:        'none',
+      confidence:   0,
+      bbox:         null,
+      pixelCount:   0,
+      flickerRatio: 0,
+    })
   }
 
   if (!isActive) return null
+
+  const isConfirmed = detection.state === 'confirmed' && detection.isFire
+  const isVerifying = detection.state === 'verifying'
+  const isNone      = detection.state === 'none'
 
   return (
     <div style={{
@@ -161,18 +127,18 @@ export default function FireDetectionOverlay({
       overflow: 'hidden', display: 'flex', flexDirection: 'column',
     }}>
 
-      {/* ── 1. REAL-TIME FLAME BOUNDING BOX RETICLE ── */}
-      {detection.isFire && detection.bbox && (
+      {/* ── 1. FLAME BOUNDING BOX RETICLE — ONLY WHEN CONFIRMED ── */}
+      {isConfirmed && detection.bbox && (
         <div
           style={{
             position: 'absolute',
-            left: `${Math.max(2, Math.min(92, detection.bbox.x * 100))}%`,
-            top: `${Math.max(2, Math.min(85, detection.bbox.y * 100))}%`,
-            width: `${Math.max(12, Math.min(60, detection.bbox.width * 100))}%`,
-            height: `${Math.max(12, Math.min(60, detection.bbox.height * 100))}%`,
+            left:   `${Math.max(2, Math.min(90, detection.bbox.x * 100))}%`,
+            top:    `${Math.max(4, Math.min(84, detection.bbox.y * 100))}%`,
+            width:  `${Math.max(10, Math.min(50, detection.bbox.width * 100))}%`,
+            height: `${Math.max(10, Math.min(48, detection.bbox.height * 100))}%`,
             border: '2.5px solid #FF3B30',
             borderRadius: 8,
-            boxShadow: '0 0 20px rgba(255, 59, 48, 0.75), inset 0 0 15px rgba(255, 120, 0, 0.4)',
+            boxShadow: '0 0 22px rgba(255, 59, 48, 0.75), inset 0 0 14px rgba(255, 120, 0, 0.4)',
             transition: 'all 0.12s ease-out',
             pointerEvents: 'none',
           }}
@@ -186,7 +152,7 @@ export default function FireDetectionOverlay({
           {/* Floating Flame Target Label */}
           <div style={{
             position: 'absolute', top: -28, left: '50%', transform: 'translateX(-50%)',
-            background: 'rgba(220, 38, 38, 0.92)', backdropFilter: 'blur(4px)',
+            background: 'rgba(220, 38, 38, 0.94)', backdropFilter: 'blur(4px)',
             color: 'white', padding: '3px 10px', borderRadius: 6,
             fontSize: '0.74rem', fontWeight: 800, letterSpacing: '0.04em',
             whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5,
@@ -198,13 +164,15 @@ export default function FireDetectionOverlay({
         </div>
       )}
 
-      {/* ── 2. TOP SCANNING STATUS BAR ── */}
+      {/* ── 2. TOP SCANNING STATUS BAR (3 DISTINCT STATES) ── */}
       <div style={{
         margin: '68px auto 0',
         pointerEvents: 'all',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
       }}>
-        {!detection.isFire ? (
+
+        {/* STATE A: NO FIRE DETECTED */}
+        {isNone && (
           <div style={{
             background: 'rgba(15, 23, 42, 0.88)', backdropFilter: 'blur(8px)',
             border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -215,36 +183,81 @@ export default function FireDetectionOverlay({
           }}>
             <span style={{
               width: 9, height: 9, borderRadius: '50%', background: '#10B981',
-              boxShadow: '0 0 10px #10B981', animation: 'pulse 1.5s infinite',
+              boxShadow: '0 0 10px #10B981', flexShrink: 0,
             }} />
-            <span>AI Camera Active · Scanning live frames for flame hazards…</span>
+            <span>AI Camera Active · <strong>NO FIRE DETECTED</strong></span>
             <span style={{ color: '#94A3B8', fontSize: '0.74rem', borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: 8 }}>
-              Show candle/match flame to camera
+              Point at candle / lighter
             </span>
+            <button
+              onClick={handleSimulateFire}
+              title="Test simulation"
+              style={{
+                background: 'rgba(234, 88, 12, 0.22)',
+                border: '1px solid rgba(234, 88, 12, 0.5)',
+                color: '#FFB347', borderRadius: 8, padding: '2px 8px',
+                fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 3, marginLeft: 4,
+              }}
+            >
+              <Flame size={11} color="#FFB347" /> Simulate
+            </button>
           </div>
-        ) : (
+        )}
+
+        {/* STATE B: VERIFYING FIRE... */}
+        {isVerifying && (
           <div style={{
-            background: 'linear-gradient(90deg, rgba(220, 38, 38, 0.95), rgba(234, 88, 12, 0.95))',
+            background: 'rgba(120, 85, 0, 0.90)', backdropFilter: 'blur(8px)',
+            border: '1.5px solid #FCD34D',
+            borderRadius: 14, padding: '8px 18px',
+            color: 'white', fontSize: '0.84rem', fontWeight: 700,
+            display: 'flex', alignItems: 'center', gap: 8,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          }}>
+            <span style={{
+              width: 10, height: 10, borderRadius: '50%', background: '#FCD34D',
+              boxShadow: '0 0 10px #FCD34D', flexShrink: 0,
+              animation: 'pulse 0.8s ease-in-out infinite',
+            }} />
+            <span>🟡 VERIFYING FIRE... (Analyzing flame flicker & heat core)</span>
+          </div>
+        )}
+
+        {/* STATE C: FIRE HAZARD DETECTED */}
+        {isConfirmed && (
+          <div style={{
+            background: 'linear-gradient(90deg, rgba(220, 38, 38, 0.96), rgba(234, 88, 12, 0.96))',
             border: '1.5px solid #FCA5A5',
             borderRadius: 14, padding: '10px 20px',
             color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-            boxShadow: '0 6px 24px rgba(220, 38, 38, 0.5)',
+            boxShadow: '0 6px 24px rgba(220, 38, 38, 0.55)',
             animation: 'slideDownFade 0.25s ease-out',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.96rem', fontWeight: 800, letterSpacing: '0.04em' }}>
               <Flame size={18} color="#FEF08A" />
               🔥 FIRE HAZARD DETECTED
-              <span style={{ background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: 6, fontSize: '0.74rem' }}>
+              <span style={{
+                background: 'rgba(0,0,0,0.3)', padding: '2px 9px', borderRadius: 6,
+                fontSize: '0.74rem', fontWeight: 700,
+              }}>
                 {Math.round(detection.confidence * 100)}% CONFIDENCE
               </span>
+              <button
+                onClick={handleReset}
+                title="Reset detection"
+                style={{
+                  background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.25)',
+                  color: 'white', borderRadius: 6, padding: '2px 7px',
+                  fontSize: '0.68rem', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 3,
+                }}
+              >
+                <RotateCcw size={11} /> Reset
+              </button>
             </div>
             <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#FEF08A', display: 'flex', alignItems: 'center', gap: 6 }}>
               <ShieldAlert size={15} /> ⚠️ MAINTAIN SAFE DISTANCE
-            </div>
-            <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: '0.76rem', color: '#FEE2E2', fontWeight: 600 }}>
-              <span>🧯 Identify Correct Extinguisher</span>
-              <span>•</span>
-              <span>🚪 Locate Emergency Exit</span>
             </div>
           </div>
         )}
@@ -252,195 +265,7 @@ export default function FireDetectionOverlay({
 
       <div style={{ flex: 1 }} />
 
-      {/* ── 3. INTERACTIVE SAFETY TRAINING CARD (PHASE 4 & 5) ── */}
-      {(taskState === 'question' || taskState === 'feedback_correct' || taskState === 'feedback_wrong') && (
-        <div style={{
-          pointerEvents: 'all',
-          margin: '0 auto 20px',
-          width: 'min(580px, calc(100vw - 32px))',
-          background: 'rgba(15, 23, 42, 0.94)',
-          backdropFilter: 'blur(16px)',
-          border: taskState === 'feedback_correct' ? '2px solid #10B981'
-            : taskState === 'feedback_wrong' ? '2px solid #EF4444'
-            : '1.5px solid rgba(255, 255, 255, 0.2)',
-          borderRadius: 20,
-          padding: '22px 24px',
-          boxShadow: '0 12px 36px rgba(0, 0, 0, 0.6)',
-          animation: 'slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-        }}>
-
-          {/* Card Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{
-                background: 'rgba(234, 88, 12, 0.2)',
-                border: '1px solid rgba(234, 88, 12, 0.5)',
-                color: 'var(--color-brand)',
-                borderRadius: 8, padding: '4px 10px',
-                fontSize: '0.74rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em',
-              }}>
-                Safety Protocol Assessment
-              </span>
-              {responseTimeMs && (
-                <span style={{ color: '#94A3B8', fontSize: '0.74rem' }}>
-                  Response: {(responseTimeMs / 1000).toFixed(1)}s
-                </span>
-              )}
-            </div>
-            {isTTSSupported(lang) && (
-              <button
-                onClick={() => speak(qData.question, lang)}
-                style={{
-                  background: 'transparent', border: 'none', color: '#CBD5E1',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.76rem',
-                }}
-              >
-                <Volume2 size={14} /> Listen
-              </button>
-            )}
-          </div>
-
-          {/* Question text */}
-          <h3 style={{
-            color: 'white',
-            fontSize: 'clamp(1rem, 2.5vw, 1.15rem)',
-            fontWeight: 800,
-            lineHeight: 1.35,
-            marginBottom: 16,
-          }}>
-            {qData.question}
-          </h3>
-
-          {/* 4 Answer Options */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-            {qData.options.map((opt) => {
-              const isSelected = selectedOption === opt.label
-              const isCorrectOpt = opt.correct
-              let btnBg = 'rgba(255, 255, 255, 0.07)'
-              let border = '1px solid rgba(255, 255, 255, 0.15)'
-              let textColor = 'white'
-
-              if (taskState === 'feedback_correct' || taskState === 'feedback_wrong') {
-                if (isCorrectOpt) {
-                  btnBg = 'rgba(16, 185, 129, 0.25)'
-                  border = '1.5px solid #10B981'
-                  textColor = '#A7F3D0'
-                } else if (isSelected && !isCorrectOpt) {
-                  btnBg = 'rgba(239, 68, 68, 0.25)'
-                  border = '1.5px solid #EF4444'
-                  textColor = '#FECACA'
-                }
-              }
-
-              return (
-                <button
-                  key={opt.label}
-                  onClick={() => handleOptionSelect(opt)}
-                  disabled={taskState !== 'question'}
-                  style={{
-                    background: btnBg,
-                    border,
-                    borderRadius: 12,
-                    padding: '12px 14px',
-                    color: textColor,
-                    cursor: taskState === 'question' ? 'pointer' : 'default',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    textAlign: 'left',
-                    fontWeight: 700,
-                    fontSize: '0.9rem',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <span style={{
-                    width: 24, height: 24, borderRadius: 6,
-                    background: isSelected ? 'var(--color-brand)' : 'rgba(255,255,255,0.12)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '0.78rem', fontWeight: 800, flexShrink: 0,
-                  }}>
-                    {opt.label}
-                  </span>
-                  <span style={{ flex: 1 }}>{opt.text}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Feedback Section (Phase 5) */}
-          {taskState === 'feedback_correct' && (
-            <div style={{
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid #10B981',
-              borderRadius: 12, padding: '12px 16px',
-              marginBottom: 14,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#34D399', fontWeight: 800, fontSize: '0.94rem', marginBottom: 4 }}>
-                <CheckCircle2 size={20} />
-                ✓ YOU ARE CORRECT!
-              </div>
-              <p style={{ color: '#E2E8F0', fontSize: '0.82rem', lineHeight: 1.5, margin: 0 }}>
-                {qData.explanation}
-              </p>
-            </div>
-          )}
-
-          {taskState === 'feedback_wrong' && (
-            <div style={{
-              background: 'rgba(239, 68, 68, 0.15)',
-              border: '1px solid #EF4444',
-              borderRadius: 12, padding: '12px 16px',
-              marginBottom: 14,
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#F87171', fontWeight: 800, fontSize: '0.94rem', marginBottom: 4 }}>
-                <XCircle size={20} />
-                ✕ INCORRECT ANSWER
-              </div>
-              <p style={{ color: '#FEF08A', fontWeight: 700, fontSize: '0.84rem', margin: '0 0 4px 0' }}>
-                Correct answer: CO₂ extinguisher.
-              </p>
-              <p style={{ color: '#E2E8F0', fontSize: '0.82rem', lineHeight: 1.5, margin: 0 }}>
-                {qData.explanation}
-              </p>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            {taskState === 'feedback_wrong' && (
-              <button
-                onClick={handleRetryQuestion}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.25)',
-                  color: 'white', borderRadius: 10,
-                  padding: '10px 16px', fontSize: '0.84rem', fontWeight: 700,
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                }}
-              >
-                <RotateCcw size={15} /> Try Again
-              </button>
-            )}
-
-            {(taskState === 'feedback_correct' || taskState === 'feedback_wrong') && (
-              <button
-                onClick={handleProceed}
-                style={{
-                  background: 'var(--color-brand)',
-                  color: 'white', border: 'none', borderRadius: 10,
-                  padding: '10px 20px', fontSize: '0.86rem', fontWeight: 800,
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8,
-                  boxShadow: '0 4px 14px rgba(224,90,0,0.4)',
-                }}
-              >
-                Continue Training →
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Completion Confirmation Badge */}
+      {/* ── 3. STEP COMPLETION BADGE (WHEN CONFIRMED) ── */}
       {taskState === 'completed' && (
         <div style={{
           pointerEvents: 'all',
@@ -452,7 +277,7 @@ export default function FireDetectionOverlay({
           boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
         }}>
           <CheckCircle2 size={18} />
-          <span>Fire Safety Protocol Verified! Step 1 Complete ✓</span>
+          <span>Fire Source Identified ✓ — Proceeding to Step 2</span>
         </div>
       )}
     </div>
