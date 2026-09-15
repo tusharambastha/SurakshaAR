@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Trophy, Clock, Star, TrendingUp, ChevronRight, AlertTriangle, Flame, Wind, Cog, Lock } from 'lucide-react'
+import { Trophy, Clock, Star, TrendingUp, ChevronRight, AlertTriangle, Flame, Wind, Cog, Lock, PlayCircle } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { mockGetScenarios, mockGetSessions } from '../lib/mockDb'
 import { getScenarioText } from '../lib/i18n'
@@ -8,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { Navbar } from '../components/layout/Navbar'
 import { scoreRating } from '../lib/scoring'
+import VideoTutorialModal from '../components/ui/VideoTutorialModal'
 
 const HAZARD_ICONS = {
   gas_leak: <Wind size={18} />,
@@ -40,6 +42,7 @@ export default function Dashboard() {
   const { user, profile } = useAuth()
   const { T, lang } = useLang()
   const navigate = useNavigate()
+  const [showVideoTutorial, setShowVideoTutorial] = useState(false)
 
   const { data: scenarios, isLoading: loadingS } = useQuery({
     queryKey: ['scenarios'],
@@ -105,6 +108,66 @@ export default function Dashboard() {
               label={T('lastTrained')}
               value={sessions?.[0] ? fmt(sessions[0].completed_at) : '—'}
               sub="most recent" color="var(--color-text-muted)" bg="var(--color-surface-alt)" loading={loadingSess} />
+          </div>
+
+          {/* How to Use / Video Tutorial Banner */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, var(--color-brand-50, #FFF3EB) 0%, var(--color-surface, #FFFFFF) 100%)',
+              border: '1.5px solid var(--color-brand-100, #FFE6D5)',
+              borderRadius: 'var(--radius-lg, 16px)',
+              padding: '16px 20px',
+              marginBottom: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 16,
+              boxShadow: '0 2px 8px rgba(224, 90, 0, 0.06)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 'var(--radius-md, 12px)',
+                  background: 'var(--color-brand, #E05A00)',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 4px 12px rgba(224, 90, 0, 0.25)',
+                }}
+              >
+                <PlayCircle size={24} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: 'var(--text-base, 1rem)', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+                  {T('howToUse') || 'How to Use SurakshaAR?'}
+                </h3>
+                <p style={{ fontSize: 'var(--text-xs, 0.8rem)', color: 'var(--color-text-secondary)', margin: '2px 0 0' }}>
+                  First time training? Watch the 2-minute video tutorial before starting AR simulation.
+                </p>
+              </div>
+            </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowVideoTutorial(true)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 18px',
+                fontSize: 'var(--text-sm)',
+                fontWeight: 700,
+                borderRadius: 'var(--radius-md, 10px)',
+              }}
+            >
+              <PlayCircle size={17} /> {T('watchTutorial') || 'Watch Video Guide'}
+            </button>
           </div>
 
           {/* Modules */}
@@ -177,6 +240,12 @@ export default function Dashboard() {
               </div>
             )}
           </section>
+
+          {/* In-Platform Video Tutorial Modal */}
+          <VideoTutorialModal
+            isOpen={showVideoTutorial}
+            onClose={() => setShowVideoTutorial(false)}
+          />
         </div>
       </main>
     </div>

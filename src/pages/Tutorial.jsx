@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Volume2, SkipForward } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Volume2, SkipForward, PlayCircle } from 'lucide-react'
 import { useLang } from '../contexts/LanguageContext'
 import { speak, isTTSSupported } from '../lib/voice'
 import { Navbar } from '../components/layout/Navbar'
+import VideoTutorialModal from '../components/ui/VideoTutorialModal'
 
 const STEP_ICONS = ['📷', '🎯', '🦺', '📋', '✅']
 
@@ -12,6 +13,7 @@ export default function Tutorial() {
   const navigate = useNavigate()
   const { T, tutorialSteps, lang } = useLang()
   const [current, setCurrent] = useState(0)
+  const [showVideoModal, setShowVideoModal] = useState(false)
   const total = tutorialSteps.length
 
   function handleNext() {
@@ -35,11 +37,27 @@ export default function Tutorial() {
         display: 'flex', justifyContent: 'center',
       }}>
         <div style={{ width: '100%', maxWidth: 520 }}>
-          <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <h1 style={{ fontSize: 'var(--text-2xl)', marginBottom: 8 }}>{T('howItWorksTitle')}</h1>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginBottom: 14 }}>
               Before you begin AR training, here's what to expect.
             </p>
+            <button
+              onClick={() => setShowVideoModal(true)}
+              className="btn btn-secondary btn-sm"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                borderRadius: 'var(--radius-md, 8px)',
+                padding: '6px 14px',
+              }}
+            >
+              <PlayCircle size={15} style={{ color: 'var(--color-brand)' }} />
+              {T('watchTutorial') || 'Watch Video Walkthrough'} (2:34)
+            </button>
           </div>
 
           {/* Progress dots */}
@@ -104,6 +122,11 @@ export default function Tutorial() {
               <SkipForward size={14} /> {T('skipTutorial')}
             </button>
           </div>
+
+          <VideoTutorialModal
+            isOpen={showVideoModal}
+            onClose={() => setShowVideoModal(false)}
+          />
         </div>
       </main>
     </div>

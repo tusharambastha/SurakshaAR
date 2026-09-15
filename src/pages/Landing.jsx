@@ -632,6 +632,101 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Learn How to Use SurakshaAR (Video Tutorial) */}
+      <section id="learn-how-to-use" style={{
+        padding: '64px var(--space-4)',
+        background: 'var(--color-surface, #FFFFFF)',
+        borderTop: '1px solid var(--color-border)',
+      }}>
+        <div className="page-container">
+          <div style={{ textAlign: 'center', marginBottom: 36 }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 14px',
+              borderRadius: 999,
+              background: 'var(--color-brand-50, #FFF3EB)',
+              color: 'var(--color-brand, #E05A00)',
+              fontSize: 'var(--text-xs)',
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              marginBottom: 12,
+            }}>
+              <span>🎬</span> {T('videoTutorial') || 'Video Tutorial'}
+            </div>
+            <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2.25rem)', marginBottom: 12, color: 'var(--color-text-primary)' }}>
+              {T('learnHowToUse') || 'Learn How to Use SurakshaAR'}
+            </h2>
+            <p style={{ color: 'var(--color-text-muted)', maxWidth: 640, margin: '0 auto', fontSize: 'var(--text-base)', lineHeight: 1.6 }}>
+              {T('learnHowToUseSubtitle') || 'Watch our complete video walkthrough to learn how to navigate the dashboard, interact with the safety assistant, scan hazards in AR, and earn verified certification.'}
+            </p>
+          </div>
+
+          <div style={{
+            maxWidth: 920,
+            margin: '0 auto',
+            background: '#000000',
+            borderRadius: 'var(--radius-lg, 16px)',
+            overflow: 'hidden',
+            boxShadow: '0 16px 40px rgba(0, 0, 0, 0.12)',
+            border: '1px solid var(--color-border)',
+            position: 'relative',
+            aspectRatio: '16 / 9',
+          }}>
+            <video
+              src={`${import.meta.env.BASE_URL}suraksha_ar_final_demo.mp4`}
+              controls
+              playsInline
+              preload="metadata"
+              style={{
+                width: '100%',
+                height: '100%',
+                display: 'block',
+                objectFit: 'contain',
+              }}
+            >
+              Your browser does not support the video tag.
+            </video>
+          </div>
+
+          {/* Chapters / Timeline Highlights */}
+          <div style={{
+            maxWidth: 920,
+            margin: '20px auto 0',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+            gap: 12,
+            textAlign: 'center',
+          }}>
+            {[
+              { time: '00:27', label: 'Dashboard & Modules', icon: '📊' },
+              { time: '00:38', label: 'Safety Assistant', icon: '💬' },
+              { time: '00:51', label: 'AR Tutorial', icon: '📋' },
+              { time: '01:02', label: 'Camera AR Hazard', icon: '🔥' },
+              { time: '01:40', label: 'Assessment Quiz', icon: '📝' },
+              { time: '02:10', label: 'Verified Certificate', icon: '📜' },
+            ].map((ch, idx) => (
+              <div
+                key={idx}
+                style={{
+                  padding: '10px 8px',
+                  background: 'var(--color-surface-alt, #FAF8F5)',
+                  borderRadius: 'var(--radius-md, 8px)',
+                  border: '1px solid var(--color-border)',
+                  fontSize: 'var(--text-xs)',
+                }}
+              >
+                <div style={{ fontSize: '1rem', marginBottom: 2 }}>{ch.icon}</div>
+                <div style={{ fontWeight: 700, color: 'var(--color-brand)' }}>{ch.time}</div>
+                <div style={{ color: 'var(--color-text-secondary)', marginTop: 2, fontSize: '0.75rem' }}>{ch.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Features strip */}
       <section style={{
         background: 'var(--color-surface)',
