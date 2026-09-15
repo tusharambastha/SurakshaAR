@@ -171,7 +171,7 @@ export default function GasLeakDetectionOverlay({
           flexDirection: 'column',
           alignItems:    'center',
           gap:           6,
-          pointerEvents: 'all',
+          pointerEvents: 'auto',
           maxWidth:      '94vw',
         }}
       >
@@ -533,7 +533,7 @@ export default function GasLeakDetectionOverlay({
             bottom:         110,
             left:           '50%',
             transform:      'translateX(-50%)',
-            pointerEvents:  'all',
+            pointerEvents:  'auto',
             background:     'rgba(16, 185, 129, 0.95)',
             color:          'white',
             borderRadius:   14,
