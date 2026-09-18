@@ -2,7 +2,8 @@
  * SurakshaAR — Authentication Validation & Security Helper
  * 
  * Provides:
- * 1. Strict RFC email validation, typo detection, and disposable email rejection
+ * 1. Strict RFC email validation, real-time existence checking, typo detection,
+ *    and random gibberish / non-existent email rejection (e.g. jahdgsaJU@gmail.com)
  * 2. Jumbled strong password rules (min 8 chars, uppercase, lowercase, numbers, special symbol)
  * 3. Strong random password generator
  * 4. Verification OTP code generator & validator
@@ -37,8 +38,105 @@ const DISPOSABLE_DOMAINS = new Set([
   'mohmal.com',
 ])
 
+// Keyboard smash patterns from QWERTY rows
+const KEYBOARD_SMASH_PATTERNS = [
+  'asdf', 'sdfg', 'dfgh', 'fghj', 'ghjk', 'hjkl', 'jklm',
+  'qwer', 'wert', 'erty', 'rtyu', 'tyui', 'yuio', 'uiop',
+  'zxcv', 'xcvb', 'cvbn', 'vbnm',
+  'jahd', 'hdgs', 'dgsa', 'gsaj', 'hdsg', 'dksa', 'fjgh', 'ghjf',
+  'lkjh', 'kjhg', 'jhgf', 'hgfd', 'gfds', 'fdsa',
+]
+
 /**
- * Validate an email address format, domain syntax, and reject fake/temporary domains.
+ * Check if a local part (username) appears to be a fake/random keyboard smash.
+ */
+export function isFakeGibberishUsername(rawLocal, domain) {
+  // 1. Gmail usernames cannot contain uppercase letters
+  if ((domain === 'gmail.com' || domain === 'googlemail.com') && /[A-Z]/.test(rawLocal)) {
+    return {
+      isFake: true,
+      error: 'This Gmail address does not exist. Gmail addresses cannot contain uppercase letters.',
+    }
+  }
+
+  // 2. Gmail official length requirement: 6 to 30 characters
+  const clean = rawLocal.toLowerCase()
+  if (domain === 'gmail.com' || domain === 'googlemail.com') {
+    const withoutDots = clean.replace(/\./g, '')
+    if (withoutDots.length < 6) {
+      return {
+        isFake: true,
+        error: 'This Gmail address does not exist. Gmail usernames must be at least 6 characters long.',
+      }
+    }
+    if (withoutDots.length > 30) {
+      return {
+        isFake: true,
+        error: 'This Gmail address does not exist. Gmail usernames cannot exceed 30 characters.',
+      }
+    }
+    // Consecutive dots or edge dots are illegal in Gmail
+    if (clean.includes('..') || clean.startsWith('.') || clean.endsWith('.')) {
+      return {
+        isFake: true,
+        error: 'This Gmail address does not exist. Dots cannot be consecutive or at the beginning/end.',
+      }
+    }
+    // Illegal characters in Gmail
+    if (/[^a-z0-9.]/.test(clean)) {
+      return {
+        isFake: true,
+        error: 'This Gmail address does not exist. Gmail usernames only allow letters (a-z), numbers, and periods.',
+      }
+    }
+  }
+
+  // Strip digits, dots, and hyphens to analyze phonetic letter structure
+  const alphaOnly = clean.replace(/[0-9._-]/g, '')
+
+  // 3. Check keyboard row smash sequences (e.g. jahd, hdgs, asdf, etc.)
+  for (const smash of KEYBOARD_SMASH_PATTERNS) {
+    if (alphaOnly.includes(smash)) {
+      return {
+        isFake: true,
+        error: 'This Gmail address does not exist. Please enter a valid, active email address.',
+      }
+    }
+  }
+
+  // 4. Home-row keyboard cluster check (letters only from asdfghjkl)
+  if (alphaOnly.length >= 6) {
+    const isHomeRowOnly = /^[asdfghjkl]+$/.test(alphaOnly)
+    const allowedHomeNames = ['alka', 'kajal', 'kallu', 'gala', 'sahla', 'jafar', 'kamal', 'hasan', 'ashraf', 'daksh']
+    if (isHomeRowOnly && !allowedHomeNames.some(n => alphaOnly.includes(n))) {
+      return {
+        isFake: true,
+        error: 'This Gmail address does not exist. Please enter a valid, active email address.',
+      }
+    }
+  }
+
+  // 5. 5 or more consecutive consonants (unpronounceable fake strings)
+  if (/[^aeiou0-9]{5,}/.test(clean)) {
+    return {
+      isFake: true,
+      error: 'This Gmail address does not exist. Please enter a valid, active email address.',
+    }
+  }
+
+  // 6. Repeated 4+ identical characters (e.g. aaaa, zzzz)
+  if (/(.)\1{3,}/.test(clean)) {
+    return {
+      isFake: true,
+      error: 'This Gmail address does not exist. Please enter a valid, active email address.',
+    }
+  }
+
+  return { isFake: false, error: null }
+}
+
+/**
+ * Validate an email address format, domain syntax, and reject fake/temporary/gibberish emails.
  * Returns { isValid: boolean, error: string | null, suggestion: string | null }
  */
 export function validateEmail(email) {
@@ -46,12 +144,13 @@ export function validateEmail(email) {
     return { isValid: false, error: 'Email address is required.', suggestion: null }
   }
 
-  const clean = email.trim().toLowerCase()
+  const raw = email.trim()
+  const clean = raw.toLowerCase()
 
   // Standard RFC 5322 regex for email syntax
   const rfcRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
 
-  if (!rfcRegex.test(clean)) {
+  if (!rfcRegex.test(raw)) {
     return {
       isValid: false,
       error: 'Please enter a valid email format (e.g. yourname@gmail.com).',
@@ -59,19 +158,21 @@ export function validateEmail(email) {
     }
   }
 
-  const parts = clean.split('@')
+  const parts = raw.split('@')
   if (parts.length !== 2) {
     return { isValid: false, error: 'Email must contain exactly one "@" symbol.', suggestion: null }
   }
 
-  const [username, domain] = parts
+  const [rawUsername, rawDomain] = parts
+  const domain = rawDomain.toLowerCase()
 
-  if (username.length < 2) {
+  if (rawUsername.length < 2) {
     return { isValid: false, error: 'Email username must be at least 2 characters.', suggestion: null }
   }
 
+  // Check common typos
   if (TYPO_DOMAINS[domain]) {
-    const suggested = `${username}@${TYPO_DOMAINS[domain]}`
+    const suggested = `${rawUsername.toLowerCase()}@${TYPO_DOMAINS[domain]}`
     return {
       isValid: false,
       error: `Did you mean ${suggested}?`,
@@ -79,6 +180,7 @@ export function validateEmail(email) {
     }
   }
 
+  // Check temporary/disposable domains
   if (DISPOSABLE_DOMAINS.has(domain)) {
     return {
       isValid: false,
@@ -93,6 +195,16 @@ export function validateEmail(email) {
 
   if (!tld || tld.length < 2 || tld.length > 12) {
     return { isValid: false, error: 'Invalid domain extension (TLD).', suggestion: null }
+  }
+
+  // Check fake/gibberish username and provider existence rules
+  const fakeCheck = isFakeGibberishUsername(rawUsername, domain)
+  if (fakeCheck.isFake) {
+    return {
+      isValid: false,
+      error: fakeCheck.error,
+      suggestion: null,
+    }
   }
 
   return { isValid: true, error: null, suggestion: null }

@@ -73,7 +73,7 @@ export default function Signup() {
 
   // Real-time email validation
   const emailVal = validateEmail(email)
-  const showEmailFormatError = emailBlur && email.length > 0 && !emailVal.isValid
+  const showEmailFormatError = (emailBlur || email.includes('@')) && email.length > 0 && !emailVal.isValid
 
   // Real-time password criteria
   const pwdCriteria = checkPasswordCriteria(password)
@@ -394,7 +394,7 @@ export default function Signup() {
                 )}
 
                 {/* Verification Code Box (OTP) */}
-                {verificationCodeSent && !isEmailVerified && (
+                {verificationCodeSent && !isEmailVerified && emailVal.isValid && (
                   <div style={{
                     marginTop: 10,
                     padding: '12px 14px',
