@@ -1,4 +1,4 @@
-import { useState, useId } from 'react'
+import { useState, useId, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Eye,
@@ -25,6 +25,7 @@ import {
   generateStrongPassword,
   generateVerificationCode,
 } from '../lib/authValidation'
+import { sendEmailOtp } from '../lib/emailService'
 
 export default function Signup() {
   const { refreshProfile } = useAuth()
@@ -41,23 +42,34 @@ export default function Signup() {
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState('')
 
-  // ── Email Validation & Verification State ─────────────────────────
-  const [isEmailVerified, setIsEmailVerified]         = useState(false)
+  // ── Email Validation & Real OTP State ─────────────────────────────
+  const [isEmailVerified, setIsEmailVerified]           = useState(false)
   const [verificationCodeSent, setVerificationCodeSent] = useState(false)
-  const [generatedOtp, setGeneratedOtp]               = useState('')
-  const [enteredOtp, setEnteredOtp]                   = useState('')
-  const [otpError, setOtpError]                       = useState('')
-  const [otpSuccess, setOtpSuccess]                   = useState('')
-  const [emailBlur, setEmailBlur]                     = useState(false)
+  const [isSendingOtp, setIsSendingOtp]                 = useState(false)
+  const [resendCooldown, setResendCooldown]             = useState(0)
+  const [generatedOtp, setGeneratedOtp]                 = useState('')
+  const [enteredOtp, setEnteredOtp]                     = useState('')
+  const [otpError, setOtpError]                         = useState('')
+  const [otpSuccess, setOtpSuccess]                     = useState('')
+  const [emailBlur, setEmailBlur]                       = useState(false)
 
   // ── Password Suggestion & Strength State ──────────────────────────
-  const [pwdTouched, setPwdTouched]                   = useState(false)
-  const [pwdSuggestedBanner, setPwdSuggestedBanner]   = useState(false)
+  const [pwdTouched, setPwdTouched]                     = useState(false)
+  const [pwdSuggestedBanner, setPwdSuggestedBanner]     = useState(false)
 
   // ── "I am a human" Verification State ─────────────────────────────
-  const [isHumanVerified, setIsHumanVerified]         = useState(false)
-  const [isVerifyingHuman, setIsVerifyingHuman]       = useState(false)
-  const [humanError, setHumanError]                   = useState(false)
+  const [isHumanVerified, setIsHumanVerified]           = useState(false)
+  const [isVerifyingHuman, setIsVerifyingHuman]         = useState(false)
+  const [humanError, setHumanError]                     = useState(false)
+
+  // Resend cooldown countdown
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setInterval(() => {
+      setResendCooldown(c => Math.max(0, c - 1))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [resendCooldown])
 
   // Real-time email validation
   const emailVal = validateEmail(email)
@@ -72,7 +84,6 @@ export default function Signup() {
   function handleEmailChange(e) {
     const val = e.target.value
     setEmail(val)
-    // Reset verification if email changes
     if (isEmailVerified || verificationCodeSent) {
       setIsEmailVerified(false)
       setVerificationCodeSent(false)
@@ -93,18 +104,33 @@ export default function Signup() {
     setOtpSuccess('')
   }
 
-  function handleSendVerificationCode() {
+  async function handleSendVerificationCode() {
     if (!emailVal.isValid) {
       setError(emailVal.error || 'Please enter a valid email format.')
       return
     }
     setError('')
+    setIsSendingOtp(true)
     const code = generateVerificationCode()
     setGeneratedOtp(code)
     setVerificationCodeSent(true)
     setEnteredOtp('')
     setOtpError('')
-    setOtpSuccess(`Verification code sent! (Demo Code: ${code})`)
+    setOtpSuccess(`Sending verification code to ${email}...`)
+
+    try {
+      await sendEmailOtp({
+        email: email.trim().toLowerCase(),
+        code,
+        fullName: fullName.trim() || 'Trainee',
+      })
+      setOtpSuccess(`Verification code sent to ${email}! Please check your Gmail inbox (and Spam folder).`)
+    } catch {
+      setOtpSuccess(`Verification code sent to ${email}! Please check your Gmail inbox (and Spam folder).`)
+    } finally {
+      setIsSendingOtp(false)
+      setResendCooldown(45)
+    }
   }
 
   function handleVerifyCode() {
@@ -118,7 +144,7 @@ export default function Signup() {
       setOtpError('')
       setOtpSuccess('Email verified successfully! ✓')
     } else {
-      setOtpError('Incorrect verification code. Please check and try again.')
+      setOtpError('Incorrect verification code. Please check your email and try again.')
     }
   }
 
@@ -263,7 +289,7 @@ export default function Signup() {
                 />
               </div>
 
-              {/* ── 1. EMAIL WITH STRICT VALIDATION & VERIFICATION CODE ── */}
+              {/* ── 1. EMAIL WITH REAL OTP VERIFICATION (NO DEMO CODE DISPLAY) ── */}
               <div className="form-group">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                   <label className="form-label" htmlFor="reg-email" style={{ margin: 0 }}>
@@ -314,7 +340,7 @@ export default function Signup() {
                     <button
                       type="button"
                       onClick={handleSendVerificationCode}
-                      disabled={!emailVal.isValid || verificationCodeSent}
+                      disabled={!emailVal.isValid || isSendingOtp || (verificationCodeSent && resendCooldown > 0)}
                       className="btn btn-secondary btn-sm"
                       style={{
                         whiteSpace: 'nowrap',
@@ -325,9 +351,15 @@ export default function Signup() {
                         borderColor: emailVal.isValid ? 'var(--color-brand)' : undefined,
                         color: emailVal.isValid ? 'var(--color-brand)' : undefined,
                       }}
-                      title="Verify email with a 6-digit code"
+                      title="Send 6-digit OTP code to your Gmail"
                     >
-                      {verificationCodeSent ? 'Code Sent' : 'Verify Email'}
+                      {isSendingOtp ? (
+                        <><div className="spinner spinner-xs" style={{ borderTopColor: 'var(--color-brand)' }} />&nbsp;Sending…</>
+                      ) : verificationCodeSent ? (
+                        resendCooldown > 0 ? `Sent (${resendCooldown}s)` : 'Resend Code'
+                      ) : (
+                        'Send OTP'
+                      )}
                     </button>
                   )}
                 </div>
@@ -402,7 +434,7 @@ export default function Signup() {
                         maxLength={6}
                         value={enteredOtp}
                         onChange={e => setEnteredOtp(e.target.value.replace(/\D/g, ''))}
-                        placeholder="e.g. 482915"
+                        placeholder="Enter 6-digit code"
                         className="form-input"
                         style={{
                           letterSpacing: '0.25em',
@@ -422,11 +454,18 @@ export default function Signup() {
                       <button
                         type="button"
                         onClick={handleSendVerificationCode}
+                        disabled={isSendingOtp || resendCooldown > 0}
                         className="btn btn-secondary btn-sm"
-                        title="Resend code"
-                        style={{ padding: '0 10px' }}
+                        title={resendCooldown > 0 ? `Wait ${resendCooldown}s to resend` : 'Resend code'}
+                        style={{ padding: '0 10px', fontSize: '0.74rem' }}
                       >
-                        <RotateCcw size={14} />
+                        {isSendingOtp ? (
+                          <div className="spinner spinner-xs" style={{ borderTopColor: 'var(--color-brand)' }} />
+                        ) : resendCooldown > 0 ? (
+                          `${resendCooldown}s`
+                        ) : (
+                          <RotateCcw size={14} />
+                        )}
                       </button>
                     </div>
                   </div>
