@@ -199,6 +199,112 @@ Open [http://localhost:5174](http://localhost:5174) in your browser.
 
 ---
 
+## 🤖 Suraksha Mitra — Real AI Safety Chatbot
+
+SurakshaAR features **Suraksha Mitra**, a genuine conversational AI assistant tailored specifically for frontline mining and manufacturing workers across Jharkhand. Unlike canned chatbots, Suraksha Mitra connects to Google Gemini (`gemini-2.0-flash`) via an external serverless backend proxy with real-time token streaming, multi-turn conversation memory, and sliding-window rate limiting.
+
+### 📐 Architecture & Security
+```
+[React App on GitHub Pages]
+        │
+        ▼ (POST /api/chat with { messages, sessionId, stream: true })
+[Cloudflare Worker Backend Proxy]
+        │
+        ├── In-memory Sliding Window Rate Limiting (25 req/min per session)
+        ├── CORS Origin Authorization
+        ├── Reads GEMINI_API_KEY from Worker Secrets (Zero frontend exposure)
+        │
+        ▼ (Streaming SSE / JSON)
+[Google Gemini API (gemini-2.0-flash)]
+```
+
+---
+
+### 🧪 Example Test Conversations for Verification
+
+Use these test conversations to confirm that the chatbot delivers dynamic, context-aware answers (not canned scripts):
+
+#### 1. PPE & Mining Safety (English)
+> **User:** What PPE is mandatory before entering an underground coal mine in Jharkhand?  
+> **Suraksha Mitra:** Before entering an underground mine, you must have 6 essential DGMS-approved items:  
+> 1. Certified Hard Hat with a secure cap lamp bracket.  
+> 2. Intrinsically safe Miner's Cap Lamp and battery pack.  
+> 3. Self-Rescuer (filter or chemical oxygen type) worn on your belt at all times.  
+> 4. Steel-toed safety boots with puncture-resistant soles.  
+> 5. Heavy-duty dust mask / respirator (N95 or P100 rated).  
+> 6. High-visibility fluorescent reflective belt.  
+> Never cross the shaft bottom without checking your lamp and self-rescuer seals!
+
+#### 2. Mining Hazard & Ventilation (हिंदी)
+> **User:** भूमिगत कोयला खदान में मीथेन गैस का रिसाव होने पर तुरंत क्या करना चाहिए?  
+> **Suraksha Mitra:** मीथेन (Firedamp) एक अत्यंत ज्वलनशील और विस्फोटक गैस है। रिसाव का संकेत मिलते ही:  
+> 1. **कोई चिंगारी न बनाएं:** किसी भी स्विच, अनधिकृत बैटरी या माचिस का प्रयोग बिल्कुल न करें।  
+> 2. **तुरंत काम रोकें:** अपने औजार और मशीनें सुरक्षित रूप से बंद करें।  
+> 3. **हवा की दिशा (Fresh Air Base) में जाएं:** हमेशा इनटेक एयरवे (ताजी हवा के मार्ग) की तरफ बाहर निकलें।  
+> 4. **सुपरवाइज़र को सूचित करें:** सुरक्षित दूरी पर पहुंचकर खदान के टेलीफोन से तुरंत वेंटिलेशन अधिकारी को सतर्क करें।
+
+#### 3. High-Voltage Electrical Safety (Hinglish)
+> **User:** Substation transformer maintenance se pehle LOTO kaise apply karte hain?  
+> **Suraksha Mitra:** Substation transformer par bina LOTO ke haath lagana jaanleva ho sakta hai. Ye 6 steps follow karein:  
+> 1. **Preparation:** Work Permit (PTW) check karein aur affected teams ko inform karein.  
+> 2. **Shutdown:** Transformer ka upstream circuit breaker trip karein.  
+> 3. **Isolation:** Isolator switches ko physically open karein.  
+> 4. **Lock & Tag:** Isolator handle par apna personal Padlock lagayein aur Danger Tag baandhein.  
+> 5. **Stored Energy Discharge:** Earthing switch band karke residual voltage discharge karein.  
+> 6. **Verification:** Calibrated high-voltage detector wand se zero potential test karein. Zero confirm hone ke baad hi maintenance shuru karein!
+
+#### 4. Contextual Follow-up (AI Memory Test)
+> **Turn 1 (User):** My safety helmet fell from 10 meters and has a small hairline crack.  
+> **Turn 1 (Suraksha Mitra):** That helmet has suffered severe structural impact. The internal shell lattice absorbs energy by deforming; even a hairline crack means it has lost its protective integrity against future falling rocks.  
+> **Turn 2 (User):** Can I just put industrial duct tape over it and use it for one shift?  
+> **Turn 2 (Suraksha Mitra):** **NO, absolutely not.** Tape provides zero impact absorption. Furthermore, adhesives contain solvents that can degrade the helmet's polycarbonate shell. Hand it over to the safety store immediately and get an IS 2925 certified replacement before entering any work zone.
+
+#### 5. Gentle Redirection (Non-Safety Topics)
+> **User:** Who won the cricket match yesterday?  
+> **Suraksha Mitra:** As your Suraksha Mitra, I stay focused on keeping you safe in the plant and mines! Let's talk safety — are your PPE checks complete for today, or do you have questions about the AR fire and gas modules?
+
+---
+
+### 🚀 Cloudflare Worker Backend Deployment Guide
+
+Because the SurakshaAR frontend is hosted statically on GitHub Pages, the backend proxy runs as an independent serverless function on **Cloudflare Workers** (100,000 free requests/day).
+
+#### Step 1: Install Wrangler CLI & Authenticate
+```bash
+# Login to your free Cloudflare account
+npx wrangler login
+```
+
+#### Step 2: Deploy the Worker
+```bash
+cd worker
+npx wrangler deploy
+```
+*Note your deployed Worker URL from the terminal output (e.g. `https://suraksha-chat-worker.<your-subdomain>.workers.dev`).*
+
+#### Step 3: Set Your Gemini API Key as a Secret
+```bash
+# Get your free Gemini API key from https://aistudio.google.com/app/apikey
+npx wrangler secret put GEMINI_API_KEY
+# When prompted, paste your API key (e.g. AIzaSy...)
+```
+
+#### Step 4: Update Frontend Environment & Redeploy GitHub Pages
+In your project root `.env`:
+```env
+VITE_CHAT_API_URL=https://suraksha-chat-worker.<your-subdomain>.workers.dev/api/chat
+```
+Then build and push the new build to your `gh-pages` branch:
+```bash
+npm run build
+cd dist
+git add -A
+git commit -m "deploy: connect Suraksha Mitra Cloudflare Worker backend"
+git push origin gh-pages
+```
+
+---
+
 ## 🧪 Verification & Testing
 
 ```bash

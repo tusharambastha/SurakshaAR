@@ -1,15 +1,30 @@
 import fs from 'fs'
 import path from 'path'
+import { RateLimiter } from '../worker/rateLimiter.js'
 import {
   checkCriticalHazardGuardrails,
   queryKnowledgeBase,
   MODULES
 } from '../src/lib/safetyKnowledge.js'
 
+export const SURAKSHA_MITRA_SYSTEM_PROMPT = `You are 'Suraksha Mitra', the AI safety-training assistant inside SurakshaAR, an AR training simulator for mining and manufacturing workers in Jharkhand, India. Your job:
+- Answer questions about industrial safety procedures, PPE (personal protective equipment), mining hazards, machine safety, and the AR training modules in this app.
+- Explain things in simple, practical language — many users are frontline workers, not engineers.
+- Respond in the same language the user writes in — Hindi, Hinglish, or English — match their style naturally.
+- If asked about something outside industrial safety/training/the app itself, gently redirect back to safety topics.
+- Keep answers concise and conversational, like a helpful colleague, not a textbook.
+- Never give unsafe or incorrect safety advice; if unsure, say so and suggest consulting a certified safety officer.
+- You can reference module names/features in this app if the user asks 'how do I use X'.`
+
+// Local rate limiter instance
+export const localLimiter = new RateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 30,
+})
+
 /**
  * Retrieve Gemini API key strictly on the server side.
  * Checks process.env, .env, .env.local, .env.production.
- * Never exposed to frontend client code.
  */
 export function getGeminiApiKey() {
   if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 10) {
@@ -39,22 +54,55 @@ export function getGeminiApiKey() {
 }
 
 /**
- * Server-side Chat API with Google Search Grounding via Gemini API.
+ * Server-side Chat API for Suraksha Mitra
+ * Supports:
+ * 1. New conversational agent: { messages: [...], sessionId, stream }
+ * 2. Legacy signature: { query, lang, module, history }
  */
-export async function handleChatApi({ query, lang = 'en', module = MODULES.GLOBAL, history = [] }) {
-  if (!query || typeof query !== 'string' || query.trim().length === 0) {
+export async function handleChatApi(payload = {}) {
+  const sessionId = payload.sessionId || 'local-session'
+  const rateCheck = localLimiter.check(sessionId)
+  if (!rateCheck.allowed) {
     return {
-      answer: "Please enter a valid question.",
-      source: "Suraksha Saathi",
+      error: 'Rate limit exceeded. Please wait a moment before asking another question.',
+      reply: '⚠️ Rate limit exceeded. Please wait a moment before sending more messages.',
+      retryAfter: rateCheck.retryAfter,
+    }
+  }
+
+  // Normalize input
+  let query = payload.query
+  let messages = Array.isArray(payload.messages) ? payload.messages : []
+
+  if (messages.length > 0) {
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')
+    query = lastUserMsg?.content || lastUserMsg?.text || ''
+  } else if (query) {
+    messages = [{ role: 'user', content: query }]
+  }
+
+  if (!query || query.trim().length === 0) {
+    return {
+      reply: 'Please ask an industrial safety or training question.',
+      answer: 'Please ask an industrial safety or training question.',
+      source: 'Suraksha Mitra',
       confidence: 0,
       sources: []
     }
   }
 
-  // 1. Critical Hazard Guardrail Check FIRST (Prevents fatal instructions)
-  const critical = checkCriticalHazardGuardrails(query, lang)
+  const lang = payload.lang || 'en'
+  const module = payload.module || MODULES.GLOBAL
+
+  // 1. Critical Hazard Guardrail Check FIRST (checks query + recent conversation context)
+  const fullContextQuery = [
+    query,
+    ...(Array.isArray(messages) ? messages.slice(-4).map(m => m.content || m.text || '') : [])
+  ].join(' ')
+  const critical = checkCriticalHazardGuardrails(fullContextQuery, lang)
   if (critical) {
     return {
+      reply: critical.answer,
       answer: critical.answer,
       source: critical.source,
       confidence: critical.confidence,
@@ -63,103 +111,68 @@ export async function handleChatApi({ query, lang = 'en', module = MODULES.GLOBA
     }
   }
 
-  // 2. Query trusted local knowledge base for priority context
-  const localMatch = queryKnowledgeBase(query, lang, module, history)
+  // 2. Query verified local safety knowledge
+  const localMatch = queryKnowledgeBase(query, lang, module, messages)
 
   // 3. Check for Gemini API key
   const apiKey = getGeminiApiKey()
 
   if (!apiKey || apiKey === 'your-gemini-api-key-here') {
-    console.info('[SurakshaSaathi] No active GEMINI_API_KEY configured — serving verified safety knowledge response.')
-    if (localMatch && !localMatch.isFallback) {
-      return {
-        answer: localMatch.answer,
-        source: localMatch.source || 'Suraksha Saathi Safety Assistant',
-        confidence: localMatch.confidence || 0.95,
-        sources: localMatch.sources || []
-      }
-    }
+    console.info('[SurakshaMitra] No active GEMINI_API_KEY configured — serving verified safety response.')
+    const safeReply = localMatch?.answer || (
+      lang === 'hi'
+        ? 'मैं सुरक्षा मित्र हूँ। औद्योगिक और खनन सुरक्षा (PPE, गैस रिसाव, बिजली, मशीन सुरक्षा) पर आप मुझसे कोई भी सवाल पूछ सकते हैं।'
+        : lang === 'hinglish'
+          ? 'Main hoon Suraksha Mitra. Industrial aur mining safety (PPE, fire, gas leak, electrical, machinery) par aap mujhse koi bhi practical sawal pooch sakte hain.'
+          : 'I am Suraksha Mitra. You can ask me any practical questions regarding industrial safety, PPE, mining hazards, fire response, or AR training.'
+    )
     return {
-      answer: localMatch?.answer || (
-        lang === 'hi'
-          ? 'इस विषय के लिए कृपया अपने कार्यस्थल के मानक संचालन प्रक्रिया (SOP) या सुरक्षा अधिकारी से परामर्श करें।'
-          : lang === 'hinglish'
-            ? 'Iss safety query ke liye please apne site ke Standard Operating Procedure (SOP) ya Safety Officer se consult karein.'
-            : 'For this safety query, please consult your site Standard Operating Procedure (SOP) or designated Safety Officer.'
-      ),
-      source: 'Suraksha Saathi Safety Assistant',
-      confidence: 0.7,
-      sources: []
+      reply: safeReply,
+      answer: safeReply,
+      source: (localMatch && !localMatch.isFallback) ? localMatch.source : 'Suraksha Mitra Safety Knowledge',
+      confidence: (localMatch && !localMatch.isFallback) ? 0.95 : 0.7,
+      sources: localMatch?.sources || []
     }
   }
 
-  console.log('[SurakshaSaathi] Executing live Gemini Google Search Grounding for:', query);
-
-  // 4. Gemini API Call with Official Google Search Grounding
+  // 4. Live Gemini API Call
   try {
-    const langInstructions = {
-      hi: 'Reply strictly in clear Hindi (Devanagari script).',
-      hinglish: 'Reply in natural, conversational Hinglish (Hindi written in Roman/English alphabet, using common workplace terminology).',
-      sat: 'Reply in Santali if possible or simple clear Hindi/English.',
-      en: 'Reply in clear, professional English.'
-    }[lang] || 'Reply in the same language and style used by the user.'
-
-    let trustedContextPrompt = ''
-    if (localMatch && !localMatch.isFallback) {
-      trustedContextPrompt = `\n--- TRUSTED SURAKSHAAR SAFETY KNOWLEDGE BASE (PRIORITY BASELINE) ---\n${localMatch.answer}\nSource Standard: ${localMatch.source}\n---------------------------------------------------------------\nUse the verified safety context above as authoritative for industrial standards (IS, OSHA, DGMS, SurakshaAR platform). Augment with Google Search grounding for any recent updates, real-world examples, or technical details.`
-    }
-
-    const systemInstruction = `You are 'Suraksha Saathi', an advanced, highly intelligent AI Assistant designed with the quality, breadth, and conversational clarity of ChatGPT and Google Gemini. You specialize in Industrial Safety, Engineering, and the SurakshaAR platform, but you are fully equipped to answer ANY user question (general knowledge, science, everyday topics, technical explanations, how-to guides, and safety protocols) with utmost clarity, depth, and helpfulness.
-
-Key Answering Guidelines:
-1. Response Quality & Clarity (ChatGPT / Gemini caliber):
-   - Answer ANY question the user asks clearly, accurately, and thoroughly.
-   - Use clean Markdown with bold keywords, organized bullet points, numbered steps, and helpful section headers.
-   - Break down complex topics into intuitive, easy-to-understand explanations with real-world examples.
-   - If the user asks something in Hindi or Hinglish, explain naturally and conversationally in that exact style.
-
-2. Safety-Critical Interventions:
-   - For life-threatening industrial situations (electrical fires, toxic gas, machine entanglements, LOTO, confined spaces), always enforce strict safety standards (NEVER water on electrical/grease fire, NEVER solo confined entry, NEVER tape cracked helmets).
-
-3. Language & Tone:
-   - ${langInstructions}
-   - Warm, professional, supportive, and exceptionally clear.
-${trustedContextPrompt}`
-
-    // Format conversation history for Gemini (alternating user / model)
     const contents = []
-    if (Array.isArray(history) && history.length > 0) {
-      const recent = history.slice(-6)
-      for (const m of recent) {
-        if (m.role === 'user' && m.text) {
-          contents.push({ role: 'user', parts: [{ text: m.text }] })
-        } else if (m.role === 'bot' && m.text) {
-          // Avoid consecutive identical roles
-          if (contents.length > 0 && contents[contents.length - 1].role === 'model') {
-            contents[contents.length - 1].parts[0].text += '\n' + m.text
-          } else if (contents.length > 0) {
-            contents.push({ role: 'model', parts: [{ text: m.text }] })
-          }
-        }
+    const recentMessages = messages.slice(-10)
+
+    for (const m of recentMessages) {
+      const role = m.role === 'assistant' ? 'model' : 'user'
+      const text = typeof m.content === 'string' ? m.content : (m.text || '')
+      if (!text.trim()) continue
+
+      if (contents.length > 0 && contents[contents.length - 1].role === role) {
+        contents[contents.length - 1].parts[0].text += '\n' + text
+      } else {
+        contents.push({ role, parts: [{ text }] })
       }
     }
 
-    // Append current query from user
-    contents.push({ role: 'user', parts: [{ text: query }] })
+    if (contents.length === 0) {
+      contents.push({ role: 'user', parts: [{ text: query }] })
+    }
 
-    // Models to try with Google Search Grounding tool
-    const models = ['gemini-1.5-flash', 'gemini-2.0-flash']
+    let trustedContextPrompt = ''
+    if (localMatch && !localMatch.isFallback) {
+      trustedContextPrompt = `\n--- VERIFIED SURAKSHAAR SAFETY BASELINE ---\n${localMatch.answer}\nSource: ${localMatch.source}\n-------------------------------------------`
+    }
+
+    const fullSystemInstruction = `${SURAKSHA_MITRA_SYSTEM_PROMPT}${trustedContextPrompt}`
+
+    const models = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.7-flash', 'gemini-3.8-flash', 'gemini-flash-latest']
     let candidate = null
     let lastError = null
 
     for (const modelName of models) {
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
-      
       const requestPayload = {
         contents,
-        tools: [{ google_search: {} }],
         systemInstruction: {
-          parts: [{ text: systemInstruction }]
+          parts: [{ text: fullSystemInstruction }]
         },
         generationConfig: {
           temperature: 0.5,
@@ -167,31 +180,11 @@ ${trustedContextPrompt}`
         }
       }
 
-      let res = await fetch(apiUrl, {
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestPayload)
       })
-
-      // If google_search fails, try googleSearch
-      if (!res.ok && res.status === 400) {
-        requestPayload.tools = [{ googleSearch: {} }]
-        res = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestPayload)
-        })
-      }
-
-      // If tools fail, retry without tools to guarantee a direct Gemini answer
-      if (!res.ok) {
-        delete requestPayload.tools
-        res = await fetch(apiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestPayload)
-        })
-      }
 
       if (res.ok) {
         const json = await res.json()
@@ -201,50 +194,31 @@ ${trustedContextPrompt}`
         }
       } else {
         const errText = await res.text()
-        lastError = `Gemini API [${modelName}] ${res.status}: ${errText}`
-        console.warn('[SurakshaSaathi]', lastError)
+        lastError = `Gemini API [${modelName}] failed (${res.status}): ${errText}`
+        console.warn('[SurakshaMitra]', lastError)
       }
     }
 
     if (candidate && candidate.content?.parts) {
       const rawText = candidate.content.parts.map(p => p.text).filter(Boolean).join('\n')
-      
-      // Extract Google Search Grounding citations
-      const sources = []
-      const groundingMeta = candidate.groundingMetadata
-      if (groundingMeta?.groundingChunks) {
-        for (const chunk of groundingMeta.groundingChunks) {
-          if (chunk.web?.uri) {
-            const uri = chunk.web.uri
-            const title = chunk.web.title || new URL(uri).hostname
-            if (!sources.some(s => s.uri === uri)) {
-              sources.push({ title, uri })
-            }
-          }
-        }
-      }
-
-      const hasWebGrounding = sources.length > 0
-      const sourceLabel = hasWebGrounding
-        ? 'Google Search Grounding via Gemini AI'
-        : (localMatch && !localMatch.isFallback ? localMatch.source : 'Suraksha Saathi AI')
-
       return {
+        reply: rawText,
         answer: rawText,
-        source: sourceLabel,
-        sources,
-        confidence: hasWebGrounding ? 0.98 : 0.92,
-        groundingQueries: groundingMeta?.webSearchQueries || []
+        source: 'Suraksha Mitra AI (Gemini)',
+        confidence: 0.98,
+        sources: []
       }
     }
   } catch (err) {
-    console.error('[handleChatApi] Error calling Gemini with Google Search:', err)
+    console.error('[handleChatApi] Error calling Gemini:', err)
   }
 
-  // Graceful fallback to verified local safety knowledge base on any API error
+  // Graceful fallback on API error
+  const fallbackAnswer = localMatch?.answer || "I am your safety assistant. Please consult your certified safety officer or check site SOPs."
   return {
-    answer: localMatch?.answer || "I could not find reliable information for this query. Please check official safety manuals or consult your site supervisor.",
-    source: localMatch?.source || "National Industrial Safety Protocol",
+    reply: fallbackAnswer,
+    answer: fallbackAnswer,
+    source: localMatch?.source || "Suraksha Mitra Safety Knowledge",
     confidence: localMatch?.confidence || 0.65,
     sources: []
   }

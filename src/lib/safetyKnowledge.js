@@ -715,44 +715,59 @@ export async function querySafetyAssistant(input, lang = 'en', currentModule = M
   const critical = checkCriticalHazardGuardrails(input, lang);
   if (critical) return critical;
 
-  // Try calling the secure server-side chat endpoint with Google Search Grounding
+  // Try calling the secure server-side chat endpoint (Cloudflare Worker or Vite proxy)
   if (typeof window !== 'undefined') {
-    const endpoints = ['/SurakshaAR/api/chat', '/api/chat', '/.netlify/functions/chat'];
+    const customEndpoint = import.meta.env.VITE_CHAT_API_URL
+    const endpoints = [
+      ...(customEndpoint ? [customEndpoint] : []),
+      '/SurakshaAR/api/chat',
+      '/api/chat',
+      '/.netlify/functions/chat'
+    ]
     for (const endpoint of endpoints) {
       try {
-        console.log(`[SurakshaSaathi] Sending query to backend endpoint (${endpoint}):`, input);
+        console.log(`[SurakshaMitra] Sending query to backend endpoint (${endpoint}):`, input)
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query: input,
+            message: input,
+            messages: [
+              ...(Array.isArray(history)
+                ? history.slice(-8).map(m => ({
+                    role: m.role === 'assistant' || m.role === 'bot' ? 'assistant' : 'user',
+                    content: m.text || m.content || ''
+                  }))
+                : []),
+              { role: 'user', content: input }
+            ],
             lang,
             module: currentModule,
-            history: Array.isArray(history)
-              ? history.slice(-6).map(m => ({ role: m.role, text: m.text }))
-              : []
+            sessionId: (typeof localStorage !== 'undefined' && localStorage.getItem('suraksha_mitra_session_id')) || 'default-session',
           })
-        });
+        })
         if (res.ok) {
-          const data = await res.json();
-          if (data && data.answer) {
-            console.log('[SurakshaSaathi] Successfully received response from backend:', {
-              source: data.source,
-              hasSources: Array.isArray(data.sources) && data.sources.length > 0,
-              answerPreview: data.answer.slice(0, 60) + '...'
-            });
+          const data = await res.json()
+          const text = data?.reply || data?.answer
+          if (text) {
+            console.log('[SurakshaMitra] Successfully received response from backend:', {
+              source: data.source || data.provider,
+              answerPreview: text.slice(0, 60) + '...'
+            })
             return {
-              answer: data.answer,
-              source: data.source || 'Suraksha Saathi AI',
+              answer: text,
+              reply: text,
+              source: data.source || (data.provider ? `Suraksha Mitra (${data.provider})` : 'Suraksha Mitra AI'),
               sources: Array.isArray(data.sources) ? data.sources : [],
               confidence: data.confidence || 0.95,
               groundingQueries: data.groundingQueries || [],
               isCritical: data.isCritical || false,
-            };
+            }
           }
         }
       } catch (err) {
-        console.warn(`[SurakshaSaathi] Endpoint ${endpoint} connection issue:`, err);
+        console.warn(`[SurakshaMitra] Endpoint ${endpoint} connection issue:`, err)
       }
     }
   }

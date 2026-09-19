@@ -1,20 +1,35 @@
 /**
- * SurakshaAR — Safety Chatbot Component (Suraksha Saathi)
- *
- * Curated industrial safety knowledge base matcher.
+ * SurakshaAR — AI Conversational Agent Component ("Suraksha Mitra")
+ * 
  * Features:
- * - 4-Language bar: English, हिंदी, Hinglish, ᱥᱟᱱᱛᱟᱲᱤ
- * - 3-Language voice support: English (en-IN), Hindi (hi-IN), Hinglish (hi-IN)
- * - Voice Input (Speech-to-Text) with live listening indicator
- * - Voice Output (Text-to-Speech) with speaker toggle & stop
- * - Quick suggested question pills
- * - Safe, deterministic fallback for unrecognized queries
+ * - Real conversational AI agent tailored for Jharkhand industrial & mining workers
+ * - Real-time Server-Sent Events (SSE) streaming with progressive token rendering
+ * - Multi-turn conversation memory with localStorage persistence across refreshes
+ * - Contextual history management (sends last ~10 messages as context)
+ * - In-header 4-Language bar: English, हिंदी, Hinglish, ᱥᱟᱱᱛᱟᱲᱤ
+ * - 3-Language voice input (STT) and text-to-speech output (TTS)
+ * - Sliding-window rate limit awareness & graceful fallback handling (zero raw error traces)
+ * - Mobile responsive drawer/sheet for factory floor smartphones and tablets
+ * - Clear Chat / New Conversation reset
  */
 import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { MessageCircle, X, Send, Bot, Volume2, VolumeX, Mic, MicOff, Sparkles } from 'lucide-react'
+import {
+  MessageCircle,
+  X,
+  Send,
+  Bot,
+  Volume2,
+  VolumeX,
+  Mic,
+  MicOff,
+  RotateCcw,
+  Sparkles,
+  ShieldCheck,
+  AlertCircle
+} from 'lucide-react'
 import { useLang } from '../../contexts/LanguageContext'
-import { queryKnowledgeBase, querySafetyAssistant, getSuggestedQuestions, MODULES } from '../../lib/safetyKnowledge'
+import { querySafetyAssistant, getSuggestedQuestions, MODULES } from '../../lib/safetyKnowledge'
 import { speak, stopSpeech, startListening, isTTSSupported, isVoiceSupported } from '../../lib/voice'
 
 export const CHAT_LANGUAGES = [
@@ -27,62 +42,48 @@ export const CHAT_LANGUAGES = [
 const WELCOME_MESSAGES = {
   en: {
     id: 'welcome-en',
-    role: 'bot',
-    text: "👷 Hello! I am your Suraksha Saathi safety assistant. Ask me about fire response, gas leaks, PPE safety gear, or emergency procedures.\n\nYou can also use the 🎙️ Mic button to speak in English, Hindi, or Hinglish!",
-    source: 'National Industrial Safety Protocol',
+    role: 'assistant',
+    content: "👷 Johar! I am **Suraksha Mitra**, your AI safety-training assistant for mining and manufacturing in Jharkhand.\n\nAsk me about PPE gear, blast hazards, machinery safety, LOTO protocols, or any AR training module in this app!\n\n🎙️ *Tip: You can also tap the Mic to speak in English, Hindi, or Hinglish.*",
+    source: 'Suraksha Mitra AI',
   },
   hi: {
     id: 'welcome-hi',
-    role: 'bot',
-    text: "👷 नमस्ते! मैं आपका सुरक्षा साथी हूँ। मुझसे आग से बचाव, गैस रिसाव, PPE सुरक्षा उपकरण, या आपातकालीन प्रक्रियाओं के बारे में पूछें।\n\nआप 🎙️ माइक बटन दबाकर हिंदी, हिंग्लिश या अंग्रेज़ी में बोलकर भी पूछ सकते हैं!",
-    source: 'राष्ट्रीय औद्योगिक सुरक्षा प्रोटोकॉल',
+    role: 'assistant',
+    content: "👷 जोहार! मैं **सुरक्षा मित्र** हूँ, झारखंड के खनन एवं औद्योगिक श्रमिकों के लिए आपका AI सुरक्षा-प्रशिक्षण साथी।\n\nमुझसे PPE किट, गैस रिसाव, खदान के खतरों, मशीनरी सेफ्टी, LOTO नियमों या इस ऐप के AR मॉड्यूल के बारे में पूछें!\n\n🎙️ *माइक बटन दबाकर आप बोलकर भी सवाल पूछ सकते हैं।*",
+    source: 'सुरक्षा मित्र AI',
   },
   hinglish: {
     id: 'welcome-hinglish',
-    role: 'bot',
-    text: "👷 Namaste! Main aapka Suraksha Saathi hoon. Aap mujhse Fire safety, Gas leak, PPE kit, ya Emergency evacuation ke baare mein likhkar ya 🎙️ Mic button se bolkar pooch sakte hain!",
-    source: 'National Industrial Safety Protocol',
+    role: 'assistant',
+    content: "👷 Johar! Main hoon **Suraksha Mitra**, Jharkhand ke mining aur manufacturing workers ka AI safety assistant.\n\nAap mujhse PPE kit, mine hazards, gas leak, machine safety, LOTO rules ya is app ke AR modules ke baare mein kuch bhi pooch sakte hain!\n\n🎙️ *Aap Mic daba kar bolkar bhi pooch sakte hain!*",
+    source: 'Suraksha Mitra AI',
   },
   sat: {
     id: 'welcome-sat',
-    role: 'bot',
-    text: "👷 ᱡᱚᱦᱟᱨ! ᱤᱧ ᱟᱢᱤᱡ ᱥᱩᱨᱠᱷᱟ ᱥᱟᱛᱷᱤ (Suraksha Saathi) ᱠᱟᱹᱱᱟᱹᱧ᱾ ᱥᱮᱸᱜᱮᱞ ᱤᱬᱤᱡ, ᱜᱮᱥ ᱞᱤᱠ, PPE ᱥᱟᱢᱟᱱ ᱟᱨ ᱟᱯᱟᱛᱠᱟᱞ ᱱᱤᱭᱟᱹᱢ ᱠᱚ ᱵᱟᱵᱚᱛ ᱠᱩᱞᱤᱭ ᱢᱮ᱾",
-    source: 'ᱡᱟᱹᱛᱤᱭᱟᱹᱨᱤ ᱠᱟᱹᱨᱜᱟᱲ ᱥᱩᱨᱠᱷᱟ ᱯᱨᱳᱴᱳᱠᱳᱞ',
+    role: 'assistant',
+    content: "👷 ᱡᱚᱦᱟᱨ! ᱤᱧ ᱫᱚ **ᱥᱩᱨᱠᱷᱟ ᱢᱤᱛᱨᱚ** (Suraksha Mitra) ᱠᱟᱹᱱᱟᱹᱧ᱾ ᱠᱷᱟᱫᱟᱱ ᱟᱨ ᱠᱟᱹᱨᱜᱟᱲ ᱨᱮᱱᱟᱜ ᱨᱩᱠᱷᱤᱭᱟᱹ, PPE ᱥᱟᱢᱟᱱ ᱟᱨ AR ᱴᱨᱮᱱᱤᱝ ᱵᱟᱵᱚᱛ ᱤᱧ ᱠᱩᱞᱤ ᱫᱟᱲᱮᱭᱟᱹᱧᱟ᱾",
+    source: 'ᱥᱩᱨᱠᱷᱟ ᱢᱤᱛᱨᱚ AI',
   },
 }
 
 const PLACEHOLDERS = {
-  en: 'Ask or speak about fire, gas leak, PPE…',
-  hi: 'आग, गैस रिसाव, PPE के बारे में पूछें या बोलें…',
-  hinglish: 'Fire, gas leak, PPE ke baare mein likhein ya bolein…',
-  sat: 'ᱥᱮᱸᱜᱮᱞ, ᱜᱮᱥ ᱞᱤᱠ, PPE ᱵᱟᱵᱚᱛ ᱠᱩᱞᱤᱭ ᱢᱮ…',
+  en: 'Ask Suraksha Mitra about safety, PPE, mining...',
+  hi: 'सुरक्षा मित्र से सुरक्षा, PPE, खनन के बारे में पूछें...',
+  hinglish: 'Suraksha Mitra se safety, PPE, mining ke baare mein poochein...',
+  sat: 'ᱥᱩᱨᱠᱷᱟ ᱢᱤᱛᱨᱚ ᱴᱷᱮᱱ ᱠᱩᱞᱤᱭ ᱢᱮ…',
 }
 
-const QUICK_SUGGESTIONS = {
-  en: [
-    { label: '🔴 Fire Extinguisher', query: 'How to use a fire extinguisher?' },
-    { label: '⚡ Electrical Fire', query: 'Which extinguisher for electrical fire?' },
-    { label: '🦺 PPE Kit', query: 'What PPE should I wear during a fire?' },
-    { label: '💨 Gas Leak', query: 'How do I detect a gas leak?' },
-  ],
-  hi: [
-    { label: '🔴 अग्निशामक', query: 'अग्निशामक का उपयोग कैसे करें?' },
-    { label: '⚡ बिजली की आग', query: 'बिजली की आग के लिए कौन सा अग्निशामक?' },
-    { label: '🦺 PPE उपकरण', query: 'आग के दौरान कौन सा PPE पहनें?' },
-    { label: '💨 गैस रिसाव', query: 'गैस रिसाव कैसे पहचानें?' },
-  ],
-  hinglish: [
-    { label: '🔴 Fire Extinguisher', query: 'Fire extinguisher kaise use karein?' },
-    { label: '⚡ Bijli ki Aag', query: 'Bijli ki aag ke liye kaunsa extinguisher use karein?' },
-    { label: '🦺 PPE Kit', query: 'Fire emergency mein kaunsa PPE pehnein?' },
-    { label: '💨 Gas Leak', query: 'Gas leak kaise detect karein?' },
-  ],
-  sat: [
-    { label: '🔴 ᱥᱮᱸᱜᱮᱞ ᱤᱬᱤᱡᱤᱡ', query: 'ᱥᱮᱸᱜᱮᱞ ᱤᱬᱤᱡᱤᱡ ᱪᱮᱫ ᱞᱮᱠᱟ ᱵᱮᱵᱷᱟᱨᱟ?' },
-    { label: '⚡ ᱵᱤᱡᱽᱞᱤ ᱥᱮᱸᱜᱮᱞ', query: 'ᱵᱤᱡᱽᱞᱤ ᱥᱮᱸᱜᱮᱞ ᱞᱟᱹᱜᱤᱫ ᱚᱠᱟ ᱤᱬᱤᱡᱤᱡ?' },
-    { label: '🦺 PPE ᱥᱟᱢᱟᱱ', query: 'ᱥᱮᱸᱜᱮᱞ ᱚᱠᱛᱚ ᱪᱮᱫ PPE ᱦᱚᱨᱚᱜ ᱞᱟᱹᱠᱛᱤ?' },
-    { label: '💨 ᱜᱮᱥ ᱞᱤᱠ', query: 'ᱜᱮᱥ ᱞᱤᱠ ᱪᱮᱫ ᱞᱮᱠᱟ ᱪᱤᱱᱦᱟᱹᱣᱟ?' },
-  ],
+const STORAGE_KEY = 'suraksha_mitra_chat_history'
+const SESSION_KEY = 'suraksha_mitra_session_id'
+
+function getSessionId() {
+  if (typeof window === 'undefined') return 'sess-default'
+  let id = localStorage.getItem(SESSION_KEY)
+  if (!id) {
+    id = 'sess_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now().toString(36)
+    localStorage.setItem(SESSION_KEY, id)
+  }
+  return id
 }
 
 function getActiveModuleFromPath(pathname) {
@@ -100,29 +101,65 @@ export default function SafetyChatbot() {
   const { lang: globalLang } = useLang()
   const location = useLocation()
   const activeModule = getActiveModuleFromPath(location?.pathname)
-  const [open, setOpen]                     = useState(false)
+
+  const [open, setOpen] = useState(false)
   const [badgeDismissed, setBadgeDismissed] = useState(false)
-  const [chatLang, setChatLang]             = useState(() => {
+  const [chatLang, setChatLang] = useState(() => {
     return localStorage.getItem('sar_chat_lang') || (['en', 'hi', 'sat'].includes(globalLang) ? globalLang : 'en')
   })
-  const [input, setInput]                   = useState('')
-  const [messages, setMessages]             = useState(() => [WELCOME_MESSAGES[chatLang] || WELCOME_MESSAGES.en])
-  const [typing, setTyping]                 = useState(false)
-  const [isListening, setIsListening]       = useState(false)
-  const [speakingMsgId, setSpeakingMsgId]   = useState(null)
-  const [voiceNotice, setVoiceNotice]       = useState(null)
 
-  const bottomRef       = useRef(null)
-  const inputRef        = useRef(null)
-  const recognitionRef  = useRef(null)
+  // Load chat history from localStorage so it survives page reloads
+  const [messages, setMessages] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY)
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed
+          }
+        }
+      } catch (err) {
+        console.warn('[SafetyChatbot] Could not load chat history:', err)
+      }
+    }
+    return [WELCOME_MESSAGES[chatLang] || WELCOME_MESSAGES.en]
+  })
 
-  // Sync initial welcome message if user switches chatLang and chat is empty/welcome
+  const [input, setInput] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [isListening, setIsListening] = useState(false)
+  const [speakingMsgId, setSpeakingMsgId] = useState(null)
+  const [voiceNotice, setVoiceNotice] = useState(null)
+  const [activeEndpoint, setActiveEndpoint] = useState(null)
+
+  const bottomRef = useRef(null)
+  const inputRef = useRef(null)
+  const recognitionRef = useRef(null)
+  const abortControllerRef = useRef(null)
+
+  // Save messages to localStorage whenever they update
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+      } catch (err) {
+        console.warn('[SafetyChatbot] Failed to save chat history:', err)
+      }
+    }
+  }, [messages])
+
+  function scrollBottom(smooth = true) {
+    setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
+    }, 40)
+  }
+
   function handleLanguageChange(newLang) {
     if (newLang === chatLang) return
     setChatLang(newLang)
     localStorage.setItem('sar_chat_lang', newLang)
 
-    // Stop ongoing speech & listening
     stopSpeech()
     setSpeakingMsgId(null)
     if (recognitionRef.current) {
@@ -130,7 +167,6 @@ export default function SafetyChatbot() {
       setIsListening(false)
     }
 
-    // Add a stylish system notification in the chat
     const langObj = CHAT_LANGUAGES.find(l => l.code === newLang)
     const noticeText = {
       en: '🌐 Language switched to English (Voice enabled 🎙️)',
@@ -139,29 +175,37 @@ export default function SafetyChatbot() {
       sat: '🌐 ᱯᱟᱹᱨᱥᱤ ᱥᱟᱱᱛᱟᱲᱤ ᱛᱮ ᱵᱚᱫᱚᱞᱮᱱᱟ 🌿',
     }[newLang] || `Switched to ${langObj?.name}`
 
-    // If chat only has 1 message (welcome), swap it directly
-    if (messages.length <= 1) {
-      setMessages([WELCOME_MESSAGES[newLang] || WELCOME_MESSAGES.en])
-    } else {
-      setMessages(prev => [
-        ...prev,
-        {
-          id: Date.now(),
-          role: 'system',
-          text: noticeText,
-        },
-      ])
-    }
+    setMessages(prev => [
+      ...prev,
+      {
+        id: 'sys-' + Date.now(),
+        role: 'system',
+        content: noticeText,
+      }
+    ])
     scrollBottom()
   }
 
-  function scrollBottom() {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  function handleClearChat() {
+    stopSpeech()
+    setSpeakingMsgId(null)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    setIsGenerating(false)
+    const freshWelcome = WELCOME_MESSAGES[chatLang] || WELCOME_MESSAGES.en
+    const newHistory = [{ ...freshWelcome, id: 'welcome-' + Date.now() }]
+    setMessages(newHistory)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory))
+    }
+    scrollBottom()
   }
 
   function handleOpen() {
     setOpen(true)
     setTimeout(() => inputRef.current?.focus(), 200)
+    scrollBottom(false)
   }
 
   function handleClose() {
@@ -174,34 +218,208 @@ export default function SafetyChatbot() {
     }
   }
 
+  /**
+   * Process a question using real streaming from backend proxy (Cloudflare Worker or Vite dev server)
+   * with graceful fallback to verified safety knowledge base.
+   */
   async function processQuery(queryText) {
     const query = (queryText ?? input).trim()
-    if (!query) return
+    if (!query || isGenerating) return
     setInput('')
 
-    const userMsg = { id: Date.now(), role: 'user', text: query }
-    setMessages(prev => [...prev, userMsg])
-    scrollBottom()
-    setTyping(true)
-
-    // Thinking delay for natural dialogue
-    await new Promise(r => setTimeout(r, 450 + Math.random() * 350))
-
-    const recentHistory = messages.slice(-5)
-    const result = await querySafetyAssistant(query, chatLang, activeModule, recentHistory)
-    const text = typeof result === 'string' ? result : (result?.answer || "I'm your safety assistant. Please ask any industrial safety question.")
-    const source = typeof result === 'object' && result?.source ? result.source : 'Safety Knowledge Base'
-    const sources = typeof result === 'object' && Array.isArray(result?.sources) ? result.sources : []
-    const botMsg = {
-      id: Date.now() + 1,
-      role: 'bot',
-      text,
-      source,
-      sources,
-      confidence: typeof result === 'object' && result?.confidence ? result.confidence : 0.85,
+    // Cancel any active stream
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
     }
-    setTyping(false)
-    setMessages(prev => [...prev, botMsg])
+    const abortController = new AbortController()
+    abortControllerRef.current = abortController
+
+    const userMsgId = 'u-' + Date.now()
+    const userMsg = {
+      id: userMsgId,
+      role: 'user',
+      content: query,
+      timestamp: Date.now()
+    }
+
+    const updatedHistory = [...messages, userMsg]
+    setMessages(updatedHistory)
+    scrollBottom()
+    setIsGenerating(true)
+
+    // Build context with the last ~10 messages
+    const contextualMessages = updatedHistory
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .slice(-10)
+      .map(m => ({ role: m.role, content: m.content }))
+
+    const sessionId = getSessionId()
+    const customEndpoint = import.meta.env.VITE_CHAT_API_URL
+    const endpointsToTry = [
+      ...(customEndpoint ? [customEndpoint] : []),
+      '/SurakshaAR/api/chat',
+      '/api/chat',
+      '/.netlify/functions/chat'
+    ]
+
+    let streamedSuccess = false
+    const botMsgId = 'a-' + Date.now()
+
+    for (const endpoint of endpointsToTry) {
+      if (abortController.signal.aborted) break
+      try {
+        setActiveEndpoint(endpoint)
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream, application/json',
+            'X-Session-Id': sessionId,
+          },
+          body: JSON.stringify({
+            messages: contextualMessages,
+            sessionId,
+            stream: true,
+            query,
+            lang: chatLang,
+            module: activeModule
+          }),
+          signal: abortController.signal
+        })
+
+        // Check for rate limit
+        if (response.status === 429) {
+          const rateData = await response.json().catch(() => ({}))
+          const waitTime = rateData.retryAfter ? ` (~${rateData.retryAfter}s)` : ''
+          setMessages(prev => [
+            ...prev,
+            {
+              id: botMsgId,
+              role: 'assistant',
+              content: `⚠️ **Rate limit notice**: You've asked several questions in a short period. Please wait about a minute${waitTime} before asking your next question to protect AI resources.`,
+              source: 'Rate Limiter'
+            }
+          ])
+          streamedSuccess = true
+          break
+        }
+
+        if (!response.ok) {
+          console.warn(`[SafetyChatbot] Endpoint ${endpoint} returned ${response.status}`)
+          continue
+        }
+
+        const contentType = response.headers.get('content-type') || ''
+
+        // 1. Streaming SSE response
+        if (contentType.includes('text/event-stream') && response.body) {
+          // Add placeholder bot message
+          setMessages(prev => [
+            ...prev,
+            {
+              id: botMsgId,
+              role: 'assistant',
+              content: '',
+              streaming: true,
+              source: 'Suraksha Mitra AI'
+            }
+          ])
+
+          const reader = response.body.getReader()
+          const decoder = new TextDecoder('utf-8')
+          let accumulatedText = ''
+          let buffer = ''
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || ''
+
+            for (const line of lines) {
+              const trimmed = line.trim()
+              if (!trimmed.startsWith('data:')) continue
+              const dataPayload = trimmed.slice(5).trim()
+              if (dataPayload === '[DONE]') continue
+
+              try {
+                const parsed = JSON.parse(dataPayload)
+                if (parsed.chunk) {
+                  accumulatedText += parsed.chunk
+                  setMessages(prev =>
+                    prev.map(m =>
+                      m.id === botMsgId ? { ...m, content: accumulatedText } : m
+                    )
+                  )
+                  scrollBottom()
+                }
+              } catch {
+                // Ignore chunk boundary json parse errors
+              }
+            }
+          }
+
+          // Mark streaming complete
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === botMsgId ? { ...m, streaming: false } : m
+            )
+          )
+          streamedSuccess = true
+          break
+        }
+
+        // 2. Non-streaming JSON response
+        if (contentType.includes('application/json')) {
+          const json = await response.json()
+          const replyText = json.reply || json.answer
+          if (replyText) {
+            setMessages(prev => [
+              ...prev,
+              {
+                id: botMsgId,
+                role: 'assistant',
+                content: replyText,
+                source: json.source || (json.provider ? `Suraksha Mitra (${json.provider})` : 'Suraksha Mitra AI'),
+                sources: json.sources || []
+              }
+            ])
+            streamedSuccess = true
+            break
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return
+        console.warn(`[SafetyChatbot] Failed with endpoint ${endpoint}:`, err)
+      }
+    }
+
+    // 3. Graceful Fallback if backend proxy was unavailable
+    if (!streamedSuccess && !abortController.signal.aborted) {
+      console.info('[SafetyChatbot] Using local safety knowledge fallback.')
+      const localResult = await querySafetyAssistant(query, chatLang, activeModule, contextualMessages)
+      const text = typeof localResult === 'string'
+        ? localResult
+        : (localResult?.answer || localResult?.reply || "I'm your Suraksha Mitra safety assistant. Please consult your site safety officer.")
+      const source = typeof localResult === 'object' && localResult?.source
+        ? localResult.source
+        : 'Suraksha Mitra Safety Knowledge'
+
+      setMessages(prev => [
+        ...prev,
+        {
+          id: botMsgId,
+          role: 'assistant',
+          content: text,
+          source,
+          sources: localResult?.sources || []
+        }
+      ])
+    }
+
+    setIsGenerating(false)
     scrollBottom()
   }
 
@@ -221,7 +439,11 @@ export default function SafetyChatbot() {
     }
     stopSpeech()
     setSpeakingMsgId(msg.id)
-    const speechCleanText = (msg.text || '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/https?:\/\/\S+/g, '')
+    const speechCleanText = (msg.content || '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[*_#`]/g, '')
+      .replace(/https?:\/\/\S+/g, '')
+
     speak(speechCleanText, chatLang, () => {
       setSpeakingMsgId(null)
     })
@@ -237,9 +459,8 @@ export default function SafetyChatbot() {
       return
     }
 
-    // Voice recognition supported in 3 languages: en, hi, hinglish
     if (chatLang === 'sat') {
-      setVoiceNotice('🎙️ Voice recognition is supported in 3 languages: English, Hindi, and Hinglish. Please switch language tab to speak.')
+      setVoiceNotice('🎙️ Voice recognition is supported in English, Hindi, and Hinglish. Please switch language to speak.')
       setTimeout(() => setVoiceNotice(null), 4000)
       return
     }
@@ -257,7 +478,7 @@ export default function SafetyChatbot() {
       (error) => {
         setIsListening(false)
         console.warn('[SafetyChatbot] Voice recognition error:', error)
-        setVoiceNotice('Could not recognize voice. Please check mic permission or speak clearly.')
+        setVoiceNotice('Could not recognize voice. Please check microphone permission.')
         setTimeout(() => setVoiceNotice(null), 4000)
       }
     )
@@ -272,10 +493,11 @@ export default function SafetyChatbot() {
     return () => {
       stopSpeech()
       if (recognitionRef.current) recognitionRef.current.stop()
+      if (abortControllerRef.current) abortControllerRef.current.abort()
     }
   }, [])
 
-  const currentSuggestions = getSuggestedQuestions(activeModule, chatLang) || QUICK_SUGGESTIONS[chatLang] || QUICK_SUGGESTIONS.en
+  const currentSuggestions = getSuggestedQuestions(activeModule, chatLang) || []
   const hasVoice = isVoiceSupported(chatLang)
 
   return (
@@ -294,9 +516,22 @@ export default function SafetyChatbot() {
           0%, 80%, 100% { transform: translateY(0); }
           40% { transform: translateY(-6px); }
         }
+        @keyframes cursorBlink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        @media (max-width: 480px) {
+          .suraksha-chat-window {
+            width: calc(100vw - 20px) !important;
+            right: 10px !important;
+            bottom: 84px !important;
+            height: calc(100vh - 100px) !important;
+            max-height: 560px !important;
+          }
+        }
       `}</style>
 
-      {/* Floating button speech badge */}
+      {/* Floating speech badge */}
       {!open && !badgeDismissed && (
         <div
           onClick={handleOpen}
@@ -337,7 +572,7 @@ export default function SafetyChatbot() {
               Aapka Apna
             </span>
             <span style={{ color: 'var(--color-brand)', fontSize: '0.84rem', fontWeight: 800, letterSpacing: '-0.01em' }}>
-              Suraksha Saathi
+              Suraksha Mitra
             </span>
           </div>
 
@@ -369,7 +604,7 @@ export default function SafetyChatbot() {
       {/* Floating launcher button */}
       <button
         onClick={open ? handleClose : handleOpen}
-        aria-label="Aapka Apna Suraksha Saathi"
+        aria-label="Suraksha Mitra AI Assistant"
         style={{
           position: 'fixed', bottom: 24, right: 24,
           width: 56, height: 56, borderRadius: '50%',
@@ -389,11 +624,12 @@ export default function SafetyChatbot() {
       {open && (
         <div
           role="dialog"
-          aria-label="Suraksha Saathi"
+          aria-label="Suraksha Mitra AI Assistant"
+          className="suraksha-chat-window"
           style={{
             position: 'fixed', bottom: 92, right: 24,
-            width: 'min(410px, calc(100vw - 32px))',
-            height: 'min(560px, calc(100vh - 110px))',
+            width: 'min(420px, calc(100vw - 32px))',
+            height: 'min(580px, calc(100vh - 110px))',
             background: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-xl)',
@@ -404,7 +640,7 @@ export default function SafetyChatbot() {
             animation: 'slideUpFade 0.25s ease',
           }}
         >
-          {/* Header with Integrated Chatbot-Only 4-Language Bar */}
+          {/* Header with Persona & Controls */}
           <div style={{
             background: 'var(--color-brand)',
             padding: '12px 14px 10px',
@@ -414,7 +650,7 @@ export default function SafetyChatbot() {
             flexShrink: 0,
             boxShadow: '0 3px 10px rgba(224, 90, 0, 0.25)',
           }}>
-            {/* Top Row: Bot Icon, Title, Online Status, Close */}
+            {/* Top Row: Bot Icon, Title, Status, Clear Chat, Close */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{
                 width: 36, height: 36, borderRadius: '50%',
@@ -424,24 +660,57 @@ export default function SafetyChatbot() {
               }}>
                 <Bot size={20} color="white" />
               </div>
-              <div>
-                <p style={{ color: 'white', fontWeight: 800, fontSize: '0.94rem', lineHeight: 1.2 }}>
-                  Suraksha Saathi
-                </p>
-                <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.67rem', fontWeight: 500 }}>
-                  Curated Knowledge Base • Chatbot Only
-                </p>
-              </div>
-              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  background: 'rgba(0,0,0,0.22)', padding: '3px 8px', borderRadius: '12px',
-                }}>
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#4AFF91' }} />
-                  <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.04em' }}>
-                    ONLINE
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <p style={{ color: 'white', fontWeight: 800, fontSize: '0.96rem', lineHeight: 1.2 }}>
+                    Suraksha Mitra
+                  </p>
+                  <span style={{
+                    fontSize: '0.62rem',
+                    background: 'rgba(255,255,255,0.25)',
+                    color: 'white',
+                    padding: '1px 6px',
+                    borderRadius: '10px',
+                    fontWeight: 700,
+                  }}>
+                    AI
                   </span>
                 </div>
+                <p style={{
+                  color: 'rgba(255,255,255,0.88)',
+                  fontSize: '0.66rem',
+                  fontWeight: 500,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  Safety Assistant • Jharkhand Mines & Plants
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* Reset / Clear Chat Button */}
+                <button
+                  onClick={handleClearChat}
+                  title="Clear conversation / New Chat"
+                  aria-label="Clear chat"
+                  style={{
+                    background: 'rgba(255,255,255,0.18)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: 26, height: 26,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer',
+                    color: 'white',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.3)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.18)'}
+                >
+                  <RotateCcw size={13} />
+                </button>
+
+                {/* Close Button */}
                 <button
                   onClick={handleClose}
                   aria-label="Close chat"
@@ -458,7 +727,7 @@ export default function SafetyChatbot() {
               </div>
             </div>
 
-            {/* In-Header Dedicated Language Bar (4 Languages, 3 with Voice) */}
+            {/* Language Bar (4 Languages, 3 with Voice) */}
             <div style={{
               background: 'rgba(0, 0, 0, 0.22)',
               borderRadius: '12px',
@@ -500,19 +769,11 @@ export default function SafetyChatbot() {
                   >
                     <span>{item.native}</span>
                     {item.voice ? (
-                      <span style={{
-                        fontSize: '0.62rem',
-                        lineHeight: 1,
-                        opacity: isSelected ? 1 : 0.8,
-                      }}>
+                      <span style={{ fontSize: '0.62rem', lineHeight: 1, opacity: isSelected ? 1 : 0.8 }}>
                         🎙️
                       </span>
                     ) : (
-                      <span style={{
-                        fontSize: '0.62rem',
-                        lineHeight: 1,
-                        opacity: isSelected ? 1 : 0.7,
-                      }}>
+                      <span style={{ fontSize: '0.62rem', lineHeight: 1, opacity: isSelected ? 1 : 0.7 }}>
                         📝
                       </span>
                     )}
@@ -522,7 +783,7 @@ export default function SafetyChatbot() {
             </div>
           </div>
 
-          {/* Voice status notice if any */}
+          {/* Voice status notice */}
           {voiceNotice && (
             <div style={{
               background: '#FFF3CD', color: '#856404',
@@ -531,7 +792,7 @@ export default function SafetyChatbot() {
               display: 'flex', alignItems: 'center', gap: 6,
               lineHeight: 1.3, flexShrink: 0,
             }}>
-              <span>ℹ️</span>
+              <AlertCircle size={13} />
               <span style={{ flex: 1 }}>{voiceNotice}</span>
               <button
                 onClick={() => setVoiceNotice(null)}
@@ -593,22 +854,22 @@ export default function SafetyChatbot() {
                     padding: '3px 10px',
                     borderRadius: '12px',
                   }}>
-                    {msg.text}
+                    {msg.content}
                   </div>
                 )
               }
 
-              const isBot = msg.role === 'bot'
+              const isAssistant = msg.role === 'assistant' || msg.role === 'bot'
               const isSpeaking = speakingMsgId === msg.id
 
               return (
                 <div key={msg.id} style={{
                   display: 'flex',
-                  justifyContent: isBot ? 'flex-start' : 'flex-end',
+                  justifyContent: isAssistant ? 'flex-start' : 'flex-end',
                   gap: 8,
                   alignItems: 'flex-end',
                 }}>
-                  {isBot && (
+                  {isAssistant && (
                     <div style={{
                       width: 28, height: 28, borderRadius: '50%',
                       background: 'rgba(224, 90, 0, 0.12)',
@@ -619,20 +880,34 @@ export default function SafetyChatbot() {
                     </div>
                   )}
 
-                  <div style={{ maxWidth: '84%' }}>
+                  <div style={{ maxWidth: '86%' }}>
                     <div style={{
                       padding: '10px 13px',
-                      background: isBot ? 'var(--color-surface-alt)' : 'var(--color-brand)',
-                      color: isBot ? 'var(--color-text-primary)' : 'white',
-                      borderRadius: isBot ? '4px 18px 18px 18px' : '18px 18px 4px 18px',
-                      fontSize: 'var(--text-sm)',
+                      background: isAssistant ? 'var(--color-surface-alt)' : 'var(--color-brand)',
+                      color: isAssistant ? 'var(--color-text-primary)' : 'white',
+                      borderRadius: isAssistant ? '4px 18px 18px 18px' : '18px 18px 4px 18px',
+                      fontSize: '0.85rem',
                       lineHeight: 1.55,
-                      border: isBot ? '1px solid var(--color-border)' : 'none',
+                      border: isAssistant ? '1px solid var(--color-border)' : 'none',
                       whiteSpace: 'pre-line',
+                      wordBreak: 'break-word',
                     }}>
-                      {msg.text}
+                      {msg.content}
 
-                      {/* Display verified web citations / source links */}
+                      {/* Streaming blinking cursor */}
+                      {msg.streaming && (
+                        <span style={{
+                          display: 'inline-block',
+                          width: 6,
+                          height: 14,
+                          background: 'var(--color-brand)',
+                          marginLeft: 3,
+                          verticalAlign: 'middle',
+                          animation: 'cursorBlink 0.8s infinite',
+                        }} />
+                      )}
+
+                      {/* Web citations if any */}
                       {Array.isArray(msg.sources) && msg.sources.length > 0 && (
                         <div style={{
                           marginTop: 8,
@@ -643,9 +918,9 @@ export default function SafetyChatbot() {
                           gap: 4,
                         }}>
                           <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>
-                            🔗 Verified Sources & Citations:
+                            🔗 Verified Sources:
                           </span>
-                          {msg.sources.slice(0, 4).map((s, idx) => (
+                          {msg.sources.slice(0, 3).map((s, idx) => (
                             <a
                               key={idx}
                               href={s.uri}
@@ -658,7 +933,6 @@ export default function SafetyChatbot() {
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis',
                                 whiteSpace: 'nowrap',
-                                display: 'block',
                               }}
                               title={s.title || s.uri}
                             >
@@ -669,8 +943,8 @@ export default function SafetyChatbot() {
                       )}
                     </div>
 
-                    {/* Source tag + Voice Readout button */}
-                    {isBot && (
+                    {/* Source tag + Voice Readout */}
+                    {isAssistant && !msg.streaming && (
                       <div style={{
                         display: 'flex', gap: 6, marginTop: 4,
                         alignItems: 'center', flexWrap: 'wrap',
@@ -684,11 +958,11 @@ export default function SafetyChatbot() {
                             borderRadius: 'var(--radius-pill)',
                             padding: '1px 6px',
                           }}>
-                            📚 {msg.source}
+                            🛡️ {msg.source}
                           </span>
                         )}
 
-                        {isTTSSupported(chatLang) && (
+                        {isTTSSupported(chatLang) && msg.content && (
                           <button
                             onClick={() => handleToggleSpeech(msg)}
                             title={isSpeaking ? 'Stop speaking' : 'Listen with Voice'}
@@ -728,8 +1002,8 @@ export default function SafetyChatbot() {
               )
             })}
 
-            {/* Typing indicator */}
-            {typing && (
+            {/* Waiting for first streaming token indicator */}
+            {isGenerating && !messages.some(m => m.streaming) && (
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                 <div style={{
                   width: 28, height: 28, borderRadius: '50%',
@@ -744,15 +1018,18 @@ export default function SafetyChatbot() {
                   background: 'var(--color-surface-alt)',
                   border: '1px solid var(--color-border)',
                   borderRadius: '4px 18px 18px 18px',
-                  display: 'flex', gap: 4,
+                  display: 'flex', gap: 4, alignItems: 'center',
                 }}>
                   {[0, 1, 2].map(i => (
                     <div key={i} style={{
                       width: 6, height: 6, borderRadius: '50%',
-                      background: 'var(--color-text-muted)',
+                      background: 'var(--color-brand)',
                       animation: `typingBounce 1s ease ${i * 0.15}s infinite`,
                     }} />
                   ))}
+                  <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', marginLeft: 6 }}>
+                    Thinking…
+                  </span>
                 </div>
               </div>
             )}
@@ -769,11 +1046,11 @@ export default function SafetyChatbot() {
             flexShrink: 0,
             background: 'var(--color-surface)',
           }}>
-            {currentSuggestions.map((item, idx) => (
+            {currentSuggestions.slice(0, 4).map((item, idx) => (
               <button
                 key={idx}
                 onClick={() => processQuery(item.query)}
-                disabled={typing || isListening}
+                disabled={isGenerating || isListening}
                 style={{
                   background: 'var(--color-surface-alt)',
                   border: '1px solid var(--color-border)',
@@ -836,7 +1113,7 @@ export default function SafetyChatbot() {
               }}
             />
 
-            {/* Voice Input (Microphone) Button */}
+            {/* Voice Input (Microphone) */}
             <button
               onClick={toggleVoiceInput}
               title={
@@ -863,17 +1140,17 @@ export default function SafetyChatbot() {
             {/* Send Button */}
             <button
               onClick={() => processQuery()}
-              disabled={!input.trim() || typing}
+              disabled={!input.trim() || isGenerating}
               style={{
                 width: 38, height: 38, borderRadius: '50%',
-                background: input.trim() ? 'var(--color-brand)' : 'var(--color-border)',
+                background: input.trim() && !isGenerating ? 'var(--color-brand)' : 'var(--color-border)',
                 border: 'none',
-                cursor: input.trim() ? 'pointer' : 'default',
+                cursor: input.trim() && !isGenerating ? 'pointer' : 'default',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0,
                 transition: 'background 0.15s',
               }}
-              aria-label="Send query"
+              aria-label="Send message"
             >
               <Send size={16} color="white" />
             </button>
@@ -888,11 +1165,10 @@ export default function SafetyChatbot() {
             flexShrink: 0,
             background: 'var(--color-surface)',
           }}>
-            Curated Safety KB • 4 Languages • 3 Voice Modes (EN, HI, Hinglish)
+            Suraksha Mitra AI • Streaming & Real-time Reasoning • 4 Languages
           </div>
         </div>
       )}
     </>
   )
 }
-
