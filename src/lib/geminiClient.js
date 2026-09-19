@@ -76,12 +76,29 @@ export function formatMessagesForGemini(messages = [], query = '') {
   return contents
 }
 
+export function getLanguagePrompt(lang = 'en') {
+  if (lang === 'en') {
+    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected ENGLISH in the interface. You MUST write your ENTIRE response in clear, fluent ENGLISH. Do NOT answer in Hindi or Hinglish, even if the user types words in Hindi.`
+  }
+  if (lang === 'hi') {
+    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected HINDI (हिंदी). You MUST write your ENTIRE response in natural, fluent Devanagari Hindi (हिंदी).`
+  }
+  if (lang === 'hinglish') {
+    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected HINGLISH. You MUST write your ENTIRE response in conversational Hinglish (Hindi written in Roman / English alphabets, e.g. 'Haan bilkul, main aapko samjhata hoon...').`
+  }
+  if (lang === 'sat') {
+    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected SANTALI (ᱥᱟᱱᱛᱟᱲᱤ). You MUST write your response in Santali (Ol Chiki script) with clear, simple terms.`
+  }
+  return ''
+}
+
 /**
  * Generate a conversational response directly from Gemini API
  */
 export async function generateClientGeminiResponse({
   messages = [],
   query = '',
+  lang = 'en',
   signal = null,
   systemPrompt = SURAKSHA_MITRA_SYSTEM_PROMPT
 }) {
@@ -90,6 +107,7 @@ export async function generateClientGeminiResponse({
     throw new Error('No Gemini API key available')
   }
 
+  const effectiveSystemPrompt = `${systemPrompt}${getLanguagePrompt(lang)}`
   const contents = formatMessagesForGemini(messages, query)
   let lastError = null
 
@@ -104,7 +122,7 @@ export async function generateClientGeminiResponse({
         body: JSON.stringify({
           contents,
           systemInstruction: {
-            parts: [{ text: systemPrompt }]
+            parts: [{ text: effectiveSystemPrompt }]
           },
           generationConfig: {
             temperature: 0.6,
@@ -149,6 +167,7 @@ export async function generateClientGeminiResponse({
 export async function streamClientGeminiResponse({
   messages = [],
   query = '',
+  lang = 'en',
   signal = null,
   onChunk,
   systemPrompt = SURAKSHA_MITRA_SYSTEM_PROMPT
@@ -158,6 +177,7 @@ export async function streamClientGeminiResponse({
     throw new Error('No Gemini API key available')
   }
 
+  const effectiveSystemPrompt = `${systemPrompt}${getLanguagePrompt(lang)}`
   const contents = formatMessagesForGemini(messages, query)
   let lastError = null
 
@@ -172,7 +192,7 @@ export async function streamClientGeminiResponse({
         body: JSON.stringify({
           contents,
           systemInstruction: {
-            parts: [{ text: systemPrompt }]
+            parts: [{ text: effectiveSystemPrompt }]
           },
           generationConfig: {
             temperature: 0.6,

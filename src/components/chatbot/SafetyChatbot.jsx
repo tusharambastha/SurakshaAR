@@ -418,6 +418,7 @@ export default function SafetyChatbot() {
         await streamClientGeminiResponse({
           messages: contextualMessages,
           query,
+          lang: chatLang,
           signal: abortController.signal,
           onChunk: (chunk, total) => {
             accumulated = total

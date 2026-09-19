@@ -24,6 +24,22 @@ HOW TO COMMUNICATE (BEHAVE LIKE CHATGPT / GEMINI):
 5. Industrial Safety Standards:
    - Ground all safety practices in authentic standards (IS 2925, IS 15298, OSHA, DGMS), but explain them in simple layman terms without overwhelming jargon.`
 
+export function getLanguagePrompt(lang = 'en') {
+  if (lang === 'en') {
+    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected ENGLISH in the interface. You MUST write your ENTIRE response in clear, fluent ENGLISH. Do NOT answer in Hindi or Hinglish, even if the user types words in Hindi.`
+  }
+  if (lang === 'hi') {
+    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected HINDI (हिंदी). You MUST write your ENTIRE response in natural, fluent Devanagari Hindi (हिंदी).`
+  }
+  if (lang === 'hinglish') {
+    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected HINGLISH. You MUST write your ENTIRE response in conversational Hinglish (Hindi written in Roman / English alphabets, e.g. 'Haan bilkul, main aapko samjhata hoon...').`
+  }
+  if (lang === 'sat') {
+    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected SANTALI (ᱥᱟᱱᱛᱟᱲᱤ). You MUST write your response in Santali (Ol Chiki script) with clear, simple terms.`
+  }
+  return ''
+}
+
 // Local rate limiter instance
 export const localLimiter = new RateLimiter({
   windowMs: 60 * 1000,
@@ -169,7 +185,7 @@ export async function handleChatApi(payload = {}) {
       trustedContextPrompt = `\n\n[Background Safety Knowledge (IS/OSHA Reference): ${localMatch.answer}\nUse these verified technical facts for accuracy, but formulate your response in a warm, helpful, conversational AI style matching the user's question.]`
     }
 
-    const fullSystemInstruction = `${SURAKSHA_MITRA_SYSTEM_PROMPT}${trustedContextPrompt}`
+    const fullSystemInstruction = `${SURAKSHA_MITRA_SYSTEM_PROMPT}${getLanguagePrompt(lang)}${trustedContextPrompt}`
 
     const models = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest']
     let candidate = null

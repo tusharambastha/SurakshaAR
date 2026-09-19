@@ -778,6 +778,7 @@ export async function querySafetyAssistant(input, lang = 'en', currentModule = M
   try {
     const geminiRes = await generateClientGeminiResponse({
       query: input,
+      lang,
       messages: Array.isArray(history)
         ? history.map(m => ({
             role: m.role === 'assistant' || m.role === 'bot' ? 'assistant' : 'user',
