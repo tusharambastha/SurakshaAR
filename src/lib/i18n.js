@@ -636,6 +636,20 @@ export const SCENARIO_I18N = {
       description: 'ᱠᱟᱹᱨᱜᱟᱲ ᱨᱮ ᱵᱤᱡᱽᱞᱤ ᱥᱮᱸᱜᱮᱞ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱥᱤᱠᱷᱟᱣ ᱢᱮ᱾ ᱵᱚᱛᱚᱨ ᱪᱤᱱᱦᱟᱹᱣ ᱢᱮ, ᱟᱯᱟᱛᱠᱟᱞᱤᱱ ᱱᱤᱭᱟᱹᱢ ᱞᱟᱦᱟᱭ ᱢᱮ, PPE ᱦᱚᱨᱚᱜ ᱢᱮ, ᱴᱷᱤᱠ ᱥᱮᱸᱜᱮᱞ ᱤᱬᱤᱡᱤᱡ ᱵᱮᱵᱷᱟᱨ ᱢᱮ ᱟᱨ ᱥᱩᱨᱠᱷᱤᱛ ᱵᱟᱦᱨᱮ ᱚᱰᱚᱠ ᱢᱮ᱾',
     },
   },
+  'a1b2c3d4-0004-0004-0004-000000000004': {
+    en: {
+      title: 'PPE & Industrial Hazard Baseline',
+      description: 'Master mandatory Personal Protective Equipment protocols and baseline factory floor hazard identification. Don complete safety gear in correct order, inspect compliance, and verify safe worksite entry.',
+    },
+    hi: {
+      title: 'पीपीई और औद्योगिक खतरा आधार रेखा',
+      description: 'अनिवार्य व्यक्तिगत सुरक्षा उपकरण (PPE) प्रोटोकॉल और बुनियादी फैक्ट्री फ्लोर खतरे की पहचान में महारत हासिल करें। सही क्रम में पूर्ण सुरक्षा गियर पहनें, अनुपालन का निरीक्षण करें और सुरक्षित कार्यस्थल प्रवेश सत्यापित करें।',
+    },
+    sat: {
+      title: 'PPE ᱟᱨ ᱠᱟᱹᱨᱜᱟᱲ ᱵᱚᱛᱚᱨ ᱵᱩᱱᱤᱭᱟᱹᱫᱽ',
+      description: 'ᱞᱟᱹᱠᱛᱤᱭᱟᱱ PPE ᱱᱤᱭᱟᱹᱢ ᱟᱨ ᱠᱟᱹᱨᱜᱟᱲ ᱵᱚᱛᱚᱨ ᱪᱤᱱᱦᱟᱹᱣ ᱪᱮᱫᱚᱜ ᱢᱮ᱾ ᱴᱷᱤᱠ ᱛᱷᱟᱨ ᱛᱮ ᱯᱩᱨᱟᱹ ᱥᱮᱯᱷᱴᱤ ᱥᱟᱢᱟᱱ ᱦᱚᱨᱚᱜ ᱢᱮ, ᱯᱟᱨᱠᱷᱟᱣ ᱢᱮ ᱟᱨ ᱥᱩᱨᱠᱷᱤᱛ ᱠᱟᱹᱢᱤ ᱴᱷᱟᱶ ᱵᱚᱞᱚᱱ ᱯᱩᱨᱟᱹᱣ ᱢᱮ᱾',
+    },
+  },
   'a1b2c3d4-0002-0002-0002-000000000002': {
     en: {
       title: 'Gas Leak & Confined Space Protocol',
@@ -650,17 +664,31 @@ export const SCENARIO_I18N = {
       description: 'ᱠᱷᱟᱫᱟᱱ ᱨᱮ ᱵᱚᱛᱚᱨᱟᱱ ᱜᱮᱥ ᱞᱤᱠ ᱡᱚᱠᱷᱚᱱ ᱵᱟᱰᱤ ᱥᱤᱥᱴᱚᱢ ᱛᱮ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱥᱤᱠᱷᱟᱣ ᱢᱮ᱾ ᱞᱤᱠ ᱪᱤᱱᱦᱟᱹᱣ ᱢᱮ, ᱯᱨᱳᱴᱳᱠᱚᱞ ᱮᱦᱚᱵ ᱢᱮ, ᱥᱟᱦᱮᱫ ᱥᱟᱢᱟᱱ ᱦᱚᱨᱚᱜ ᱢᱮ ᱟᱨ ᱥᱩᱨᱠᱷᱤᱛ ᱵᱟᱦᱨᱮ ᱚᱰᱚᱠ ᱢᱮ᱾',
     },
   },
-  'a1b2c3d4-0003-0003-0003-000000000003': {
+  'a1b2c3d4-0005-0005-0005-000000000005': {
     en: {
-      title: 'Machinery Safety & Lockout/Tagout',
-      description: 'Learn to safely isolate and lock out machinery before maintenance using the LOTO procedure. Prevents accidental machine startup during maintenance.',
+      title: 'High-Voltage Electrical Substation Safety',
+      description: 'Master high-voltage arc-flash boundaries, dielectric insulating PPE, zero-energy state verification, and safe substation maintenance switching protocols.',
     },
     hi: {
-      title: 'मशीनरी सुरक्षा और लॉकआउट/टैगआउट',
-      description: 'LOTO प्रक्रिया का उपयोग करते हुए रखरखाव से पहले मशीनरी को सुरक्षित रूप से अलग और लॉक करना सीखें। रखरखाव के दौरान आकस्मिक मशीन स्टार्टअप को रोकता है।',
+      title: 'हाई-वोल्टेज इलेक्ट्रिकल सबस्टेशन सुरक्षा',
+      description: 'हाई-वोल्टेज आर्क-फ्लैश सीमाओं, डाइइलेक्ट्रिक इंसुलेटिंग PPE, शून्य-ऊर्जा स्थिति सत्यापन और सुरक्षित सबस्टेशन रखरखाव स्विचिंग प्रोटोकॉल में महारत हासिल करें।',
     },
     sat: {
-      title: 'ᱢᱮᱥᱤᱱ ᱥᱩᱨᱠᱷᱟ ᱟᱨ ᱞᱚᱠ-ᱟᱣᱩᱴ/ᱴᱮᱜᱽ-ᱟᱣᱩᱴ',
+      title: 'ᱦᱟᱭ-ᱵᱷᱳᱞᱴᱮᱡᱽ ᱵᱤᱡᱽᱞᱤ ᱥᱟᱵᱽᱥᱴᱮᱥᱚᱱ ᱨᱩᱠᱷᱤᱭᱟᱹ',
+      description: 'ᱟᱨᱠ-ᱯᱷᱞᱮᱥ ᱨᱩᱠᱷᱤᱭᱟᱹ, ᱵᱤᱡᱽᱞᱤ ᱵᱷᱮᱜᱟᱨ ᱱᱤᱭᱟᱹᱢ (isolation), ᱟᱨᱛᱷᱤᱝ ᱱᱤᱭᱟᱹᱢ ᱟᱨ ᱦᱟᱭ-ᱵᱷᱳᱞᱴᱮᱡᱽ ᱥᱟᱵᱽᱥᱴᱮᱥᱚᱱ ᱯᱨᱳᱴᱳᱠᱚᱞ ᱥᱤᱠᱷᱟᱣ᱾',
+    },
+  },
+  'a1b2c3d4-0003-0003-0003-000000000003': {
+    en: {
+      title: 'Heavy Industrial Machinery & Nip-Point Guarding',
+      description: 'Learn to safely isolate machinery before maintenance using LOTO procedures. Master rotating nip-point guarding and physical barrier interlocks.',
+    },
+    hi: {
+      title: 'भारी औद्योगिक मशीनरी और निप-पॉइंट गार्डिंग',
+      description: 'LOTO प्रक्रियाओं का उपयोग करके रखरखाव से पहले मशीनरी को सुरक्षित रूप से अलग करना सीखें। घूर्णन निप-पॉइंट गार्डिंग और भौतिक बैरियर इंटरलॉक्स में महारत हासिल करें।',
+    },
+    sat: {
+      title: 'ᱦᱟᱢᱟᱞ ᱠᱟᱹᱨᱜᱟᱲ ᱢᱮᱥᱤᱱ ᱟᱨ ᱱᱤᱯ-ᱯᱚᱭᱮᱱᱴ ᱜᱟᱨᱰᱤᱝ',
       description: 'LOTO ᱱᱤᱭᱟᱹᱢ ᱛᱮ ᱢᱮᱥᱤᱱ ᱥᱟᱯᱲᱟᱣ ᱞᱟᱦᱟ ᱥᱩᱨᱠᱷᱤᱛ ᱞᱮᱠᱟᱛᱮ ᱵᱚᱸᱫᱽ ᱟᱨ ᱞᱚᱠ ᱪᱮᱫᱚᱜ ᱢᱮ᱾ ᱠᱟᱹᱢᱤ ᱚᱠᱛᱚ ᱨᱮ ᱦᱟᱴᱟᱛ ᱢᱮᱥᱤᱱ ᱮᱦᱚᱵ ᱠᱷᱚᱱ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱮᱢᱟᱭ᱾',
     },
   },

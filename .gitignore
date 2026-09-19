@@ -24,3 +24,11 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Large video recordings & scratch binaries
+*.mov
+*.mp4
+bin/
+scratch/
+assemble_demo.py
+

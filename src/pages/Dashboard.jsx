@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Trophy, Clock, Star, TrendingUp, ChevronRight, AlertTriangle, Flame, Wind, Cog, Lock, PlayCircle } from 'lucide-react'
+import { Trophy, Clock, Star, TrendingUp, ChevronRight, AlertTriangle, Flame, Wind, Cog, Lock, PlayCircle, ShieldCheck, Zap } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { mockGetScenarios, mockGetSessions } from '../lib/mockDb'
 import { getScenarioText } from '../lib/i18n'
@@ -15,7 +15,16 @@ const HAZARD_ICONS = {
   gas_leak: <Wind size={18} />,
   fire: <Flame size={18} />,
   machinery: <Cog size={18} />,
+  ppe: <ShieldCheck size={18} />,
+  electrical: <Zap size={18} />,
 }
+const SCENARIO_ORDER = [
+  'a1b2c3d4-0001-0001-0001-000000000001', // Fire & Explosion Response
+  'a1b2c3d4-0004-0004-0004-000000000004', // PPE & Industrial Hazard Baseline
+  'a1b2c3d4-0002-0002-0002-000000000002', // Gas Leak & Confined Space Protocol
+  'a1b2c3d4-0005-0005-0005-000000000005', // High-Voltage Electrical Substation Safety
+  'a1b2c3d4-0003-0003-0003-000000000003', // Heavy Industrial Machinery & Nip-Point Guarding
+]
 const DIFFICULTY_COLORS = {
   beginner: 'var(--color-success)',
   intermediate: 'var(--color-warning)',
@@ -185,10 +194,16 @@ export default function Dashboard() {
               </div>
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-                {scenarios.map(s => (
-                  <ModuleCard key={s.id} scenario={s} sessions={sessions}
-                    onStart={() => navigate(`/tutorial/${s.id}`)} T={T} lang={lang} />
-                ))}
+                {[...scenarios]
+                  .sort((a, b) => {
+                    const idxA = SCENARIO_ORDER.indexOf(a.id)
+                    const idxB = SCENARIO_ORDER.indexOf(b.id)
+                    return (idxA === -1 ? 99 : idxA) - (idxB === -1 ? 99 : idxB)
+                  })
+                  .map(s => (
+                    <ModuleCard key={s.id} scenario={s} sessions={sessions}
+                      onStart={() => navigate(`/tutorial/${s.id}`)} T={T} lang={lang} />
+                  ))}
               </div>
             )}
           </section>

@@ -11,9 +11,10 @@
  * - Safe, deterministic fallback for unrecognized queries
  */
 import { useState, useRef, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { MessageCircle, X, Send, Bot, Volume2, VolumeX, Mic, MicOff, Sparkles } from 'lucide-react'
 import { useLang } from '../../contexts/LanguageContext'
-import { queryKnowledgeBase } from '../../lib/safetyKnowledge'
+import { queryKnowledgeBase, querySafetyAssistant, getSuggestedQuestions, MODULES } from '../../lib/safetyKnowledge'
 import { speak, stopSpeech, startListening, isTTSSupported, isVoiceSupported } from '../../lib/voice'
 
 export const CHAT_LANGUAGES = [
@@ -84,8 +85,21 @@ const QUICK_SUGGESTIONS = {
   ],
 }
 
+function getActiveModuleFromPath(pathname) {
+  if (!pathname) return MODULES.GLOBAL
+  if (pathname.includes('0001') || pathname.includes('fire')) return MODULES.FIRE_EXPLOSION
+  if (pathname.includes('0002') || pathname.includes('gas')) return MODULES.GAS_LEAK
+  if (pathname.includes('0003') || pathname.includes('electrical')) return MODULES.ELECTRICAL
+  if (pathname.includes('0004') || pathname.includes('ppe')) return MODULES.PPE
+  if (pathname.includes('0005') || pathname.includes('machinery')) return MODULES.MACHINERY
+  if (pathname.includes('0006') || pathname.includes('mining')) return MODULES.MINING
+  return MODULES.GLOBAL
+}
+
 export default function SafetyChatbot() {
   const { lang: globalLang } = useLang()
+  const location = useLocation()
+  const activeModule = getActiveModuleFromPath(location?.pathname)
   const [open, setOpen]                     = useState(false)
   const [badgeDismissed, setBadgeDismissed] = useState(false)
   const [chatLang, setChatLang]             = useState(() => {
@@ -173,14 +187,17 @@ export default function SafetyChatbot() {
     // Thinking delay for natural dialogue
     await new Promise(r => setTimeout(r, 450 + Math.random() * 350))
 
-    const result = queryKnowledgeBase(query, chatLang, null)
+    const recentHistory = messages.slice(-5)
+    const result = await querySafetyAssistant(query, chatLang, activeModule, recentHistory)
     const text = typeof result === 'string' ? result : (result?.answer || "I'm your safety assistant. Please ask any industrial safety question.")
     const source = typeof result === 'object' && result?.source ? result.source : 'Safety Knowledge Base'
+    const sources = typeof result === 'object' && Array.isArray(result?.sources) ? result.sources : []
     const botMsg = {
       id: Date.now() + 1,
       role: 'bot',
       text,
       source,
+      sources,
       confidence: typeof result === 'object' && result?.confidence ? result.confidence : 0.85,
     }
     setTyping(false)
@@ -204,7 +221,8 @@ export default function SafetyChatbot() {
     }
     stopSpeech()
     setSpeakingMsgId(msg.id)
-    speak(msg.text, chatLang, () => {
+    const speechCleanText = (msg.text || '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/https?:\/\/\S+/g, '')
+    speak(speechCleanText, chatLang, () => {
       setSpeakingMsgId(null)
     })
   }
@@ -257,7 +275,7 @@ export default function SafetyChatbot() {
     }
   }, [])
 
-  const currentSuggestions = QUICK_SUGGESTIONS[chatLang] || QUICK_SUGGESTIONS.en
+  const currentSuggestions = getSuggestedQuestions(activeModule, chatLang) || QUICK_SUGGESTIONS[chatLang] || QUICK_SUGGESTIONS.en
   const hasVoice = isVoiceSupported(chatLang)
 
   return (
@@ -613,6 +631,42 @@ export default function SafetyChatbot() {
                       whiteSpace: 'pre-line',
                     }}>
                       {msg.text}
+
+                      {/* Display verified web citations / source links */}
+                      {Array.isArray(msg.sources) && msg.sources.length > 0 && (
+                        <div style={{
+                          marginTop: 8,
+                          paddingTop: 8,
+                          borderTop: '1px dashed var(--color-border)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 4,
+                        }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>
+                            🔗 Verified Sources & Citations:
+                          </span>
+                          {msg.sources.slice(0, 4).map((s, idx) => (
+                            <a
+                              key={idx}
+                              href={s.uri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                fontSize: '0.66rem',
+                                color: 'var(--color-brand)',
+                                textDecoration: 'underline',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                display: 'block',
+                              }}
+                              title={s.title || s.uri}
+                            >
+                              • {s.title || s.uri}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Source tag + Voice Readout button */}

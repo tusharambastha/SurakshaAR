@@ -667,6 +667,20 @@ export default function Scenario() {
       }
       const gLight = new THREE.PointLight('#84CC16', 3.0, 8)
       hazardGroup.add(gLight)
+    } else if (scenario.hazard_type === 'ppe') {
+      hazardGroup.position.set(3, 1.4, 2.3)
+      // Amber industrial hazard caution indicator beacon & strobe
+      const beaconBase = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.2, 16), machineMat)
+      hazardGroup.add(beaconBase)
+      const beaconLight = new THREE.Mesh(
+        new THREE.SphereGeometry(0.28, 16, 16),
+        new THREE.MeshStandardMaterial({ color: '#EAB308', emissive: '#CA8A04', emissiveIntensity: 2.2 })
+      )
+      beaconLight.position.y = 0.25
+      hazardGroup.add(beaconLight)
+      const ppeLight = new THREE.PointLight('#EAB308', 3.5, 8)
+      ppeLight.position.y = 0.3
+      hazardGroup.add(ppeLight)
     } else {
       hazardGroup.position.set(3, 1.4, 2.3)
       // Flame cones and core

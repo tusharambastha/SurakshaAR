@@ -40,9 +40,36 @@ values
     false
   ),
   (
+    'a1b2c3d4-0004-0004-0004-000000000004',
+    'PPE & Industrial Hazard Baseline',
+    'Master mandatory Personal Protective Equipment protocols and baseline factory floor hazard identification. Don complete safety gear in correct order, inspect compliance, and verify safe worksite entry.',
+    'ppe',
+    'beginner',
+    100000,
+    '[
+      {"index": 0, "label": "Identify Workplace Hazard", "instruction": "Inspect the operational area and locate the unshielded electrical panel hazard before beginning work", "position": [3, 1.2, 3], "color": "#ef4444", "is_ppe_step": false},
+      {"index": 1, "label": "Equip Head & Eye Protection", "instruction": "Select the industrial safety helmet (IS 2925) and impact-resistant eye goggles from the PPE station", "position": [-4, 1.4, 1], "color": "#0ea5e9", "is_ppe_step": true},
+      {"index": 2, "label": "Equip Respiratory & Ear Protection", "instruction": "Don certified particulate respirator mask and high-decibel ear muffs for hazardous airborne and noise zones", "position": [-4, 0.9, 1], "color": "#f59e0b", "is_ppe_step": true},
+      {"index": 3, "label": "Equip High-Vis Vest & Gloves", "instruction": "Put on fluorescent Class 2 reflective safety vest and heavy-duty cut-resistant industrial gloves", "position": [-2.5, 1.0, 0.5], "color": "#22c55e", "is_ppe_step": true},
+      {"index": 4, "label": "Equip Steel-Toe Safety Boots", "instruction": "Wear puncture-resistant, electrical-hazard rated steel-toe boots before entering active work floor", "position": [-1.5, 0.5, 2], "color": "#8b5cf6", "is_ppe_step": true},
+      {"index": 5, "label": "Complete Safety Checklist Verification", "instruction": "Verify all mandatory PPE fitment at supervisor safety checkpoint and confirm readiness for site entry", "position": [0, 1.0, 10], "color": "#a855f7", "is_ppe_step": false}
+    ]'::jsonb,
+    false
+  ),
+  (
+    'a1b2c3d4-0005-0005-0005-000000000005',
+    'High-Voltage Electrical Substation Safety',
+    'Master high-voltage arc-flash boundaries, dielectric insulating PPE, zero-energy state verification, and safe substation maintenance switching protocols.',
+    'electrical',
+    'advanced',
+    180000,
+    '[]'::jsonb,
+    true
+  ),
+  (
     'a1b2c3d4-0003-0003-0003-000000000003',
-    'Machinery Safety & Lockout/Tagout',
-    'Learn to safely isolate and lock out machinery before maintenance using the LOTO procedure. Prevents accidental machine startup during maintenance.',
+    'Heavy Industrial Machinery & Nip-Point Guarding',
+    'Learn to safely isolate machinery before maintenance using LOTO procedures. Master rotating nip-point guarding and physical barrier interlocks.',
     'machinery',
     'advanced',
     150000,
@@ -105,6 +132,32 @@ insert into public.assessment_questions (
     1,
     'NEVER ignite any flame or operate electrical switches in a gas leak area — this can ignite the gas causing an explosion.',
     'गैस रिसाव क्षेत्र में कभी भी लाइटर न जलाएं या बिजली के स्विच न चलाएं — इससे विस्फोट हो सकता है।',
+    2
+  ),
+  (
+    'b1c2d3e4-0004-0004-0004-000000000001',
+    'a1b2c3d4-0004-0004-0004-000000000004',
+    'What is the role of Personal Protective Equipment (PPE) in the Hierarchy of Controls?',
+    'नियंत्रण के पदानुक्रम (Hierarchy of Controls) में व्यक्तिगत सुरक्षा उपकरण (PPE) का क्या स्थान है?',
+    'ᱨᱩᱠᱷᱤᱭᱟᱹ ᱛᱷᱟᱨ (Hierarchy of Controls) ᱨᱮ PPE ᱨᱮᱱᱟᱜ ᱴᱷᱟᱶ ᱚᱠᱟᱨᱮ?',
+    '["The very first and most effective defense", "The last line of defense when hazards cannot be eliminated", "Optional equipment used only during audits", "A replacement for safety engineering and training"]'::jsonb,
+    '["पहला और सबसे प्रभावी बचाव", "अंतिम बचाव रेखा जब खतरों को समाप्त नहीं किया जा सकता", "वैकल्पिक गियर केवल ऑडिट के दौरान", "इंजीनियरिंग और प्रशिक्षण का प्रतिस्थापन"]'::jsonb,
+    1,
+    'PPE is the last line of defense in the Hierarchy of Controls. Elimination, Substitution, and Engineering Controls must always be prioritized first.',
+    'PPE नियंत्रण पदानुक्रम में अंतिम रक्षा पंक्ति है। खतरे को समाप्त करना, प्रतिस्थापन, और इंजीनियरिंग नियंत्रण को हमेशा प्राथमिकता दी जानी चाहिए।',
+    1
+  ),
+  (
+    'b1c2d3e4-0004-0004-0004-000000000002',
+    'a1b2c3d4-0004-0004-0004-000000000004',
+    'When must an industrial safety helmet (hard hat) be immediately removed from service and replaced?',
+    'औद्योगिक सुरक्षा हेलमेट को सेवा से हटाकर तुरंत कब बदला जाना चाहिए?',
+    'ᱠᱟᱹᱨᱜᱟᱲ ᱥᱮᱯᱷᱴᱤ ᱦᱮᱞᱢᱮᱴ ᱛᱤᱥ ᱛᱩᱨᱩᱛ ᱵᱚᱫᱚᱞ ᱞᱟᱹᱠᱛᱤ ᱠᱟᱱᱟ?',
+    '["Only after 10 years of use", "After sustaining a severe impact or visible crack, even if damage seems minor", "Only if the color fades", "When the suspension strap becomes slightly dusty"]'::jsonb,
+    '["केवल 10 साल के उपयोग के बाद", "गंभीर प्रभाव या दरार आने के बाद, भले ही नुकसान मामूली दिखे", "केवल अगर रंग फीका पड़ जाए", "जब स्ट्रैप पर थोड़ी धूल लग जाए"]'::jsonb,
+    1,
+    'Any safety helmet that has absorbed a significant impact or shows cracks, dents, or deep gouges must be scrapped immediately.',
+    'जिस हेलमेट पर कोई भारी वस्तु गिरी हो या जिसमें दरार/खरोंच आई हो, उसे तुरंत बदला जाना चाहिए क्योंकि उसकी सुरक्षा क्षमता समाप्त हो जाती है।',
     2
   )
 on conflict (id) do nothing;
