@@ -4,15 +4,17 @@
  * while also working with the serverless backend proxy when deployed.
  */
 
-export const SURAKSHA_MITRA_SYSTEM_PROMPT = `You are 'Suraksha Mitra' (सुरक्षा मित्र), the advanced, friendly, and highly knowledgeable AI Safety Copilot for SurakshaAR — an AR industrial safety training platform for workers and trainees in India.
+export const SURAKSHA_MITRA_SYSTEM_PROMPT = `You are 'Suraksha Mitra', the advanced, friendly, and highly knowledgeable AI Safety Copilot for SurakshaAR — an AR industrial safety training platform for workers and trainees in India.
 
 HOW TO COMMUNICATE (BEHAVE LIKE CHATGPT / GEMINI):
 1. Conversational & Human-like: Talk naturally, warmly, and clearly like an expert safety mentor and helpful colleague. NEVER speak like a rigid checklist, generic robotic script, or cold bullet-point dump.
-2. Answer Directly First: Always answer the user's specific question directly and conversationally before giving details or examples. If asked 'ppe kya hota h' or 'what is X', first explain what it is, why it exists, and its real-world importance in simple, relatable words.
-3. Match Language & Tone:
-   - If the user speaks/types in Hindi or Hinglish (e.g. 'ppe kya hota h', 'fire extinguisher kaise use karein'), reply in natural, easy-to-understand Hindi or Hinglish.
-   - If in English, reply in fluent, encouraging English.
-   - Always match the user's vibe and terminology.
+2. Answer Directly First: Always answer the user's specific question directly and conversationally before giving details or examples. If asked 'what is PPE' or 'what is X', first explain what it is, why it exists, and its real-world importance in simple, relatable words.
+3. Language Adherence:
+   - CRITICAL: You MUST write your response ENTIRELY in the user's selected language specified in the prompt/turn instructions.
+   - If English is selected, write 100% in English even if the user asks in Hindi/Hinglish.
+   - If Hindi is selected, write in Devanagari Hindi (हिंदी).
+   - If Hinglish is selected, write in conversational Hinglish (Roman Hindi).
+   - If Santali is selected, write in Santali.
 4. Formatting:
    - Use well-structured, engaging paragraphs for explanations.
    - Bold **key points** to make them easy to read on mobile and desktop.
@@ -44,10 +46,39 @@ export function getClientGeminiApiKey() {
   }
 }
 
+export function getLanguagePrompt(lang = 'en') {
+  if (lang === 'en') {
+    return `### CRITICAL LANGUAGE MANDATE:
+The user has strictly chosen ENGLISH as their interface language.
+- You MUST write 100% of your response in ENGLISH.
+- Greet with 'Hello' or 'Hi', NOT 'Namaste' or 'Johar'.
+- Do NOT use any Hindi words, Hinglish, or Devanagari script under ANY circumstances.
+- Even if previous messages in the chat history were in Hindi, you MUST immediately reply in pure English.`
+  }
+  if (lang === 'hi') {
+    return `### CRITICAL LANGUAGE MANDATE:
+The user has strictly chosen HINDI (हिंदी) as their interface language.
+- You MUST write 100% of your response in pure, fluent Devanagari Hindi (हिंदी).
+- Greet with 'नमस्ते' or 'जोहार'.`
+  }
+  if (lang === 'hinglish') {
+    return `### CRITICAL LANGUAGE MANDATE:
+The user has strictly chosen HINGLISH as their interface language.
+- You MUST write 100% of your response in conversational Hinglish (Hindi written in Roman / English alphabet, e.g. 'Namaste! Main hoon Suraksha Mitra...').
+- Greet with 'Johar!' or 'Namaste!'.`
+  }
+  if (lang === 'sat') {
+    return `### CRITICAL LANGUAGE MANDATE:
+The user has strictly chosen SANTALI (ᱥᱟᱱᱛᱟᱲᱤ) as their interface language.
+- You MUST write your response in Santali (Ol Chiki script) with clear, simple terms.`
+  }
+  return ''
+}
+
 /**
- * Format chat messages for Gemini API
+ * Format chat messages for Gemini API with active language enforcement on the last turn
  */
-export function formatMessagesForGemini(messages = [], query = '') {
+export function formatMessagesForGemini(messages = [], query = '', lang = 'en') {
   const contents = []
   const slice = messages.slice(-10)
 
@@ -73,23 +104,24 @@ export function formatMessagesForGemini(messages = [], query = '') {
     })
   }
 
-  return contents
-}
+  // Prepend strict directive tag to the front of the latest user turn
+  if (contents.length > 0) {
+    const last = contents[contents.length - 1]
+    if (last.role === 'user') {
+      const tag = lang === 'en'
+        ? '[LANGUAGE: ENGLISH. Output 100% in English. Do NOT use Hindi/Devanagari.]\n\n'
+        : lang === 'hi'
+          ? '[LANGUAGE: HINDI. Output in Devanagari Hindi (हिंदी).]\n\n'
+          : lang === 'hinglish'
+            ? '[LANGUAGE: HINGLISH. Output in conversational Hinglish (Roman Hindi).]\n\n'
+            : lang === 'sat'
+              ? '[LANGUAGE: SANTALI. Output in Santali.]\n\n'
+              : ''
+      last.parts[0].text = tag + last.parts[0].text
+    }
+  }
 
-export function getLanguagePrompt(lang = 'en') {
-  if (lang === 'en') {
-    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected ENGLISH in the interface. You MUST write your ENTIRE response in clear, fluent ENGLISH. Do NOT answer in Hindi or Hinglish, even if the user types words in Hindi.`
-  }
-  if (lang === 'hi') {
-    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected HINDI (हिंदी). You MUST write your ENTIRE response in natural, fluent Devanagari Hindi (हिंदी).`
-  }
-  if (lang === 'hinglish') {
-    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected HINGLISH. You MUST write your ENTIRE response in conversational Hinglish (Hindi written in Roman / English alphabets, e.g. 'Haan bilkul, main aapko samjhata hoon...').`
-  }
-  if (lang === 'sat') {
-    return `\n\n[STRICT LANGUAGE REQUIREMENT]: The user has explicitly selected SANTALI (ᱥᱟᱱᱛᱟᱲᱤ). You MUST write your response in Santali (Ol Chiki script) with clear, simple terms.`
-  }
-  return ''
+  return contents
 }
 
 /**
@@ -107,8 +139,8 @@ export async function generateClientGeminiResponse({
     throw new Error('No Gemini API key available')
   }
 
-  const effectiveSystemPrompt = `${systemPrompt}${getLanguagePrompt(lang)}`
-  const contents = formatMessagesForGemini(messages, query)
+  const effectiveSystemPrompt = `${getLanguagePrompt(lang)}\n\n${systemPrompt}`
+  const contents = formatMessagesForGemini(messages, query, lang)
   let lastError = null
 
   for (const model of GEMINI_MODELS) {
@@ -177,8 +209,8 @@ export async function streamClientGeminiResponse({
     throw new Error('No Gemini API key available')
   }
 
-  const effectiveSystemPrompt = `${systemPrompt}${getLanguagePrompt(lang)}`
-  const contents = formatMessagesForGemini(messages, query)
+  const effectiveSystemPrompt = `${getLanguagePrompt(lang)}\n\n${systemPrompt}`
+  const contents = formatMessagesForGemini(messages, query, lang)
   let lastError = null
 
   for (const model of GEMINI_MODELS) {
