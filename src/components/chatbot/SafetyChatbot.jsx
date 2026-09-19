@@ -31,6 +31,7 @@ import {
 import { useLang } from '../../contexts/LanguageContext'
 import { querySafetyAssistant, getSuggestedQuestions, MODULES } from '../../lib/safetyKnowledge'
 import { speak, stopSpeech, startListening, isTTSSupported, isVoiceSupported } from '../../lib/voice'
+import { streamClientGeminiResponse } from '../../lib/geminiClient'
 
 export const CHAT_LANGUAGES = [
   { code: 'en', name: 'English', native: 'English', flag: '🇬🇧', voice: true, voiceBadge: 'Voice 🎙️' },
@@ -396,7 +397,54 @@ export default function SafetyChatbot() {
       }
     }
 
-    // 3. Graceful Fallback if backend proxy was unavailable
+    // 3. Direct Gemini Streaming (client-side AI for static hosting like GitHub Pages)
+    if (!streamedSuccess && !abortController.signal.aborted) {
+      try {
+        console.info('[SafetyChatbot] Activating client-side Gemini AI streaming...')
+        let accumulated = ''
+        
+        // Add placeholder message for streaming
+        setMessages(prev => [
+          ...prev,
+          {
+            id: botMsgId,
+            role: 'assistant',
+            content: '',
+            streaming: true,
+            source: 'Suraksha Mitra AI (Gemini)'
+          }
+        ])
+
+        await streamClientGeminiResponse({
+          messages: contextualMessages,
+          query,
+          signal: abortController.signal,
+          onChunk: (chunk, total) => {
+            accumulated = total
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === botMsgId ? { ...m, content: total } : m
+              )
+            )
+            scrollBottom()
+          }
+        })
+
+        if (accumulated.trim().length > 0) {
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === botMsgId ? { ...m, streaming: false } : m
+            )
+          )
+          streamedSuccess = true
+        }
+      } catch (geminiErr) {
+        if (geminiErr.name === 'AbortError') return
+        console.warn('[SafetyChatbot] Client Gemini stream failed, falling back:', geminiErr)
+      }
+    }
+
+    // 4. Graceful Fallback if both backend proxy and live Gemini were unavailable (e.g. offline)
     if (!streamedSuccess && !abortController.signal.aborted) {
       console.info('[SafetyChatbot] Using local safety knowledge fallback.')
       const localResult = await querySafetyAssistant(query, chatLang, activeModule, contextualMessages)
@@ -407,16 +455,26 @@ export default function SafetyChatbot() {
         ? localResult.source
         : 'Suraksha Mitra Safety Knowledge'
 
-      setMessages(prev => [
-        ...prev,
-        {
-          id: botMsgId,
-          role: 'assistant',
-          content: text,
-          source,
-          sources: localResult?.sources || []
+      setMessages(prev => {
+        const exists = prev.some(m => m.id === botMsgId)
+        if (exists) {
+          return prev.map(m =>
+            m.id === botMsgId
+              ? { ...m, content: text, streaming: false, source, sources: localResult?.sources || [] }
+              : m
+          )
         }
-      ])
+        return [
+          ...prev,
+          {
+            id: botMsgId,
+            role: 'assistant',
+            content: text,
+            source,
+            sources: localResult?.sources || []
+          }
+        ]
+      })
     }
 
     setIsGenerating(false)

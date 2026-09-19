@@ -21,6 +21,8 @@
  * 6. Optional External AI / Gemini Integration with graceful local fallback
  */
 
+import { generateClientGeminiResponse } from './geminiClient.js'
+
 export const MODULES = {
   FIRE_EXPLOSION: 'FIRE_EXPLOSION',
   GAS_LEAK: 'GAS_LEAK',
@@ -404,10 +406,10 @@ export const KNOWLEDGE_BASE = [
       'ppe kya hai', 'kya pahnna chahiye', 'suraksha samagri', 'पीपीई', 'सुरक्षा उपकरण', 'अनिवार्य पीपीई',
       '6 point ppe', 'ppe baseline', 'ᱥᱩᱨᱠᱷᱟ ᱥᱟᱢᱟᱱ'
     ],
-    answer_en: "Mandatory Industrial PPE Baseline (IS / OSHA Standard):\n\n1. 🪖 Head Protection: Certified Hard Hat (IS 2925 / EN 397) to guard against falling objects.\n2. 👁️ Eye & Face: Impact-resistant Safety Glasses with side shields (ANSI Z87.1) or Face Shield.\n3. 👂 Hearing: Earplugs or Earmuffs in noise zones exceeding 85 dBA.\n4. 🦺 Body: High-visibility reflective vest (EN 471 / IS 15809) or flame-resistant coveralls.\n5. 🧤 Hand: Task-specific gloves (Leather for hot work, Nitrile for chemicals, Cut-5 for sharp metals).\n6. 👢 Foot: Steel-toed safety shoes (IS 15298) with anti-slip and puncture-resistant soles.\n\nAlways don and inspect PPE before crossing the red hazard demarcation line.",
-    answer_hi: "अनिवार्य औद्योगिक PPE बेसलाइन (IS मानक):\n\n1. 🪖 सिर की सुरक्षा: प्रमाणित हार्ड हैट (IS 2925) सिर पर वस्तु गिरने से बचाव के लिए।\n2. 👁️ आंख और चेहरा: साइड शील्ड वाला सेफ्टी चश्मा (ANSI Z87.1) या फेस शील्ड।\n3. 👂 कान की सुरक्षा: 85 डेसिबल से अधिक शोर वाले क्षेत्रों में इयरप्लग या इयरमफ।\n4. 🦺 शरीर की सुरक्षा: हाई-विजिबिलिटी रिफ्लेक्टिव वेस्ट या फ्लेम-रेसिस्टेंट कवरऑल।\n5. 🧤 हाथ की सुरक्षा: लेदर, निट्राइल या कट-रेसिस्टेंट दस्ताने।\n6. 👢 पैर की सुरक्षा: स्टील-टो सेफ्टी जूते (IS 15298)।\n\nकार्य क्षेत्र में प्रवेश करने से पहले हमेशा PPE की जांच करें।",
-    answer_hinglish: "Plant mein mandatory PPE baseline list:\n\n1. 🪖 Safety Helmet (IS 2925 certified): Sar par chot aur falling objects se bachaav.\n2. 👁️ Safety Goggles: Aankhon mein particle ya chemical splash se bachaav.\n3. 👂 Earplugs / Earmuffs: 85 dB se zyada awaaz wali machine ke paas pehnna compulsory hai.\n4. 🦺 Reflective Safety Vest: Door se dikhne ke liye fluorescent vest.\n5. 🧤 Safety Gloves: Leather/welding, chemical nitrile ya cut-resistant gloves.\n6. 👢 Steel-Toe Safety Shoes: Pairon par bhari loha girne se ungliyan bachane ke liye.",
-    answer_sat: "ᱞᱟᱹᱠᱛᱤᱭᱟᱱ ᱠᱟᱹᱨᱜᱟᱲ PPE ᱥᱟᱢᱟᱱ:\n🪖 ᱦᱮᱞᱢᱮᱴ: ᱵᱚᱦᱚᱜ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱞᱟᱹᱜᱤᱫ᱾\n👁️ ᱥᱩᱨᱠᱷᱟ ᱪᱚᱥᱢᱟ (Goggles): ᱢᱮᱫ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱞᱟᱹᱜᱤᱫ᱾\n👂 ᱤᱭᱟᱨᱯᱞᱟᱜᱽ (Earplug): ᱢᱟᱨᱟᱝ ᱥᱟᱰᱮ ᱠᱷᱚᱱ ᱞᱩᱛᱩᱨ ᱵᱟᱧᱪᱟᱣ᱾\n🦺 ᱨᱤᱯᱷᱞᱮᱠᱴᱤᱵᱷ ᱵᱷᱮᱥᱴ: ᱧᱮᱞᱚᱜ ᱞᱟᱹᱜᱤᱫ ᱡᱷᱟᱞᱠᱟᱣ ᱠᱩᱨᱛᱤ᱾\n🧤 ᱛᱤ-ᱢᱳᱡᱟ (Gloves): ᱛᱤ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱞᱟᱹᱜᱤᱫ᱾\n👢 ᱥᱴᱤᱞ-ᱴᱳ ᱡᱩᱛᱟᱹ: ᱡᱟᱸᱜᱟ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱞᱟᱹᱜᱤᱫ᱾",
+    answer_en: "PPE stands for **Personal Protective Equipment**. In simple terms, it refers to protective gear, clothing, and helmets designed to safeguard workers from hazards that can cause serious workplace injuries or illnesses.\n\nKey components of the industrial PPE baseline (IS / OSHA standards) include:\n• 🪖 **Hard Hat (IS 2925)**: Protects the head against impacts from falling tools or debris.\n• 👁️ **Safety Glasses (ANSI Z87.1)**: Guards eyes against dust, flying particles, and chemical splashes.\n• 👂 **Earplugs / Earmuffs**: Protects hearing in high-decibel noise areas (>85 dBA).\n• 🦺 **High-Visibility Vest**: Ensures workers are clearly visible to heavy vehicle operators.\n• 🧤 **Protective Gloves**: Protects hands from sharp metal cuts, heat, or chemicals.\n• 👢 **Steel-Toed Shoes (IS 15298)**: Protects toes from crushing impacts and prevents slips.\n\nAlways inspect your gear before entering hazardous zones. Would you like to know how to inspect or fit a specific piece of PPE?",
+    answer_hi: "नमस्ते! **PPE** का पूरा नाम **Personal Protective Equipment** (व्यक्तिगत सुरक्षा उपकरण) होता है।\n\nसरल शब्दों में कहें तो, PPE वे विशेष सुरक्षा कपड़े और उपकरण होते हैं जिन्हें किसी औद्योगिक प्लांट, खदान या कंस्ट्रक्शन साइट पर काम करते समय अपनी जान और शरीर को चोट या खतरे से बचाने के लिए पहना जाता है। यह किसी भी मजदूर या कर्मचारी के लिए 'सुरक्षा की आखिरी ढाल' होता है।\n\n**ज़रूरी PPE उपकरण:**\n• 🪖 **सेफ्टी हेलमेट (IS 2925)**: सिर को ऊपर से गिरने वाली भारी वस्तुओं से बचाता है।\n• 👁️ **सेफ्टी चश्मा**: आंखों को उड़ते हुए कणों, चिंगारी और केमिकल से सुरक्षित रखता है।\n• 👂 **ईयर प्लग**: मशीनों के तेज शोर से कानों की सुनने की क्षमता को बचाता है।\n• 🦺 **रिफ्लेक्टिव जैकेट**: दूर से साफ दिखाई देने के लिए ताकि कोई गाड़ी टक्कर न मारे।\n• 🧤 **सेफ्टी ग्लव्स**: हाथ कटने, जलने या रसायन से सुरक्षा के लिए।\n• 👢 **स्टील-टो जूते (IS 15298)**: भारी वस्तु गिरने पर पैर की उंगलियों की रक्षा करते हैं।\n\nकाम शुरू करने से पहले हमेशा जांच लें कि आपका कोई गियर टूटा या ढीला तो नहीं है!",
+    answer_hinglish: "Namaste! **PPE** ka matlab hota hai **Personal Protective Equipment** (व्यक्तिगत सुरक्षा उपकरण).\n\nSeedhe shabdon mein kahein toh PPE woh saare safety gear aur kapde hain jo factory, plant, ya mining site par kaam karte waqt shramikon ko kisi bhi durghatna ya chot se bachate hain. Ye aapki safety ki aakhri line of defense hai.\n\n**Zaroori PPE Gear:**\n• 🪖 **Safety Helmet (IS 2925)**: Sar ko upar se girne wale pathar ya lohe se bachata hai.\n• 👁️ **Safety Goggles**: Aankhon ko dhool, sparks aur chemical se surakshit rakhte hain.\n• 👂 **Earplugs / Earmuffs**: Tez machine ki awaaz se kaan ko bachaane ke liye.\n• 🦺 **Reflective Vest**: Door se dikhne ke liye taaki heavy vehicle durghatna na ho.\n• 🧤 **Safety Gloves**: Haath ko katne, jalne ya chemical se bachane ke liye.\n• 👢 **Steel-Toe Safety Shoes (IS 15298)**: Pairon par bhari cheez girne se ungliyan bachate hain.\n\nKoi specific PPE inspect karne ya pehanne ka sahi tareeka poochna chahte hain?",
+    answer_sat: "ᱞᱟᱹᱠᱛᱤᱭᱟᱱ ᱠᱟᱹᱨᱜᱟᱲ PPE ᱥᱟᱢᱟᱱ (Personal Protective Equipment):\n🪖 ᱦᱮᱞᱢᱮᱴ: ᱵᱚᱦᱚᱜ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱞᱟᱹᱜᱤᱫ᱾\n👁️ ᱥᱩᱨᱠᱷᱟ ᱪᱚᱥᱢᱟ (Goggles): ᱢᱮᱫ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱞᱟᱹᱜᱤᱫ᱾\n👂 ᱤᱭᱟᱨᱯᱞᱟᱜᱽ (Earplug): ᱢᱟᱨᱟᱝ ᱥᱟᱰᱮ ᱠᱷᱚᱱ ᱞᱩᱛᱩᱨ ᱵᱟᱧᱪᱟᱣ᱾\n🦺 ᱨᱤᱯᱷᱞᱮᱠᱴᱤᱵᱷ ᱵᱷᱮᱥᱴ: ᱧᱮᱞᱚᱜ ᱞᱟᱹᱜᱤᱫ ᱡᱷᱟᱞᱠᱟᱣ ᱠᱩᱨᱛᱤ᱾\n🧤 ᱛᱤ-ᱢᱳᱡᱟ (Gloves): ᱛᱤ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱞᱟᱹᱜᱤᱫ᱾\n👢 ᱥᱴᱤᱞ-ᱴᱳ ᱡᱩᱛᱟᱹ: ᱡᱟᱸᱜᱟ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱞᱟᱹᱜᱤᱫ᱾",
   },
   {
     id: 'helmet_color_codes',
@@ -772,8 +774,27 @@ export async function querySafetyAssistant(input, lang = 'en', currentModule = M
     }
   }
 
+  // Try client-side Gemini call if running on static host (e.g. GitHub Pages)
+  try {
+    const geminiRes = await generateClientGeminiResponse({
+      query: input,
+      messages: Array.isArray(history)
+        ? history.map(m => ({
+            role: m.role === 'assistant' || m.role === 'bot' ? 'assistant' : 'user',
+            content: m.text || m.content || ''
+          }))
+        : []
+    })
+    if (geminiRes?.answer) {
+      console.log('[SurakshaMitra] Successfully generated response from client Gemini AI')
+      return geminiRes
+    }
+  } catch (err) {
+    console.warn('[SurakshaSaathi] Client Gemini fallback error:', err)
+  }
+
   // Graceful local knowledge base fallback (100% offline resilient)
-  console.warn('[SurakshaSaathi] Backend endpoints unavailable, using local safety knowledge fallback.');
+  console.warn('[SurakshaSaathi] Backend endpoints and Gemini unavailable, using local safety knowledge fallback.');
   return queryKnowledgeBase(input, lang, currentModule, history);
 }
 
