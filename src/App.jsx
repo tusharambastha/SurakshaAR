@@ -21,8 +21,10 @@ import Scenario    from './pages/Scenario'
 import Assessment  from './pages/Assessment'
 import Results     from './pages/Results'
 import Certificate from './pages/Certificate'
+import MyCertificates from './pages/MyCertificates'
 import Verify      from './pages/Verify'
 import Profile     from './pages/Profile'
+import CookieConsentBanner from './components/ui/CookieConsentBanner'
 import Admin       from './pages/admin/Admin'
 import AdminTrainees from './pages/admin/AdminTrainees'
 import AdminTraineeDetail from './pages/admin/AdminTraineeDetail'
@@ -124,6 +126,7 @@ export default function App() {
                     <Route path="/assessment/:id"        element={<ProtectedRoute><Assessment /></ProtectedRoute>} />
                     <Route path="/results/:sessionId"    element={<ProtectedRoute><Results /></ProtectedRoute>} />
                     <Route path="/certificate/:id"       element={<ProtectedRoute><Certificate /></ProtectedRoute>} />
+                    <Route path="/my-certificates"       element={<ProtectedRoute><MyCertificates /></ProtectedRoute>} />
                     <Route path="/profile"               element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
                     {/* ── Admin (role-gated) ── */}
@@ -141,6 +144,9 @@ export default function App() {
 
                   {/* Safety chatbot persists across all protected pages */}
                   <SafetyChatbot />
+
+                  {/* Cookie & privacy consent banner */}
+                  <CookieConsentBanner />
                 </HashRouter>
               </OfflineProvider>
             </AuthProvider>

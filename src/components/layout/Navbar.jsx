@@ -1,335 +1,213 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLang } from '../../contexts/LanguageContext'
 import { useAccessibility } from '../../contexts/AccessibilityContext'
+import { useOffline } from '../../contexts/OfflineContext'
 import { SUPPORTED_LANGUAGES } from '../../lib/i18n'
-import { speak } from '../../lib/voice'
+import { APP_NAME, APP_VERSION } from '../../lib/constants'
+import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import {
-  User, LogOut, ChevronDown, Sun, Volume2,
-  LayoutDashboard, Home, MoreVertical, BookOpen, HelpCircle, Settings, Info, X,
+  Menu, X, Home, LayoutDashboard, Target, Award, Bell,
+  PlayCircle, Settings, Globe, Moon, Sun, LogOut, Check,
+  ChevronRight, WifiOff, ShieldCheck, CheckCircle2, AlertTriangle, Info,
 } from 'lucide-react'
 import VideoTutorialModal from '../ui/VideoTutorialModal'
 
 export function Navbar() {
   const { user, profile, signOut } = useAuth()
   const { lang, setLang, T } = useLang()
-  const { highContrast, toggleHighContrast } = useAccessibility()
+  const { darkMode, toggleDarkMode, highContrast } = useAccessibility()
+  const { isOnline } = useOffline()
   const navigate = useNavigate()
-  const [langOpen, setLangOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
-  const [menuOpen, setMenuOpen] = useState(false)
+  const location = useLocation()
+
+  // State
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
   const [showVideoTutorial, setShowVideoTutorial] = useState(false)
-  const [showHelpModal, setShowHelpModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
-  const [showAboutModal, setShowAboutModal] = useState(false)
+  const [readNotifs, setReadNotifs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('sar_read_notifs') ?? '[]')
+    } catch {
+      return []
+    }
+  })
+  const [userCerts, setUserCerts] = useState([])
+
+  const notifRef = useRef(null)
 
   const isAdmin = profile?.role === 'admin'
+  const firstName = profile?.full_name?.split(' ')[0] ?? 'Trainee'
+
+  // Fetch user certs for notification panel
+  useEffect(() => {
+    if (!user) {
+      setUserCerts([])
+      return
+    }
+    async function loadCerts() {
+      try {
+        if (!isSupabaseConfigured) {
+          const all = JSON.parse(localStorage.getItem('mock_certificates') ?? '[]')
+          setUserCerts(all.filter(c => c.user_id === user.id))
+        } else {
+          const { data } = await supabase
+            .from('certificates')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('issued_at', { ascending: false })
+            .limit(5)
+          setUserCerts(data ?? [])
+        }
+      } catch (err) {
+        console.warn('[Navbar] Failed loading certs for notifications:', err)
+      }
+    }
+    loadCerts()
+  }, [user, location.pathname])
+
+  // Build notifications list
+  const notifications = [
+    ...(userCerts.map(c => ({
+      id: `cert-${c.id}`,
+      type: 'cert',
+      title: 'Safety Certificate Issued',
+      message: `You earned certification in "${c.course_name}" with a score of ${c.score}%.`,
+      date: c.issued_at,
+      link: `/certificate/${c.id}`,
+    }))),
+    {
+      id: 'sys-offline-ready',
+      type: 'system',
+      title: 'Offline Training Active',
+      message: 'Fire Safety, Gas Leak, and Confined Space AR modules are cached for offline field drills.',
+      date: new Date(Date.now() - 3600000 * 24).toISOString(),
+    },
+    {
+      id: 'sys-compliance-advisory',
+      type: 'advisory',
+      title: 'Factory Safety Standard IS 2925',
+      message: 'Industrial safety compliance protocols updated for high-risk manufacturing and chemical processing.',
+      date: new Date(Date.now() - 3600000 * 48).toISOString(),
+    },
+  ]
+
+  const unreadCount = notifications.filter(n => !readNotifs.includes(n.id)).length
+
+  function markAllNotificationsRead() {
+    const allIds = notifications.map(n => n.id)
+    setReadNotifs(allIds)
+    try {
+      localStorage.setItem('sar_read_notifs', JSON.stringify(allIds))
+    } catch {}
+  }
+
+  // Close drawer on path change
+  useEffect(() => {
+    setDrawerOpen(false)
+    setNotifOpen(false)
+  }, [location.pathname])
+
+  // Close on Escape
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') {
+        setDrawerOpen(false)
+        setNotifOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  // Close notification popover on click outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false)
+      }
+    }
+    if (notifOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [notifOpen])
+
+  // Lock body scroll when drawer is open on mobile
+  useEffect(() => {
+    if (drawerOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [drawerOpen])
 
   async function handleSignOut() {
+    setDrawerOpen(false)
     await signOut()
     navigate('/login')
   }
 
-  function handleVoice() {
-    // Read the current page title aloud
-    const pageTitle = document.title || 'SurakshaAR'
-    speak(pageTitle, lang)
+  function handleNavigate(path) {
+    setDrawerOpen(false)
+    navigate(path)
   }
 
-  const firstName = profile?.full_name?.split(' ')[0] ?? 'Trainee'
+  function handleTrainingModulesClick() {
+    setDrawerOpen(false)
+    if (location.pathname === '/dashboard') {
+      const el = document.getElementById('modules') || document.querySelector('[data-section="modules"]')
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' })
+        return
+      }
+    }
+    navigate('/dashboard#modules')
+  }
 
   return (
-    <nav style={{
-      position: 'fixed',
-      top: 0, left: 0, right: 0,
-      height: 'var(--navbar-height)',
-      background: 'var(--color-surface)',
-      borderBottom: '1px solid var(--color-border)',
-      boxShadow: 'var(--shadow-sm)',
-      zIndex: 'var(--z-dropdown)',
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 clamp(8px, 3vw, var(--space-4))',
-      boxSizing: 'border-box',
-    }}>
-      <div style={{
-        maxWidth: 1100, margin: '0 auto', width: '100%',
-        display: 'flex', alignItems: 'center', gap: 'clamp(6px, 2vw, var(--space-4))',
-      }}>
-        {/* Logo */}
-        <Link
-          to={user ? (isAdmin ? '/admin' : '/dashboard') : '/landing'}
-          style={{ textDecoration: 'none', flexShrink: 0, display: 'flex', alignItems: 'center' }}
-        >
-          <img
-            src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
-            alt="SurakshaAR"
-            style={{ height: 44, width: 'auto', objectFit: 'contain', display: 'block' }}
-          />
-        </Link>
-
-        {/* Admin badge */}
-        {isAdmin && (
-          <span className="badge badge-brand" style={{ fontSize: '0.65rem' }}>ADMIN</span>
-        )}
-
-        <div style={{ flex: 1 }} />
-
-        {/* Desktop controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-
-          {/* Home button */}
-          <Link
-            to="/landing"
-            style={{
-              width: 36,
-              height: 36,
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'var(--color-surface-alt)',
-              border: '1.5px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              color: 'var(--color-text-secondary)',
-              padding: 0,
-              flexShrink: 0,
-              textDecoration: 'none',
-              transition: 'all var(--transition-fast)',
-            }}
-            aria-label="Home"
-            title="Go to Home"
-          >
-            <Home size={16} />
-          </Link>
-
-          {/* Language selector */}
-          <div style={{ position: 'relative' }}>
+    <>
+      {/* ── Main Navigation Bar ── */}
+      <header
+        role="banner"
+        style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0,
+          height: 'var(--navbar-height)',
+          background: 'var(--color-surface)',
+          borderBottom: '1px solid var(--color-border)',
+          boxShadow: 'var(--shadow-sm)',
+          zIndex: 'var(--z-dropdown)',
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 clamp(12px, 3vw, var(--space-4))',
+          boxSizing: 'border-box',
+          transition: 'background var(--transition-fast), border-color var(--transition-fast)',
+        }}
+      >
+        <div style={{
+          maxWidth: 1100,
+          margin: '0 auto',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          {/* Left: Hamburger Button + Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button
-              onClick={() => { setLangOpen(o => !o); setProfileOpen(false); setMenuOpen(false) }}
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open navigation menu"
+              aria-expanded={drawerOpen}
               style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                background: 'var(--color-surface-alt)',
-                border: '1.5px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                height: 36,
-                padding: '0 12px',
-                boxSizing: 'border-box',
-                cursor: 'pointer',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 600,
-                color: 'var(--color-text-secondary)',
-              }}
-              aria-label="Select language"
-            >
-              {SUPPORTED_LANGUAGES.find(l => l.code === lang)?.nativeLabel ?? 'EN'}
-              <ChevronDown size={12} />
-            </button>
-            {langOpen && (
-              <div style={{
-                position: 'absolute', top: 'calc(100% + 4px)', right: 0,
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-md)',
-                overflow: 'hidden',
-                zIndex: 200,
-                minWidth: 140,
-              }}>
-                {SUPPORTED_LANGUAGES.map(l => (
-                  <button
-                    key={l.code}
-                    onClick={() => { setLang(l.code); setLangOpen(false) }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      width: '100%', padding: '10px 14px',
-                      background: lang === l.code ? 'var(--color-brand-50)' : 'transparent',
-                      border: 'none', cursor: 'pointer',
-                      fontSize: 'var(--text-sm)', fontWeight: lang === l.code ? 700 : 400,
-                      color: lang === l.code ? 'var(--color-brand)' : 'var(--color-text-primary)',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <span>{l.flag}</span>
-                    <span>{l.nativeLabel}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Voice button — always visible, even on mobile */}
-          <button
-            onClick={handleVoice}
-            style={{
-              width: 36,
-              height: 36,
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'var(--color-surface-alt)',
-              border: '1.5px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              color: 'var(--color-text-secondary)',
-              padding: 0,
-              flexShrink: 0,
-            }}
-            aria-label="Text to speech"
-            title="Listen (Text to Speech)"
-          >
-            <Volume2 size={16} />
-          </button>
-
-          {/* High contrast toggle — hidden on small mobile */}
-          <button
-            onClick={toggleHighContrast}
-            className="navbar-secondary-btn"
-            style={{
-              width: 36,
-              height: 36,
-              boxSizing: 'border-box',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: highContrast ? 'var(--color-brand)' : 'var(--color-surface-alt)',
-              border: '1.5px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              color: highContrast ? 'white' : 'var(--color-text-secondary)',
-              padding: 0,
-              flexShrink: 0,
-            }}
-            aria-label={highContrast ? 'Disable high contrast' : 'Enable high contrast'}
-            title={T('highContrast')}
-          >
-            <Sun size={16} />
-          </button>
-
-          {/* User profile / login */}
-          {user ? (
-            <div style={{ position: 'relative' }}>
-              <button
-                onClick={() => { setProfileOpen(o => !o); setLangOpen(false); setMenuOpen(false) }}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  background: 'var(--color-surface-alt)',
-                  border: '1.5px solid var(--color-border)',
-                  borderRadius: 'var(--radius-md)',
-                  height: 36,
-                  padding: '0 12px',
-                  boxSizing: 'border-box',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-              >
-                <div style={{
-                  width: 26, height: 26, borderRadius: '50%',
-                  background: 'var(--color-brand)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '0.7rem', fontWeight: 800, color: 'white',
-                  flexShrink: 0,
-                }}>
-                  {firstName[0]?.toUpperCase()}
-                </div>
-                <span style={{
-                  fontSize: 'var(--text-sm)', fontWeight: 600,
-                  color: 'var(--color-text-primary)',
-                  maxWidth: 72,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {firstName}
-                </span>
-                <ChevronDown size={12} style={{ color: 'var(--color-text-muted)' }} />
-              </button>
-
-              {profileOpen && (
-                <div style={{
-                  position: 'absolute', top: 'calc(100% + 4px)', right: 0,
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-md)',
-                  overflow: 'hidden',
-                  zIndex: 200,
-                  minWidth: 180,
-                }}>
-                  <div style={{
-                    padding: '12px 14px',
-                    borderBottom: '1px solid var(--color-border)',
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--color-text-muted)',
-                  }}>
-                    {user.email}
-                  </div>
-                  {isAdmin ? (
-                    <button
-                      onClick={() => { navigate('/admin'); setProfileOpen(false) }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        width: '100%', padding: '10px 14px',
-                        background: 'transparent', border: 'none', cursor: 'pointer',
-                        fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <LayoutDashboard size={15} />
-                      Admin Dashboard
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => { navigate('/profile'); setProfileOpen(false) }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        width: '100%', padding: '10px 14px',
-                        background: 'transparent', border: 'none', cursor: 'pointer',
-                        fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <User size={15} />
-                      {T('profile')}
-                    </button>
-                  )}
-                  <button
-                    onClick={handleSignOut}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      width: '100%', padding: '10px 14px',
-                      background: 'transparent', border: 'none', cursor: 'pointer',
-                      fontSize: 'var(--text-sm)', color: 'var(--color-error)',
-                      textAlign: 'left',
-                      borderTop: '1px solid var(--color-border)',
-                    }}
-                  >
-                    <LogOut size={15} />
-                    {T('logout')}
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link to="/login" className="btn btn-primary btn-sm">
-              {T('login')}
-            </Link>
-          )}
-
-          {/* Three-dot vertical menu (⋮) */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => {
-                setMenuOpen(o => !o)
-                setLangOpen(false)
-                setProfileOpen(false)
-              }}
-              style={{
-                width: 36,
-                height: 36,
+                width: 38,
+                height: 38,
                 boxSizing: 'border-box',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -338,204 +216,718 @@ export function Navbar() {
                 border: '1.5px solid var(--color-border)',
                 borderRadius: 'var(--radius-md)',
                 cursor: 'pointer',
-                color: 'var(--color-text-secondary)',
+                color: 'var(--color-text-primary)',
                 padding: 0,
                 flexShrink: 0,
                 transition: 'all var(--transition-fast)',
               }}
-              aria-label="More options"
-              aria-expanded={menuOpen}
-              title="More options"
             >
-              <MoreVertical size={16} />
+              <Menu size={20} />
             </button>
 
-            {menuOpen && (
-              <div style={{
-                position: 'absolute',
-                top: 'calc(100% + 4px)',
-                right: 0,
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: 'var(--shadow-md)',
-                overflow: 'hidden',
-                zIndex: 200,
-                minWidth: 190,
-                maxWidth: 'calc(100vw - 24px)',
+            <Link
+              to={user ? (isAdmin ? '/admin' : '/dashboard') : '/landing'}
+              style={{
+                textDecoration: 'none',
                 display: 'flex',
-                flexDirection: 'column',
-              }}>
-                <button
-                  onClick={() => {
-                    setMenuOpen(false)
-                    setShowVideoTutorial(true)
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    width: '100%', padding: '10px 14px',
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)',
-                    textAlign: 'left',
-                    transition: 'background var(--transition-fast)',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-alt)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <BookOpen size={15} color="var(--color-brand)" />
-                  <span>Training Guide</span>
-                </button>
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <img
+                src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
+                alt="SurakshaAR"
+                style={{ height: 38, width: 'auto', objectFit: 'contain', display: 'block' }}
+              />
+              {isAdmin && (
+                <span className="badge badge-brand" style={{ fontSize: '0.65rem', marginLeft: 4 }}>ADMIN</span>
+              )}
+            </Link>
+          </div>
 
-                <button
-                  onClick={() => {
-                    setMenuOpen(false)
-                    setShowHelpModal(true)
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    width: '100%', padding: '10px 14px',
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)',
-                    textAlign: 'left',
-                    transition: 'background var(--transition-fast)',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-alt)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <HelpCircle size={15} color="#0284C7" />
-                  <span>Help & Support</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMenuOpen(false)
-                    if (user) {
-                      navigate('/profile')
-                    } else {
-                      setShowSettingsModal(true)
-                    }
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    width: '100%', padding: '10px 14px',
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)',
-                    textAlign: 'left',
-                    transition: 'background var(--transition-fast)',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-alt)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <Settings size={15} color="#64748B" />
-                  <span>Settings</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMenuOpen(false)
-                    setShowAboutModal(true)
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    width: '100%', padding: '10px 14px',
-                    background: 'transparent', border: 'none', cursor: 'pointer',
-                    fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)',
-                    textAlign: 'left',
-                    transition: 'background var(--transition-fast)',
-                    borderTop: '1px solid var(--color-border)',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-alt)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  <Info size={15} color="#16A34A" />
-                  <span>About SurakshaAR</span>
-                </button>
+          {/* Right: Offline status + Notifications Bell + Profile / Login */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Offline badge */}
+            {!isOnline && (
+              <div
+                title="Working in offline mode"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '4px 8px',
+                  background: 'var(--color-warning-bg)',
+                  border: '1px solid var(--color-warning-border)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: 'var(--color-warning)',
+                }}
+              >
+                <WifiOff size={12} />
+                <span className="mobile-hide">OFFLINE</span>
               </div>
+            )}
+
+            {/* Notification Bell */}
+            <div style={{ position: 'relative' }} ref={notifRef}>
+              <button
+                type="button"
+                onClick={() => setNotifOpen(o => !o)}
+                aria-label="View notifications"
+                aria-expanded={notifOpen}
+                style={{
+                  width: 38,
+                  height: 38,
+                  boxSizing: 'border-box',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: notifOpen ? 'var(--color-brand-50)' : 'var(--color-surface-alt)',
+                  border: notifOpen ? '1.5px solid var(--color-brand)' : '1.5px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  color: notifOpen ? 'var(--color-brand)' : 'var(--color-text-secondary)',
+                  padding: 0,
+                  flexShrink: 0,
+                  position: 'relative',
+                  transition: 'all var(--transition-fast)',
+                }}
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: 4,
+                      right: 4,
+                      width: 16,
+                      height: 16,
+                      background: 'var(--color-brand)',
+                      color: '#FFFFFF',
+                      borderRadius: '50%',
+                      fontSize: '0.62rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '2px solid var(--color-surface)',
+                    }}
+                  >
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Dropdown Panel */}
+              {notifOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    width: 'clamp(290px, 86vw, 360px)',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border-strong, var(--color-border))',
+                    borderRadius: 'var(--radius-lg, 14px)',
+                    boxShadow: 'var(--shadow-xl)',
+                    zIndex: 300,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    animation: 'slideDownFade 0.15s ease-out',
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: 'var(--color-surface-alt)',
+                    borderBottom: '1px solid var(--color-border)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Bell size={15} color="var(--color-brand)" />
+                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                        Notifications
+                      </span>
+                      {unreadCount > 0 && (
+                        <span className="badge badge-brand" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
+                          {unreadCount} new
+                        </span>
+                      )}
+                    </div>
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={markAllNotificationsRead}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--color-brand)',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{
+                    maxHeight: 340,
+                    overflowY: 'auto',
+                    padding: '8px 0',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>
+                        No new notifications
+                      </div>
+                    ) : (
+                      notifications.map(n => {
+                        const isUnread = !readNotifs.includes(n.id)
+                        return (
+                          <div
+                            key={n.id}
+                            onClick={() => {
+                              if (n.link) {
+                                setNotifOpen(false)
+                                navigate(n.link)
+                              }
+                            }}
+                            style={{
+                              padding: '10px 16px',
+                              borderBottom: '1px solid var(--color-border)',
+                              background: isUnread ? 'var(--color-brand-50)' : 'transparent',
+                              cursor: n.link ? 'pointer' : 'default',
+                              display: 'flex',
+                              gap: 10,
+                              alignItems: 'flex-start',
+                              transition: 'background var(--transition-fast)',
+                            }}
+                          >
+                            <div style={{ marginTop: 2, flexShrink: 0 }}>
+                              {n.type === 'cert' && <Award size={16} color="var(--color-success)" />}
+                              {n.type === 'system' && <ShieldCheck size={16} color="var(--color-brand)" />}
+                              {n.type === 'advisory' && <AlertTriangle size={16} color="var(--color-warning)" />}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{
+                                fontSize: 'var(--text-xs)',
+                                fontWeight: isUnread ? 700 : 600,
+                                color: 'var(--color-text-primary)',
+                                marginBottom: 2,
+                              }}>
+                                {n.title}
+                              </div>
+                              <div style={{
+                                fontSize: '0.75rem',
+                                color: 'var(--color-text-secondary)',
+                                lineHeight: 1.4,
+                              }}>
+                                {n.message}
+                              </div>
+                              {n.link && (
+                                <span style={{
+                                  display: 'inline-block',
+                                  marginTop: 4,
+                                  fontSize: '0.7rem',
+                                  fontWeight: 600,
+                                  color: 'var(--color-brand)',
+                                }}>
+                                  View credential →
+                                </span>
+                              )}
+                            </div>
+                            {isUnread && (
+                              <div style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: '50%',
+                                background: 'var(--color-brand)',
+                                marginTop: 6,
+                                flexShrink: 0,
+                              }} />
+                            )}
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Trainee profile or login button */}
+            {user ? (
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(true)}
+                title="Open Profile & Menu"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: 'var(--color-surface-alt)',
+                  border: '1.5px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  height: 38,
+                  padding: '0 10px',
+                  boxSizing: 'border-box',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: '50%',
+                  background: 'var(--color-brand)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  color: '#FFFFFF',
+                  flexShrink: 0,
+                }}>
+                  {firstName[0]?.toUpperCase()}
+                </div>
+                <span style={{
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                  maxWidth: 80,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {firstName}
+                </span>
+              </button>
+            ) : (
+              <Link to="/login" className="btn btn-primary btn-sm" style={{ height: 38 }}>
+                {T('login')}
+              </Link>
             )}
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Video Tutorial Modal for Training Guide */}
+      {/* ── Slide-Out Responsive Navigation Drawer ── */}
+      {drawerOpen && (
+        <div
+          role="presentation"
+          onClick={() => setDrawerOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 9998,
+            transition: 'opacity 0.25s ease',
+          }}
+        />
+      )}
+
+      <aside
+        aria-label="Main Navigation Drawer"
+        aria-hidden={!drawerOpen}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          bottom: 0,
+          width: 320,
+          maxWidth: '85vw',
+          height: '100vh',
+          background: 'var(--color-surface)',
+          borderRight: '1px solid var(--color-border)',
+          boxShadow: drawerOpen ? 'var(--shadow-xl)' : 'none',
+          zIndex: 9999,
+          transform: drawerOpen ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Drawer Header */}
+        <div style={{
+          padding: '16px 20px',
+          borderBottom: '1px solid var(--color-border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: 'var(--color-surface-alt)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <img
+              src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
+              alt="SurakshaAR"
+              style={{ height: 36, width: 'auto', objectFit: 'contain' }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(false)}
+            aria-label="Close navigation menu"
+            style={{
+              width: 34,
+              height: 34,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--color-text-secondary)',
+              cursor: 'pointer',
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* User Card if Authenticated */}
+        {user && (
+          <div style={{
+            padding: '14px 20px',
+            borderBottom: '1px solid var(--color-border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            background: 'var(--color-surface)',
+          }}>
+            <div style={{
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              background: 'var(--color-brand)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1rem',
+              fontWeight: 800,
+              color: '#FFFFFF',
+              flexShrink: 0,
+            }}>
+              {firstName[0]?.toUpperCase()}
+            </div>
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{
+                fontSize: 'var(--text-sm)',
+                fontWeight: 700,
+                color: 'var(--color-text-primary)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}>
+                {profile?.full_name || 'Trainee Officer'}
+              </div>
+              <div style={{
+                fontSize: '0.72rem',
+                color: 'var(--color-text-muted)',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}>
+                {user.email}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Navigation Items (Scrollable Body) */}
+        <div style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '12px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+        }}>
+          {/* 🏠 Home */}
+          <button
+            type="button"
+            onClick={() => handleNavigate('/landing')}
+            style={navItemStyle(location.pathname === '/landing')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Home size={18} color="var(--color-brand)" />
+              <span>{T('home')}</span>
+            </div>
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* 📊 Dashboard */}
+          <button
+            type="button"
+            onClick={() => handleNavigate(user ? (isAdmin ? '/admin' : '/dashboard') : '/login')}
+            style={navItemStyle(location.pathname === '/dashboard' || location.pathname === '/admin')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <LayoutDashboard size={18} color="#0284C7" />
+              <span>{isAdmin ? 'Admin Dashboard' : T('dashboard')}</span>
+            </div>
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* 🎯 Training Modules */}
+          <button
+            type="button"
+            onClick={handleTrainingModulesClick}
+            style={navItemStyle(false)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Target size={18} color="#16A34A" />
+              <span>Training Modules</span>
+            </div>
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* 🏆 My Certificates */}
+          <button
+            type="button"
+            onClick={() => handleNavigate(user ? '/my-certificates' : '/login')}
+            style={navItemStyle(location.pathname === '/my-certificates')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Award size={18} color="#D97706" />
+              <span>My Certificates</span>
+            </div>
+            {userCerts.length > 0 && (
+              <span className="badge badge-success" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+                {userCerts.length}
+              </span>
+            )}
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* 🔔 Notifications */}
+          <button
+            type="button"
+            onClick={() => {
+              setDrawerOpen(false)
+              setNotifOpen(true)
+            }}
+            style={navItemStyle(false)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Bell size={18} color="var(--color-brand)" />
+              <span>Notifications</span>
+            </div>
+            {unreadCount > 0 && (
+              <span className="badge badge-brand" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+                {unreadCount}
+              </span>
+            )}
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* ▶ Tutorial / How It Works */}
+          <button
+            type="button"
+            onClick={() => {
+              setDrawerOpen(false)
+              setShowVideoTutorial(true)
+            }}
+            style={navItemStyle(false)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <PlayCircle size={18} color="#8B5CF6" />
+              <span>Tutorial / How It Works</span>
+            </div>
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* ⚙ Settings */}
+          <button
+            type="button"
+            onClick={() => {
+              setDrawerOpen(false)
+              if (user) {
+                navigate('/profile')
+              } else {
+                setShowSettingsModal(true)
+              }
+            }}
+            style={navItemStyle(location.pathname === '/profile')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Settings size={18} color="#64748B" />
+              <span>Settings</span>
+            </div>
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+        </div>
+
+        {/* ── Drawer Bottom Controls ── */}
+        <div style={{
+          borderTop: '1px solid var(--color-border)',
+          padding: '14px 18px',
+          background: 'var(--color-surface-alt)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}>
+          {/* 🌐 Language Switcher */}
+          <div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              color: 'var(--color-text-muted)',
+              marginBottom: 6,
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}>
+              <Globe size={13} />
+              <span>Language</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+              {SUPPORTED_LANGUAGES.map(l => {
+                const isActive = lang === l.code
+                return (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={() => setLang(l.code)}
+                    style={{
+                      padding: '6px 4px',
+                      background: isActive ? 'var(--color-brand)' : 'var(--color-surface)',
+                      color: isActive ? '#FFFFFF' : 'var(--color-text-primary)',
+                      border: '1px solid',
+                      borderColor: isActive ? 'var(--color-brand)' : 'var(--color-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      fontSize: '0.75rem',
+                      fontWeight: isActive ? 700 : 500,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 4,
+                      transition: 'all var(--transition-fast)',
+                    }}
+                  >
+                    <span>{l.flag}</span>
+                    <span>{l.nativeLabel}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ◐ Dark Mode Toggle */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '4px 0',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {darkMode ? (
+                <Moon size={16} color="var(--color-brand)" />
+              ) : (
+                <Sun size={16} color="var(--color-brand)" />
+              )}
+              <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                Dark Mode
+              </span>
+            </div>
+
+            {/* Modern Toggle Switch */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={darkMode}
+              onClick={toggleDarkMode}
+              style={{
+                width: 44,
+                height: 24,
+                borderRadius: 12,
+                background: darkMode ? 'var(--color-brand)' : 'var(--color-border-strong, #ccc)',
+                border: 'none',
+                position: 'relative',
+                cursor: 'pointer',
+                padding: 2,
+                transition: 'background 0.2s ease',
+              }}
+            >
+              <div style={{
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                background: '#FFFFFF',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                transform: darkMode ? 'translateX(20px)' : 'translateX(0)',
+                transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              }} />
+            </button>
+          </div>
+
+          {/* 🚪 Logout (if logged in) */}
+          {user ? (
+            <button
+              type="button"
+              onClick={handleSignOut}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                padding: '9px 12px',
+                background: 'var(--color-error-bg)',
+                border: '1px solid var(--color-error-border)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--color-error)',
+                fontSize: 'var(--text-xs)',
+                fontWeight: 700,
+                cursor: 'pointer',
+                marginTop: 2,
+              }}
+            >
+              <LogOut size={15} />
+              <span>{T('logout')}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleNavigate('/login')}
+              className="btn btn-primary btn-sm btn-full"
+            >
+              <span>{T('login')}</span>
+            </button>
+          )}
+
+          {/* App Version — Central at very bottom */}
+          <div style={{
+            textAlign: 'center',
+            fontSize: '0.7rem',
+            color: 'var(--color-text-muted)',
+            paddingTop: 4,
+            fontWeight: 500,
+            letterSpacing: '0.02em',
+          }}>
+            {APP_NAME} {APP_VERSION}
+          </div>
+        </div>
+      </aside>
+
+      {/* Video Tutorial Modal */}
       <VideoTutorialModal
         isOpen={showVideoTutorial}
         onClose={() => setShowVideoTutorial(false)}
       />
 
-      {/* Help & Support Modal */}
-      {showHelpModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 16, boxSizing: 'border-box',
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowHelpModal(false) }}
-        >
-          <div style={{
-            background: 'var(--color-surface)',
-            borderRadius: 'var(--radius-lg, 16px)',
-            width: '100%', maxWidth: 460,
-            overflow: 'hidden',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
-            border: '1px solid var(--color-border)',
-          }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '14px 18px', borderBottom: '1px solid var(--color-border)',
-              background: 'var(--color-surface-alt)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
-                <HelpCircle size={18} color="#0284C7" />
-                <span>Help & Support</span>
-              </div>
-              <button
-                onClick={() => setShowHelpModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <h4 style={{ margin: '0 0 6px', fontSize: 'var(--text-sm)', fontWeight: 700 }}>National Emergency Helplines</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 'var(--text-xs)' }}>
-                  <div style={{ padding: '8px 10px', background: 'var(--color-surface-alt)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                    <strong>🚒 Fire:</strong> 101
-                  </div>
-                  <div style={{ padding: '8px 10px', background: 'var(--color-surface-alt)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                    <strong>🚑 Ambulance:</strong> 108
-                  </div>
-                  <div style={{ padding: '8px 10px', background: 'var(--color-surface-alt)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                    <strong>👮 Police:</strong> 100
-                  </div>
-                  <div style={{ padding: '8px 10px', background: 'var(--color-surface-alt)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                    <strong>🆘 National Emergency:</strong> 112
-                  </div>
-                </div>
-              </div>
-              <div>
-                <h4 style={{ margin: '0 0 6px', fontSize: 'var(--text-sm)', fontWeight: 700 }}>Suraksha Saathi AI Assistant</h4>
-                <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                  For real-time guidance on safety procedures, PPE compliance, and emergency protocols, tap the <strong>Suraksha Saathi</strong> floating assistant at the bottom right corner of your screen.
-                </p>
-              </div>
-              <button
-                className="btn btn-primary btn-sm btn-full"
-                onClick={() => setShowHelpModal(false)}
-                style={{ marginTop: 4 }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Settings Modal */}
+      {/* Settings Modal (Unauthenticated fallback) */}
       {showSettingsModal && (
         <div
           role="dialog"
@@ -553,7 +945,7 @@ export function Navbar() {
             borderRadius: 'var(--radius-lg, 16px)',
             width: '100%', maxWidth: 440,
             overflow: 'hidden',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+            boxShadow: 'var(--shadow-xl)',
             border: '1px solid var(--color-border)',
           }}>
             <div style={{
@@ -566,6 +958,7 @@ export function Navbar() {
                 <span>Settings</span>
               </div>
               <button
+                type="button"
                 onClick={() => setShowSettingsModal(false)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
               >
@@ -574,19 +967,21 @@ export function Navbar() {
             </div>
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                Preferences like <strong>Language</strong> and <strong>High Contrast Mode</strong> can be adjusted anytime directly from the top navigation bar.
+                Preferences like <strong>Language</strong> and <strong>Dark Mode</strong> can be toggled directly at the bottom of the navigation drawer.
               </p>
               <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
                 Sign in to your trainee account to configure your personal profile, department, and site location preferences.
               </p>
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                 <button
+                  type="button"
                   className="btn btn-primary btn-sm btn-full"
                   onClick={() => { setShowSettingsModal(false); navigate('/login') }}
                 >
                   Sign In
                 </button>
                 <button
+                  type="button"
                   className="btn btn-ghost btn-sm btn-full"
                   onClick={() => setShowSettingsModal(false)}
                 >
@@ -597,92 +992,25 @@ export function Navbar() {
           </div>
         </div>
       )}
-
-      {/* About SurakshaAR Modal */}
-      {showAboutModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 16, boxSizing: 'border-box',
-          }}
-          onClick={(e) => { if (e.target === e.currentTarget) setShowAboutModal(false) }}
-        >
-          <div style={{
-            background: 'var(--color-surface)',
-            borderRadius: 'var(--radius-lg, 16px)',
-            width: '100%', maxWidth: 460,
-            overflow: 'hidden',
-            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
-            border: '1px solid var(--color-border)',
-          }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '14px 18px', borderBottom: '1px solid var(--color-border)',
-              background: 'var(--color-surface-alt)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
-                <Info size={18} color="#16A34A" />
-                <span>About SurakshaAR</span>
-              </div>
-              <button
-                onClick={() => setShowAboutModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <img
-                  src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
-                  alt="SurakshaAR"
-                  style={{ height: 38, width: 'auto', objectFit: 'contain' }}
-                />
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: 'var(--text-md)' }}>SurakshaAR</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-brand)', fontWeight: 600 }}>
-                    Version 1.0.0 · SIH 2026 (SIH26041)
-                  </div>
-                </div>
-              </div>
-              <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.55 }}>
-                SurakshaAR is an Augmented Reality (AR) industrial safety training platform designed to prepare workers and trainees for hazardous emergencies without real-world danger.
-              </p>
-              <div style={{
-                background: 'var(--color-surface-alt)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                padding: '10px 12px',
-                fontSize: 'var(--text-xs)',
-                color: 'var(--color-text-muted)',
-                lineHeight: 1.5,
-              }}>
-                ✓ Built for zero-casualty industrial workplaces in Bharat.<br />
-                ✓ Compliant with IS 2925, IS 15298, and national safety guidelines.
-              </div>
-              <button
-                className="btn btn-primary btn-sm btn-full"
-                onClick={() => setShowAboutModal(false)}
-                style={{ marginTop: 4 }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Close dropdowns on outside click */}
-      {(langOpen || profileOpen || menuOpen) && (
-        <div
-          style={{ position: 'fixed', inset: 0, zIndex: 150 }}
-          onClick={() => { setLangOpen(false); setProfileOpen(false); setMenuOpen(false) }}
-        />
-      )}
-    </nav>
+    </>
   )
+}
+
+function navItemStyle(active) {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    padding: '12px 14px',
+    background: active ? 'var(--color-brand-50)' : 'transparent',
+    border: 'none',
+    borderRadius: 'var(--radius-md)',
+    cursor: 'pointer',
+    fontSize: 'var(--text-sm)',
+    fontWeight: active ? 700 : 500,
+    color: active ? 'var(--color-brand)' : 'var(--color-text-primary)',
+    textAlign: 'left',
+    transition: 'background var(--transition-fast)',
+  }
 }

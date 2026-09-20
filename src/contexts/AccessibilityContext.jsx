@@ -7,10 +7,24 @@ export function AccessibilityProvider({ children }) {
     return localStorage.getItem('sar_hc') === 'true'
   })
 
+  const [darkMode, setDarkModeState] = useState(() => {
+    const saved = localStorage.getItem('sar_dark_mode')
+    if (saved !== null) return saved === 'true'
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+
   function toggleHighContrast() {
     setHighContrastState(prev => {
       const next = !prev
       localStorage.setItem('sar_hc', String(next))
+      return next
+    })
+  }
+
+  function toggleDarkMode() {
+    setDarkModeState(prev => {
+      const next = !prev
+      localStorage.setItem('sar_dark_mode', String(next))
       return next
     })
   }
@@ -23,8 +37,16 @@ export function AccessibilityProvider({ children }) {
     }
   }, [highContrast])
 
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [darkMode])
+
   return (
-    <AccessibilityContext.Provider value={{ highContrast, toggleHighContrast }}>
+    <AccessibilityContext.Provider value={{ highContrast, toggleHighContrast, darkMode, toggleDarkMode }}>
       {children}
     </AccessibilityContext.Provider>
   )

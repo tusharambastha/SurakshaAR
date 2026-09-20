@@ -145,6 +145,45 @@ html.high-contrast {
   --shadow-lg:  0 0 0 2px #FFFFFF;
 }
 
+/* ── Dark Mode ── */
+html.dark:not(.high-contrast) {
+  --color-bg:              #0E1117;
+  --color-surface:         #161B22;
+  --color-surface-alt:     #1F242D;
+  --color-border:          #2D333B;
+  --color-border-strong:   #3D444D;
+  --color-text-primary:    #F0F6FC;
+  --color-text-secondary:  #C9D1D9;
+  --color-text-muted:      #8B949E;
+  --color-text-inverse:    #161B22;
+
+  --color-brand:           #E05A00;
+  --color-brand-dark:      #B84800;
+  --color-brand-light:     #FF7A2D;
+  --color-brand-50:        #2B1A12;
+  --color-brand-100:       #482715;
+
+  --color-success:         #2EA043;
+  --color-success-bg:      #0C2D1E;
+  --color-success-border:  #1B5738;
+
+  --color-error:           #F85149;
+  --color-error-bg:        #361214;
+  --color-error-border:    #6D2224;
+
+  --color-warning:         #D29922;
+  --color-warning-bg:      #2E220D;
+  --color-warning-border:  #5C4314;
+
+  --color-info:            #388BFD;
+  --color-info-bg:         #0C2340;
+
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.35);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.6), 0 4px 8px rgba(0,0,0,0.4);
+  --shadow-xl:  0 16px 40px rgba(0,0,0,0.7), 0 8px 16px rgba(0,0,0,0.5);
+}
+
 /* ── Reset & Base ── */
 *, *::before, *::after {
   box-sizing: border-box;
