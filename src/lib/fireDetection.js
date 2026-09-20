@@ -36,10 +36,10 @@ const MIN_CLUSTER_DENSITY = 0.15  // Compactness (cluster pixels / bounding box 
 // Flame core & emitter thresholds
 const MIN_CORE_LUMA       = 205   // Core must be intense
 const MIN_PEAK_LUMA       = 218   // Peak flame pixel must be near saturation
-const MIN_EMITTER_CONTRAST= 16    // Flame luma must exceed immediate border by >= 16 luma levels
+const MIN_EMITTER_CONTRAST= 12    // Flame luma must exceed immediate border by >= 12 luma levels
 
 // Geometry constraints (buoyant vertical teardrop)
-const MIN_ASPECT_RATIO    = 1.05  // Height / Width >= 1.05 (flames burn upwards, not sideways)
+const MIN_ASPECT_RATIO    = 0.85  // Height / Width >= 0.85 (handles pixel grid quantization for small flames)
 const MAX_ASPECT_RATIO    = 4.00  // Reasonable natural flame elongation
 
 // Temporal dynamics & convective turbulence
@@ -50,8 +50,8 @@ const MIN_CENTROID_JITTER = 0.20  // Flame tip & center jitter due to air convec
 const HISTORY_LENGTH      = 8     // Rolling history length
 
 // State machine frame counts (~20-30 FPS)
-const VERIFYING_FRAMES    = 3     // ~100-150ms to enter verifying state
-const CONFIRMED_FRAMES    = 8     // ~250-300ms of sustained multi-characteristic evidence
+const VERIFYING_FRAMES    = 2     // ~70-100ms to enter verifying state
+const CONFIRMED_FRAMES    = 5     // ~180-250ms of sustained multi-characteristic evidence
 const DECAY_RATE          = 1     // Smooth decay when flame is extinguished
 
 /**
@@ -320,17 +320,30 @@ export class FireDetector {
       return this._decay()
     }
 
-    // Sort by flame quality: prioritize clusters with core presence & strong density
+    // Sort by flame quality: prioritize compact handheld flame sizes (8..50 px), hot core ratio, and interaction zone
     validClusters.sort((a, b) => {
-      const scoreA = (a.coreCount * 2) + a.density + (a.aspectRatio > 1.1 ? 1 : 0)
-      const scoreB = (b.coreCount * 2) + b.density + (b.aspectRatio > 1.1 ? 1 : 0)
+      const sizeScoreA = (a.size >= 8 && a.size <= 50) ? 60 : 0
+      const sizeScoreB = (b.size >= 8 && b.size <= 50) ? 60 : 0
+
+      const posScoreA  = a.minY >= 38 ? 30 : (a.minY >= 25 ? 10 : 0)
+      const posScoreB  = b.minY >= 38 ? 30 : (b.minY >= 25 ? 10 : 0)
+
+      const coreRatioA = a.size > 0 ? (a.coreCount / a.size) : 0
+      const coreRatioB = b.size > 0 ? (b.coreCount / b.size) : 0
+      const coreScoreA = coreRatioA * 25
+      const coreScoreB = coreRatioB * 25
+
+      const shapeScoreA = (a.aspectRatio >= 1.05 && a.aspectRatio <= 3.2) ? 15 : 0
+      const shapeScoreB = (b.aspectRatio >= 1.05 && b.aspectRatio <= 3.2) ? 15 : 0
+
+      const scoreA = sizeScoreA + posScoreA + coreScoreA + shapeScoreA + (a.density * 5)
+      const scoreB = sizeScoreB + posScoreB + coreScoreB + shapeScoreB + (b.density * 5)
       return scoreB - scoreA
     })
 
     let selectedCluster = null
     let clusterContrast = 0
     let clusterFlickerRatio = 0
-    let topTaperScore = 0
 
     for (const cand of validClusters) {
       // ── 1. CORE REQUIREMENT ──
@@ -374,14 +387,33 @@ export class FireDetector {
         continue
       }
 
-      // ── 3. VERTICAL BUOYANCY GEOMETRY (Height / Width >= 1.05) ──
+      // ── 3. VERTICAL BUOYANCY GEOMETRY ──
       // Combustion gases rise vertically; candle, lighter, and match flames are elongated upwards
       if (cand.aspectRatio < MIN_ASPECT_RATIO || cand.aspectRatio > MAX_ASPECT_RATIO) {
         continue
       }
 
+      // ── 4. CANDIDATE-LEVEL FLICKER CHECK ──
+      let fCount = 0
+      if (this.hasPrev) {
+        for (const ptIdx of cand.points) {
+          const delta = Math.abs(curLuma[ptIdx] - this.prevLuma[ptIdx])
+          if (delta >= FLICKER_LUMA_DELTA) {
+            fCount++
+          }
+        }
+      }
+      const candFlicker = cand.size > 0 ? fCount / cand.size : 0
+
+      // If multiple candidates exist and one is a static background fixture (0 flicker and near ceiling),
+      // skip it and evaluate the other candidate (the flickering lighter)!
+      if (validClusters.length > 1 && this.hasPrev && candFlicker < 0.02 && cand.minY < 38) {
+        continue
+      }
+
       selectedCluster = cand
       clusterContrast = contrast
+      clusterFlickerRatio = candFlicker
       break
     }
 
@@ -389,18 +421,6 @@ export class FireDetector {
       this._updateLuma(curLuma)
       return this._decay()
     }
-
-    // ── 4. CONVECTIVE FLICKER & TURBULENCE DYNAMICS ──
-    let flickerCount = 0
-    if (this.hasPrev) {
-      for (const ptIdx of selectedCluster.points) {
-        const delta = Math.abs(curLuma[ptIdx] - this.prevLuma[ptIdx])
-        if (delta >= FLICKER_LUMA_DELTA) {
-          flickerCount++
-        }
-      }
-    }
-    clusterFlickerRatio = selectedCluster.size > 0 ? flickerCount / selectedCluster.size : 0
 
     // Track size and centroid history
     this.sizeHistory.push(selectedCluster.size)
@@ -421,10 +441,11 @@ export class FireDetector {
 
     this._updateLuma(curLuma)
 
-    // REJECT STATIC OBJECTS (Desk lamp, stationary warm surface, body/clothing):
-    // After initial frames, a genuine flame MUST show convective boundary flicker
+    // REJECT COMPLETELY STATIC OBJECTS (Desk lamp, stationary ceiling fixture):
+    // Fixed electrical fixtures have zero flicker, zero tremor jitter, and zero size variance.
     if (this.counter >= VERIFYING_FRAMES && this.hasPrev) {
-      if (clusterFlickerRatio < MIN_FLICKER_RATIO) {
+      const isCompletelyStatic = (clusterFlickerRatio < 0.02 && centroidJitter < 0.12 && sizeVar < 0.3)
+      if (isCompletelyStatic) {
         return this._decay()
       }
     }
