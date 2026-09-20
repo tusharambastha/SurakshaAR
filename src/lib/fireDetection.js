@@ -34,8 +34,8 @@ const MAX_BOX_H_RATIO     = 0.55  // Max height 55% of frame
 const MIN_CLUSTER_DENSITY = 0.15  // Compactness (cluster pixels / bounding box area)
 
 // Flame core & emitter thresholds
-const MIN_CORE_LUMA       = 215   // Core must be intense
-const MIN_PEAK_LUMA       = 225   // Peak flame pixel must be near saturation
+const MIN_CORE_LUMA       = 210   // Core must be intense
+const MIN_PEAK_LUMA       = 222   // Peak flame pixel must be near saturation
 const MIN_EMITTER_CONTRAST= 26    // Flame luma must exceed immediate border by >= 26 luma levels
 
 // Geometry constraints (buoyant vertical teardrop)
@@ -60,13 +60,13 @@ const DECAY_RATE          = 1     // Smooth decay when flame is extinguished
 export function isCombustionCandidate(r, g, b) {
   const luma = 0.299 * r + 0.587 * g + 0.114 * b
   return (
-    luma >= 155 &&
-    r >= 205 &&
-    g >= 120 &&
-    r >= g - 12 &&
-    (r - b) >= 35 &&
-    b <= 165 &&
-    (r + g + b) >= 380
+    luma >= 165 &&
+    r >= 220 &&
+    g >= 135 &&
+    r >= g - 8 &&
+    (r - b) >= 40 &&
+    b <= 150 &&
+    (r + g + b) >= 430
   )
 }
 
@@ -77,9 +77,9 @@ export function isFlameCorePixel(r, g, b) {
   const luma = 0.299 * r + 0.587 * g + 0.114 * b
   return (
     luma >= MIN_CORE_LUMA &&
-    r >= 230 &&
-    g >= 175 &&
-    (r + g + b) >= 540 &&
+    r >= 238 &&
+    g >= 185 &&
+    (r + g + b) >= 550 &&
     r >= b + 20
   )
 }
@@ -288,6 +288,12 @@ export class FireDetector {
           const density = clusterSize / (bw * bh)
           const aspectRatio = bh / bw
 
+          // Reject clusters touching frame boundary (clothing/body/walls extending out of view)
+          const touchesBorder = (cMinX <= 1 || cMaxX >= sampleWidth - 2 || cMinY <= 1 || cMaxY >= sampleHeight - 2)
+          if (touchesBorder) {
+            continue
+          }
+
           if (
             clusterSize >= MIN_CLUSTER_PIXELS &&
             clusterSize <= MAX_CLUSTER_PIXELS &&
@@ -334,9 +340,10 @@ export class FireDetector {
 
     for (const cand of validClusters) {
       // ── 1. CORE REQUIREMENT ──
-      // Real lighter/match flame MUST have a hot core and high peak luminance
-      if (cand.coreCount < 1 || cand.peakLuma < MIN_PEAK_LUMA) {
-        continue // Skip surfaces without hot core (skin, wood, cloth)
+      // Real lighter/match flame MUST have a hot core covering >= 4% of the flame and at least 3 core pixels
+      const coreRatio = cand.size > 0 ? cand.coreCount / cand.size : 0
+      if (cand.coreCount < 3 || coreRatio < 0.04 || cand.peakLuma < MIN_PEAK_LUMA) {
+        continue // Skip surfaces without genuine hot core (skin, wood, cloth)
       }
 
       // ── 2. ACTIVE LIGHT EMITTER (LOCAL BACKGROUND CONTRAST TEST) ──
@@ -383,11 +390,13 @@ export class FireDetector {
         else bottomPixels++
       }
 
-      // Flames are naturally buoyant and taper upward
-      if (bottomPixels > 0) {
-        const taperRatio = topPixels / bottomPixels
-        topTaperScore = Math.max(0, Math.min(1.0, 1.2 - Math.abs(taperRatio - 0.7)))
+      // Flames are naturally buoyant and taper upward (bottom half wider than top half)
+      if (bottomPixels < 3 || topPixels > bottomPixels * 1.05) {
+        continue // Rejects non-teardrop shapes (e.g. shoulders, horizontal or flat patches)
       }
+
+      const taperRatio = topPixels / bottomPixels
+      topTaperScore = Math.max(0, Math.min(1.0, 1.2 - Math.abs(taperRatio - 0.7)))
 
       selectedCluster = cand
       clusterContrast = contrast
@@ -430,24 +439,16 @@ export class FireDetector {
 
     this._updateLuma(curLuma)
 
-    // REJECT STATIC OBJECTS (Desk lamp, stationary warm surface):
-    // After initial frames, a genuine flame must show convective motion or flicker
+    // REJECT STATIC OBJECTS (Desk lamp, stationary warm surface, body/clothing):
+    // After initial frames, a genuine flame MUST show convective boundary flicker
     if (this.counter >= VERIFYING_FRAMES && this.hasPrev) {
-      if (clusterFlickerRatio < MIN_FLICKER_RATIO && centroidJitter < MIN_CENTROID_JITTER && sizeVar < MIN_SIZE_VARIANCE) {
+      if (clusterFlickerRatio < MIN_FLICKER_RATIO) {
         return this._decay()
       }
     }
 
     // Increment consecutive valid flame frames
     this.counter = Math.min(this.counter + 1, CONFIRMED_FRAMES + 12)
-
-    if (this.counter >= CONFIRMED_FRAMES) {
-      this.state = 'confirmed'
-    } else if (this.counter >= VERIFYING_FRAMES) {
-      this.state = 'verifying'
-    } else {
-      this.state = 'none'
-    }
 
     // Bounding box padding for HUD reticle
     const pad = 6
@@ -462,25 +463,28 @@ export class FireDetector {
     }
 
     // ── 5. DYNAMIC CONFIDENCE CALCULATION (NO HARDCODING) ──
-    let confidence = 0
-    if (this.state === 'confirmed') {
-      const coreScore     = Math.min(1.0, (selectedCluster.coreCount / Math.max(3, selectedCluster.size * 0.15)))
-      const contrastScore = Math.min(1.0, Math.max(0, (clusterContrast - 25) / 55))
-      const geomScore     = Math.min(1.0, Math.max(0, (selectedCluster.aspectRatio - 1.0) / 0.8))
-      const flickerScore  = Math.min(1.0, Math.max(0, clusterFlickerRatio / 0.25))
+    const coreScore     = Math.min(1.0, (selectedCluster.coreCount / Math.max(3, selectedCluster.size * 0.12)))
+    const contrastScore = Math.min(1.0, Math.max(0, (clusterContrast - 25) / 50))
+    const geomScore     = Math.min(1.0, Math.max(0, (selectedCluster.aspectRatio - 1.0) / 0.8))
+    const flickerScore  = Math.min(1.0, Math.max(0, clusterFlickerRatio / 0.20))
 
-      // Weighted combination of real visual evidence
-      const rawConf = (
-        0.28 * coreScore +
-        0.28 * contrastScore +
-        0.24 * geomScore +
-        0.20 * flickerScore
-      )
+    const rawConf = (
+      0.30 * coreScore +
+      0.28 * contrastScore +
+      0.22 * geomScore +
+      0.20 * flickerScore
+    )
 
-      // Persistence factor (confidence grows slightly with sustained duration up to 0.96)
-      const durationBonus = Math.min(0.08, (this.counter - CONFIRMED_FRAMES) * 0.01)
-      confidence = Math.min(0.96, Math.max(0.70, rawConf * 0.90 + durationBonus + 0.06))
-      this.lastConfidence = Math.round(confidence * 100) / 100
+    const durationBonus = Math.min(0.08, Math.max(0, (this.counter - CONFIRMED_FRAMES) * 0.01))
+    const confidence = Math.min(0.96, Math.max(0.0, rawConf * 0.88 + durationBonus))
+    this.lastConfidence = Math.round(confidence * 100) / 100
+
+    if (this.counter >= CONFIRMED_FRAMES && this.lastConfidence >= 0.70) {
+      this.state = 'confirmed'
+    } else if (this.counter >= VERIFYING_FRAMES) {
+      this.state = 'verifying'
+    } else {
+      this.state = 'none'
     }
 
     return {
