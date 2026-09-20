@@ -34,6 +34,7 @@ export default function FireDetectionOverlay({
   const detectorRef        = useRef(null)
   const animRef            = useRef(null)
   const fireSoundPlayedRef = useRef(false)
+  const advanceTimerRef    = useRef(null)
 
   // Initialize detector
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function FireDetectionOverlay({
     })
     return () => {
       if (animRef.current) cancelAnimationFrame(animRef.current)
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current)
     }
   }, [])
 
@@ -54,6 +56,18 @@ export default function FireDetectionOverlay({
       if (videoRef?.current && detectorRef.current) {
         const result = detectorRef.current.detect(videoRef.current)
         setDetection(result)
+
+        // When flame disappears, return to unconfirmed state and cancel pending advance
+        if (result.state === 'none' && !result.isFire) {
+          if (advanceTimerRef.current) {
+            clearTimeout(advanceTimerRef.current)
+            advanceTimerRef.current = null
+          }
+          if (fireConfirmed && taskState !== 'completed') {
+            setFireConfirmed(false)
+            fireSoundPlayedRef.current = false
+          }
+        }
 
         // When flame is genuinely confirmed across sustained frames
         if (result.isFire && result.state === 'confirmed' && !fireConfirmed) {
@@ -73,8 +87,9 @@ export default function FireDetectionOverlay({
 
           if (onFireDetected) onFireDetected(result)
 
-          // Auto-advance Step 0 (Identify Fire Source) after 1.2s confirmation
-          setTimeout(() => {
+          // Auto-advance Step 0 (Identify Fire Source) after 1.2s sustained confirmation
+          if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current)
+          advanceTimerRef.current = setTimeout(() => {
             setTaskState('completed')
             if (onTaskCompleted) {
               onTaskCompleted({
@@ -96,13 +111,11 @@ export default function FireDetectionOverlay({
     }
   }, [isActive, videoRef, fireConfirmed, lang, onFireDetected, onTaskCompleted])
 
-  function handleSimulateFire() {
-    if (detectorRef.current) {
-      detectorRef.current.triggerSimulation(true)
-    }
-  }
-
   function handleReset() {
+    if (advanceTimerRef.current) {
+      clearTimeout(advanceTimerRef.current)
+      advanceTimerRef.current = null
+    }
     if (detectorRef.current) detectorRef.current.reset()
     setFireConfirmed(false)
     fireSoundPlayedRef.current = false
@@ -191,19 +204,6 @@ export default function FireDetectionOverlay({
             <span style={{ color: '#94A3B8', fontSize: '0.74rem', borderLeft: '1px solid rgba(255,255,255,0.2)', paddingLeft: 8 }}>
               Point at candle / lighter
             </span>
-            <button
-              onClick={handleSimulateFire}
-              title="Test simulation"
-              style={{
-                background: 'rgba(234, 88, 12, 0.22)',
-                border: '1px solid rgba(234, 88, 12, 0.5)',
-                color: '#FFB347', borderRadius: 8, padding: '2px 8px',
-                fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 3, marginLeft: 4,
-              }}
-            >
-              <Flame size={11} color="#FFB347" /> Simulate
-            </button>
           </div>
         )}
 

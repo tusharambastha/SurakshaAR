@@ -27,20 +27,21 @@ const SAMPLE_WIDTH  = 160
 const SAMPLE_HEIGHT = 120
 
 // Spatial constraints for match / lighter / candle flames
-const MIN_CLUSTER_PIXELS  = 8     // Minimum flame pixels in cluster (~0.04% of frame)
+// Spatial constraints for match / lighter / candle flames
+const MIN_CLUSTER_PIXELS  = 5     // Minimum flame pixels in cluster
 const MAX_CLUSTER_PIXELS  = 1200  // Flame is compact; rejects massive walls/shirts (thousands of px)
 const MAX_BOX_W_RATIO     = 0.35  // Max width 35% of frame
 const MAX_BOX_H_RATIO     = 0.55  // Max height 55% of frame
 const MIN_CLUSTER_DENSITY = 0.15  // Compactness (cluster pixels / bounding box area)
 
 // Flame core & emitter thresholds
-const MIN_CORE_LUMA       = 205   // Core must be intense
-const MIN_PEAK_LUMA       = 218   // Peak flame pixel must be near saturation
-const MIN_EMITTER_CONTRAST= 12    // Flame luma must exceed immediate border by >= 12 luma levels
+const MIN_CORE_LUMA       = 165   // Incandescent core luma threshold
+const MIN_PEAK_LUMA       = 185   // Peak flame pixel must reach incandescent brightness
+const MIN_EMITTER_CONTRAST= 8     // Flame luma must exceed immediate border (reflective objects < 4)
 
 // Geometry constraints (buoyant vertical teardrop)
-const MIN_ASPECT_RATIO    = 0.85  // Height / Width >= 0.85 (handles pixel grid quantization for small flames)
-const MAX_ASPECT_RATIO    = 4.00  // Reasonable natural flame elongation
+const MIN_ASPECT_RATIO    = 0.80  // Height / Width >= 0.80 (handles pixel grid quantization for small flames)
+const MAX_ASPECT_RATIO    = 4.50  // Reasonable natural flame elongation
 
 // Temporal dynamics & convective turbulence
 const FLICKER_LUMA_DELTA  = 10    // Luminance shift threshold
@@ -56,25 +57,30 @@ const DECAY_RATE          = 1     // Smooth decay when flame is extinguished
 
 /**
  * Check if a pixel matches the combustion envelope criteria.
- * Real combustion flames on webcams exhibit two states:
- * 1. Saturated incandescent core (Luma >= 230, R >= 235, G >= 210) due to sensor saturation.
- * 2. Warm yellow-orange envelope (Luma >= 160, R >= 220, G >= 130, R - B >= 45, B <= 130).
- * Strictly excludes human skin (Luma ~170, R ~220, G ~160, but R-B ~70, B ~120).
+ * Real combustion flames on webcams exhibit three regions:
+ * 1. Saturated incandescent core (Luma >= 215, R >= 220, G >= 180) due to sensor saturation.
+ * 2. Warm yellow-orange-red envelope (Luma >= 105, R >= 165, (R - B) >= 30, R >= G - 25).
+ * 3. Blue combustion base near wick/nozzle (B >= 130, B > R + 20, G >= 50).
+ * Strictly excludes human skin (Luma ~150-190, R ~195-230, G ~145-180, B ~110-150, but non-emitter).
  */
 export function isCombustionCandidate(r, g, b) {
   const luma = 0.299 * r + 0.587 * g + 0.114 * b
-  const isSaturatedFlame = (luma >= 230 && r >= 235 && g >= 210)
-  const isWarmFlame = (luma >= 160 && r >= 220 && g >= 130 && (r - b) >= 45 && b <= 130)
-  return isSaturatedFlame || isWarmFlame
+  const isSat = (luma >= 235 && r >= 240 && g >= 220)
+  const isWarm = (luma >= 140 && r >= 190 && g >= 110 && b <= 115 && (r - b) >= 45)
+  const isBlue = (b >= 130 && b > r + 25 && g >= 50)
+  return isSat || isWarm || isBlue
 }
 
 /**
- * Check if a pixel represents a saturated hot flame core.
+ * Check if a pixel represents an incandescent flame core.
+ * Real flame cores:
+ * 1. Saturated white-hot center: Luma >= 235, R >= 240, G >= 220
+ * 2. Bright incandescent yellow core: Luma >= 165, R >= 200, G >= 130, B <= 110, R - B >= 45
  */
 export function isFlameCorePixel(r, g, b) {
   const luma = 0.299 * r + 0.587 * g + 0.114 * b
-  const isSatCore = (luma >= 236 && r >= 240 && g >= 220)
-  const isYellowCore = (luma >= 205 && r >= 240 && g >= 175 && (r - b) >= 45 && b <= 125)
+  const isSatCore = (luma >= 235 && r >= 240 && g >= 220)
+  const isYellowCore = (luma >= 165 && r >= 200 && g >= 130 && b <= 110 && (r - b) >= 45)
   return isSatCore || isYellowCore
 }
 
@@ -282,9 +288,9 @@ export class FireDetector {
           const density = clusterSize / (bw * bh)
           const aspectRatio = bh / bw
 
-          // Reject clusters touching frame boundary (clothing/body/walls extending out of view)
+          // Reject large clusters touching frame boundary (clothing/body/walls extending out of view)
           const touchesBorder = (cMinX <= 1 || cMaxX >= sampleWidth - 2 || cMinY <= 1 || cMaxY >= sampleHeight - 2)
-          if (touchesBorder) {
+          if (touchesBorder && clusterSize > 60) {
             continue
           }
 
@@ -467,8 +473,8 @@ export class FireDetector {
 
     // ── 5. DYNAMIC CONFIDENCE CALCULATION (NO HARDCODING) ──
     const coreScore     = Math.min(1.0, (selectedCluster.coreCount / Math.max(2, selectedCluster.size * 0.10)))
-    const contrastScore = Math.min(1.0, Math.max(0, (clusterContrast - 16) / 35))
-    const geomScore     = Math.min(1.0, Math.max(0, (selectedCluster.aspectRatio - 1.0) / 0.8))
+    const contrastScore = Math.min(1.0, Math.max(0, (clusterContrast - 8) / 30))
+    const geomScore     = Math.min(1.0, Math.max(0, (selectedCluster.aspectRatio - 0.8) / 1.0))
     const flickerScore  = Math.min(1.0, Math.max(0, clusterFlickerRatio / 0.15))
 
     const rawConf = (
