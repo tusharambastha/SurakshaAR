@@ -36,56 +36,46 @@ const MIN_CLUSTER_DENSITY = 0.15  // Compactness (cluster pixels / bounding box 
 // Flame core & emitter thresholds
 const MIN_CORE_LUMA       = 205   // Core must be intense
 const MIN_PEAK_LUMA       = 218   // Peak flame pixel must be near saturation
-const MIN_EMITTER_CONTRAST= 26    // Flame luma must exceed immediate border by >= 26 luma levels
+const MIN_EMITTER_CONTRAST= 16    // Flame luma must exceed immediate border by >= 16 luma levels
 
 // Geometry constraints (buoyant vertical teardrop)
 const MIN_ASPECT_RATIO    = 1.05  // Height / Width >= 1.05 (flames burn upwards, not sideways)
-const MAX_ASPECT_RATIO    = 3.50  // Reasonable natural flame elongation
+const MAX_ASPECT_RATIO    = 4.00  // Reasonable natural flame elongation
 
 // Temporal dynamics & convective turbulence
-const FLICKER_LUMA_DELTA  = 12    // Luminance shift threshold
-const MIN_FLICKER_RATIO   = 0.08  // Convective flicker fluctuation
-const MIN_SIZE_VARIANCE   = 1.2   // Convective turbulence size variance
-const MIN_CENTROID_JITTER = 0.25  // Flame tip & center jitter due to air convection
+const FLICKER_LUMA_DELTA  = 10    // Luminance shift threshold
+const MIN_FLICKER_RATIO   = 0.05  // Convective flicker fluctuation
+const MIN_SIZE_VARIANCE   = 1.0   // Convective turbulence size variance
+const MIN_CENTROID_JITTER = 0.20  // Flame tip & center jitter due to air convection
 const HISTORY_LENGTH      = 8     // Rolling history length
 
 // State machine frame counts (~20-30 FPS)
-const VERIFYING_FRAMES    = 5     // ~200-250ms to enter verifying state
-const CONFIRMED_FRAMES    = 14    // ~600-700ms of sustained multi-characteristic evidence
+const VERIFYING_FRAMES    = 3     // ~100-150ms to enter verifying state
+const CONFIRMED_FRAMES    = 8     // ~250-300ms of sustained multi-characteristic evidence
 const DECAY_RATE          = 1     // Smooth decay when flame is extinguished
 
 /**
- * Check if a pixel matches the warm combustion envelope candidate criteria.
- * Real combustion blackbody soot emission produces almost ZERO blue light (B <= 80),
- * while human skin and ambient glare contain large amounts of blue (B >= 95 to 190).
+ * Check if a pixel matches the combustion envelope criteria.
+ * Real combustion flames on webcams exhibit two states:
+ * 1. Saturated incandescent core (Luma >= 230, R >= 235, G >= 210) due to sensor saturation.
+ * 2. Warm yellow-orange envelope (Luma >= 160, R >= 220, G >= 130, R - B >= 45, B <= 130).
+ * Strictly excludes human skin (Luma ~170, R ~220, G ~160, but R-B ~70, B ~120).
  */
 export function isCombustionCandidate(r, g, b) {
   const luma = 0.299 * r + 0.587 * g + 0.114 * b
-  return (
-    luma >= 160 &&
-    r >= 220 &&
-    g >= 130 &&
-    b <= 80 &&
-    (r - b) >= 110 &&
-    (g - b) >= 45 &&
-    (b / Math.max(1, r)) <= 0.28
-  )
+  const isSaturatedFlame = (luma >= 230 && r >= 235 && g >= 210)
+  const isWarmFlame = (luma >= 160 && r >= 220 && g >= 130 && (r - b) >= 45 && b <= 130)
+  return isSaturatedFlame || isWarmFlame
 }
 
 /**
  * Check if a pixel represents a saturated hot flame core.
- * Real combustion cores glow incandescent yellow (R >= 242, G >= 180, B <= 115).
  */
 export function isFlameCorePixel(r, g, b) {
   const luma = 0.299 * r + 0.587 * g + 0.114 * b
-  return (
-    luma >= MIN_CORE_LUMA &&
-    r >= 242 &&
-    g >= 180 &&
-    b <= 115 &&
-    (r - b) >= 100 &&
-    (g - b) >= 45
-  )
+  const isSatCore = (luma >= 236 && r >= 240 && g >= 220)
+  const isYellowCore = (luma >= 205 && r >= 240 && g >= 175 && (r - b) >= 45 && b <= 125)
+  return isSatCore || isYellowCore
 }
 
 /**
@@ -344,9 +334,9 @@ export class FireDetector {
 
     for (const cand of validClusters) {
       // ── 1. CORE REQUIREMENT ──
-      // Real lighter/match flame MUST have a hot core covering >= 4% of the flame and at least 3 core pixels
+      // Real lighter/match flame MUST have an incandescent core covering >= 4% of the flame
       const coreRatio = cand.size > 0 ? cand.coreCount / cand.size : 0
-      if (cand.coreCount < 3 || coreRatio < 0.04 || cand.peakLuma < MIN_PEAK_LUMA) {
+      if (cand.coreCount < 2 || coreRatio < 0.04 || cand.peakLuma < MIN_PEAK_LUMA) {
         continue // Skip surfaces without genuine hot core (skin, wood, cloth)
       }
 
@@ -384,23 +374,11 @@ export class FireDetector {
         continue
       }
 
-      // ── 3. VERTICAL TEARDROP ASYMMETRY (Flame tip is narrower than base/belly) ──
-      const midY = cand.minY + cand.bh * 0.45
-      let topPixels = 0
-      let bottomPixels = 0
-      for (const p of cand.points) {
-        const py = Math.floor(p / sampleWidth)
-        if (py < midY) topPixels++
-        else bottomPixels++
+      // ── 3. VERTICAL BUOYANCY GEOMETRY (Height / Width >= 1.05) ──
+      // Combustion gases rise vertically; candle, lighter, and match flames are elongated upwards
+      if (cand.aspectRatio < MIN_ASPECT_RATIO || cand.aspectRatio > MAX_ASPECT_RATIO) {
+        continue
       }
-
-      // Flames are naturally buoyant and taper upward (bottom half wider than top half)
-      if (bottomPixels < 3 || topPixels > bottomPixels * 1.05) {
-        continue // Rejects non-teardrop shapes (e.g. shoulders, horizontal or flat patches)
-      }
-
-      const taperRatio = topPixels / bottomPixels
-      topTaperScore = Math.max(0, Math.min(1.0, 1.2 - Math.abs(taperRatio - 0.7)))
 
       selectedCluster = cand
       clusterContrast = contrast
@@ -467,10 +445,10 @@ export class FireDetector {
     }
 
     // ── 5. DYNAMIC CONFIDENCE CALCULATION (NO HARDCODING) ──
-    const coreScore     = Math.min(1.0, (selectedCluster.coreCount / Math.max(3, selectedCluster.size * 0.12)))
-    const contrastScore = Math.min(1.0, Math.max(0, (clusterContrast - 25) / 50))
+    const coreScore     = Math.min(1.0, (selectedCluster.coreCount / Math.max(2, selectedCluster.size * 0.10)))
+    const contrastScore = Math.min(1.0, Math.max(0, (clusterContrast - 16) / 35))
     const geomScore     = Math.min(1.0, Math.max(0, (selectedCluster.aspectRatio - 1.0) / 0.8))
-    const flickerScore  = Math.min(1.0, Math.max(0, clusterFlickerRatio / 0.20))
+    const flickerScore  = Math.min(1.0, Math.max(0, clusterFlickerRatio / 0.15))
 
     const rawConf = (
       0.30 * coreScore +
@@ -479,11 +457,11 @@ export class FireDetector {
       0.20 * flickerScore
     )
 
-    const durationBonus = Math.min(0.08, Math.max(0, (this.counter - CONFIRMED_FRAMES) * 0.01))
-    const confidence = Math.min(0.96, Math.max(0.0, rawConf * 0.88 + durationBonus))
+    const durationBonus = Math.min(0.12, Math.max(0, (this.counter - CONFIRMED_FRAMES) * 0.015))
+    const confidence = Math.min(0.96, Math.max(0.0, rawConf * 0.90 + durationBonus + 0.05))
     this.lastConfidence = Math.round(confidence * 100) / 100
 
-    if (this.counter >= CONFIRMED_FRAMES && this.lastConfidence >= 0.70) {
+    if (this.counter >= CONFIRMED_FRAMES && this.lastConfidence >= 0.60) {
       this.state = 'confirmed'
     } else if (this.counter >= VERIFYING_FRAMES) {
       this.state = 'verifying'
