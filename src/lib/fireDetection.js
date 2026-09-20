@@ -34,8 +34,8 @@ const MAX_BOX_H_RATIO     = 0.55  // Max height 55% of frame
 const MIN_CLUSTER_DENSITY = 0.15  // Compactness (cluster pixels / bounding box area)
 
 // Flame core & emitter thresholds
-const MIN_CORE_LUMA       = 210   // Core must be intense
-const MIN_PEAK_LUMA       = 222   // Peak flame pixel must be near saturation
+const MIN_CORE_LUMA       = 205   // Core must be intense
+const MIN_PEAK_LUMA       = 218   // Peak flame pixel must be near saturation
 const MIN_EMITTER_CONTRAST= 26    // Flame luma must exceed immediate border by >= 26 luma levels
 
 // Geometry constraints (buoyant vertical teardrop)
@@ -56,31 +56,35 @@ const DECAY_RATE          = 1     // Smooth decay when flame is extinguished
 
 /**
  * Check if a pixel matches the warm combustion envelope candidate criteria.
+ * Real combustion blackbody soot emission produces almost ZERO blue light (B <= 80),
+ * while human skin and ambient glare contain large amounts of blue (B >= 95 to 190).
  */
 export function isCombustionCandidate(r, g, b) {
   const luma = 0.299 * r + 0.587 * g + 0.114 * b
   return (
-    luma >= 165 &&
+    luma >= 160 &&
     r >= 220 &&
-    g >= 135 &&
-    r >= g - 8 &&
-    (r - b) >= 40 &&
-    b <= 150 &&
-    (r + g + b) >= 430
+    g >= 130 &&
+    b <= 80 &&
+    (r - b) >= 110 &&
+    (g - b) >= 45 &&
+    (b / Math.max(1, r)) <= 0.28
   )
 }
 
 /**
  * Check if a pixel represents a saturated hot flame core.
+ * Real combustion cores glow incandescent yellow (R >= 242, G >= 180, B <= 115).
  */
 export function isFlameCorePixel(r, g, b) {
   const luma = 0.299 * r + 0.587 * g + 0.114 * b
   return (
     luma >= MIN_CORE_LUMA &&
-    r >= 238 &&
-    g >= 185 &&
-    (r + g + b) >= 550 &&
-    r >= b + 20
+    r >= 242 &&
+    g >= 180 &&
+    b <= 115 &&
+    (r - b) >= 100 &&
+    (g - b) >= 45
   )
 }
 
