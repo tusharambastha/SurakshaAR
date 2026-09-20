@@ -222,7 +222,7 @@ export default function FireDetectionOverlay({
               boxShadow: '0 0 10px #FCD34D', flexShrink: 0,
               animation: 'pulse 0.8s ease-in-out infinite',
             }} />
-            <span>🟡 VERIFYING FIRE... (Analyzing flame flicker & heat core)</span>
+            <span>🟡 VERIFYING FLAME... (Analyzing flame core & convective flicker)</span>
           </div>
         )}
 
