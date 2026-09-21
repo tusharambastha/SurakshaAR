@@ -31,6 +31,8 @@ export default function VirtualARHUD({
   onExit,
   isOnline,
   spatialDirectionCue,
+  demoMode = true,
+  onToggleDemoMode,
 }) {
   const [trackerExpanded, setTrackerExpanded] = useState(true)
 
@@ -179,6 +181,32 @@ export default function VirtualARHUD({
                 SPATIAL AR
               </span>
             </div>
+
+            {/* Demo Mode vs Realistic Training Mode Toggle */}
+            {onToggleDemoMode && (
+              <button
+                type="button"
+                onClick={onToggleDemoMode}
+                title={demoMode ? 'Switch to Realistic Multi-Location Mode' : 'Switch to Fast Presentation Demo Mode'}
+                style={{
+                  background: demoMode ? 'rgba(224, 90, 0, 0.95)' : 'rgba(28, 32, 40, 0.90)',
+                  border: `1.5px solid ${demoMode ? '#F97316' : 'rgba(255, 255, 255, 0.25)'}`,
+                  color: '#FFFFFF',
+                  borderRadius: '20px',
+                  padding: '5px 10px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  boxShadow: demoMode ? '0 0 10px rgba(224, 90, 0, 0.5)' : 'none',
+                }}
+              >
+                {demoMode ? <Zap size={12} color="#FFFFFF" fill="#FFFFFF" /> : <Compass size={12} />}
+                <span>{demoMode ? '⚡ Demo Mode' : '🏢 Realistic'}</span>
+              </button>
+            )}
 
             {onToggleMode && (
               <button
@@ -332,7 +360,9 @@ export default function VirtualARHUD({
         {!allDone && (
           <div
             style={{
-              background: inView
+              background: demoMode
+                ? 'rgba(16, 185, 129, 0.92)'
+                : inView
                 ? 'rgba(16, 185, 129, 0.90)'
                 : 'rgba(224, 90, 0, 0.92)',
               backdropFilter: 'blur(8px)',
@@ -343,13 +373,20 @@ export default function VirtualARHUD({
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
-              boxShadow: inView
+              boxShadow: demoMode || inView
                 ? '0 4px 16px rgba(16, 185, 129, 0.4)'
                 : '0 4px 16px rgba(224, 90, 0, 0.4)',
               transition: 'background 0.2s ease',
             }}
           >
-            {inView ? (
+            {demoMode ? (
+              <>
+                <Target size={16} />
+                <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>
+                  🎯 DEMO MODE: Anchored In Front (1.9m) — Aim & Tap Action
+                </span>
+              </>
+            ) : inView ? (
               <>
                 <Target size={16} />
                 <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>
@@ -384,8 +421,8 @@ export default function VirtualARHUD({
         )}
       </div>
 
-      {/* ── Off-Screen Perimeter Directional Indicators ── */}
-      {!allDone && !inView && (
+      {/* ── Off-Screen Perimeter Directional Indicators (Only in Realistic Mode) ── */}
+      {!allDone && !demoMode && !inView && (
         <>
           {turnDirection === 'left' && (
             <div
@@ -458,9 +495,9 @@ export default function VirtualARHUD({
         <div
           style={{
             marginBottom: 8,
-            background: inView ? 'rgba(16, 185, 129, 0.90)' : 'rgba(20, 24, 33, 0.85)',
+            background: (demoMode || inView) ? 'rgba(16, 185, 129, 0.90)' : 'rgba(20, 24, 33, 0.85)',
             backdropFilter: 'blur(6px)',
-            border: `1.5px solid ${inView ? '#10B981' : hazardMarker.color}`,
+            border: `1.5px solid ${(demoMode || inView) ? '#10B981' : hazardMarker.color}`,
             borderRadius: '16px',
             padding: '3px 10px',
             fontSize: '0.64rem',
@@ -469,12 +506,12 @@ export default function VirtualARHUD({
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            boxShadow: `0 0 16px ${inView ? '#10B98188' : hazardMarker.color + '44'}`,
+            boxShadow: `0 0 16px ${(demoMode || inView) ? '#10B98188' : hazardMarker.color + '44'}`,
             whiteSpace: 'nowrap',
           }}
         >
-          <Target size={12} color={inView ? '#FFFFFF' : hazardMarker.color} />
-          <span>{inView ? '🎯 OBJECT ANCHORED IN VIEW' : 'SCAN ROOM FOR MARKER'}</span>
+          <Target size={12} color={(demoMode || inView) ? '#FFFFFF' : hazardMarker.color} />
+          <span>{demoMode ? '🎯 OBJECT ANCHORED IN FRONT' : inView ? '🎯 OBJECT ANCHORED IN VIEW' : 'SCAN ROOM FOR MARKER'}</span>
         </div>
 
         {/* Precision Industrial Reticle */}

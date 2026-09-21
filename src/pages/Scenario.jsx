@@ -42,15 +42,15 @@ import VirtualARHUD from '../components/ar/VirtualARHUD'
 // ─── Floating Canvas Text Sprite Helper ────────────────────────────────────────
 function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
   const canvas = document.createElement('canvas')
-  canvas.width = 768  // wider: full text never truncated
-  canvas.height = 140
+  canvas.width = 640
+  canvas.height = 120
   const ctx = canvas.getContext('2d')
 
   // Background pill
   ctx.fillStyle = 'rgba(15, 18, 26, 0.94)'
   ctx.strokeStyle = color
-  ctx.lineWidth = 6
-  const r = 58, x = 6, y = 6, w = 756, h = 128
+  ctx.lineWidth = 5
+  const r = 48, x = 5, y = 5, w = 630, h = 110
   ctx.beginPath()
   ctx.moveTo(x + r, y)
   ctx.arcTo(x + w, y, x + w, y + h, r)
@@ -64,31 +64,32 @@ function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
   // Circular step number badge
   ctx.fillStyle = color
   ctx.beginPath()
-  ctx.arc(70, 70, 46, 0, Math.PI * 2)
+  ctx.arc(60, 60, 38, 0, Math.PI * 2)
   ctx.fill()
 
   ctx.fillStyle = '#FFFFFF'
-  ctx.font = '900 48px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.font = '900 40px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(String(stepNumber), 70, 72)
+  ctx.fillText(String(stepNumber), 60, 62)
 
-  // Title text with industrial marker icon — NO truncation
-  const markerPrefixes = ['⚠ HAZARD: ', '🚨 ALARM: ', '🦺 PPE: ', '🧯 ACTION: ', '🚪 EVACUATE: ']
+  // Title text with industrial marker icon
+  const markerPrefixes = ['⚠ HAZARD: ', '🚨 ALARM: ', '🦺 PPE: ', '🧯 ACTION: ', '🚪 EVACUATE: ', '📍 MUSTER: ']
   const prefix = markerPrefixes[stepNumber - 1] || '🎯 STEP: '
-  const displayText = prefix + label // full text, no cut-off
+  const displayText = prefix + label
 
   ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.font = 'bold 26px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  ctx.fillText(displayText, 132, 70)
+  ctx.fillText(displayText, 114, 60)
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.minFilter = THREE.LinearFilter
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false })
   const sprite = new THREE.Sprite(material)
-  sprite.scale.set(4.8, 1.10, 1) // wider to match wider canvas
+  // Human-scaled: 0.72m wide x 0.14m tall (occupies ~25% of mobile screen width at 2m distance)
+  sprite.scale.set(0.72, 0.14, 1)
   return sprite
 }
 
@@ -135,6 +136,7 @@ export default function Scenario() {
   const [stepFeedback, setStepFeedback]   = useState(null)
   const [showControlsHelp, setShowControlsHelp] = useState(true)
   const [spatialDirectionCue, setSpatialDirectionCue] = useState(null)
+  const [demoMode, setDemoMode]           = useState(true) // Presentation / Demo Mode default ON
 
   const canvasRef = useRef(null)
   const cameraStreamRef = useRef(null)
@@ -558,26 +560,27 @@ export default function Scenario() {
     scene.add(floor)
     t.floor = floor
 
-    // Machinery Units
+    // Warehouse Environment Props (Shown in 3D Simulation Mode, Hidden in Camera AR Mode)
+    const warehousePropsGroup = new THREE.Group()
     const machineMat = new THREE.MeshStandardMaterial({ color: '#4B5563', metalness: 0.7, roughness: 0.3 })
     const yellowStripeMat = new THREE.MeshStandardMaterial({ color: '#EAB308', metalness: 0.2, roughness: 0.5 })
 
     // Generator 1
     const gen1 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.0, 1.6), machineMat)
     gen1.position.set(-5, 1.0, -1)
-    scene.add(gen1)
+    warehousePropsGroup.add(gen1)
     const genStripe = new THREE.Mesh(new THREE.BoxGeometry(2.22, 0.2, 1.62), yellowStripeMat)
     genStripe.position.set(-5, 1.8, -1)
-    scene.add(genStripe)
+    warehousePropsGroup.add(genStripe)
 
     // Electrical Control Panel (Hazard 0 location: [3, 1.2, 3])
     const panelCabinet = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.4, 0.8), machineMat)
     panelCabinet.position.set(3, 1.2, 3)
-    scene.add(panelCabinet)
+    warehousePropsGroup.add(panelCabinet)
     // Panel face door
     const panelFace = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.0, 0.05), new THREE.MeshStandardMaterial({ color: '#DC2626' }))
     panelFace.position.set(3, 1.2, 2.6)
-    scene.add(panelFace)
+    warehousePropsGroup.add(panelFace)
 
     // Hazard visual effect (Fire or Gas Plume)
     const hazardGroup = new THREE.Group()
@@ -685,32 +688,33 @@ export default function Scenario() {
 
     function makeParticle(isSmoke) {
       const tex = isSmoke ? null : [flameTex1, flameTex2, flameTex3][Math.floor(Math.random() * 3)]
-      const size = isSmoke ? 0.18 + Math.random() * 0.14 : 0.08 + Math.random() * 0.18
+      // Human-relatable flame flake: 4.5 to 8 cm
+      const size = isSmoke ? 0.05 + Math.random() * 0.035 : 0.038 + Math.random() * 0.038
       const mat = new THREE.MeshBasicMaterial({
         map: isSmoke ? null : tex,
-        color: isSmoke ? new THREE.Color(0.18, 0.18, 0.18) : new THREE.Color(1, 1, 1),
+        color: isSmoke ? new THREE.Color(0.2, 0.2, 0.2) : new THREE.Color(1, 1, 1),
         transparent: true,
-        opacity: isSmoke ? 0.18 + Math.random() * 0.12 : 0.65 + Math.random() * 0.35,
+        opacity: isSmoke ? 0.15 + Math.random() * 0.10 : 0.70 + Math.random() * 0.25,
         blending: isSmoke ? THREE.NormalBlending : THREE.AdditiveBlending,
         depthWrite: false,
         side: THREE.DoubleSide,
       })
-      const geo = new THREE.PlaneGeometry(size, size * 1.4)
+      const geo = new THREE.PlaneGeometry(size, size * 1.5)
       const mesh = new THREE.Mesh(geo, mat)
 
-      // Random spawn position in a small cluster around fire base
-      const rx = (Math.random() - 0.5) * 0.22
-      const rz = (Math.random() - 0.5) * 0.22
-      const startY = isSmoke ? 0.55 + Math.random() * 0.3 : Math.random() * 0.3
+      // Compact 8cm cluster around fire base
+      const rx = (Math.random() - 0.5) * 0.08
+      const rz = (Math.random() - 0.5) * 0.08
+      const startY = isSmoke ? 0.20 + Math.random() * 0.08 : Math.random() * 0.04
       mesh.position.set(rx, startY, rz)
 
       // Per-particle velocities and lifecycle
       mesh.userData = {
-        vx: (Math.random() - 0.5) * 0.004,
-        vy: isSmoke ? 0.006 + Math.random() * 0.006 : 0.018 + Math.random() * 0.022,
-        vz: (Math.random() - 0.5) * 0.004,
-        life: Math.random(), // 0..1 normalised lifecycle position
-        speed: isSmoke ? 0.003 + Math.random() * 0.003 : 0.005 + Math.random() * 0.008,
+        vx: (Math.random() - 0.5) * 0.002,
+        vy: isSmoke ? 0.004 + Math.random() * 0.004 : 0.008 + Math.random() * 0.008,
+        vz: (Math.random() - 0.5) * 0.002,
+        life: Math.random(),
+        speed: isSmoke ? 0.004 + Math.random() * 0.003 : 0.006 + Math.random() * 0.008,
         initOpacity: mat.opacity,
         initSize: size,
         isSmoke,
@@ -728,12 +732,12 @@ export default function Scenario() {
     // Urgent-growth start time
     t.arFireStartTime = t.clock.getElapsedTime()
 
-    // Glowing point light — world-anchored at fire position
-    const arFireLight = new THREE.PointLight('#FF6600', 7.0, 4.5)
-    arFireLight.position.set(0, 0.5, 0)
+    // Glowing point lights — realistic human-relatable intensity
+    const arFireLight = new THREE.PointLight('#FF6600', 2.8, 3.0)
+    arFireLight.position.set(0, 0.25, 0)
     arFireGroup.add(arFireLight)
-    const arFireGlow = new THREE.PointLight('#FF3300', 3.5, 7.0)
-    arFireGlow.position.set(0, 1.0, 0)
+    const arFireGlow = new THREE.PointLight('#FF3300', 1.8, 3.5)
+    arFireGlow.position.set(0, 0.45, 0)
     arFireGroup.add(arFireGlow)
 
     t.arFireGroup = arFireGroup
@@ -744,33 +748,36 @@ export default function Scenario() {
     // Fire Alarm Station prop ([2.5, 2.0, -2])
     const alarmPole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2), machineMat)
     alarmPole.position.set(2.5, 1.1, -2)
-    scene.add(alarmPole)
+    warehousePropsGroup.add(alarmPole)
     const alarmBox = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.3), new THREE.MeshStandardMaterial({ color: '#EF4444', emissive: '#B91C1C', emissiveIntensity: 0.4 }))
     alarmBox.position.set(2.5, 1.9, -2)
-    scene.add(alarmBox)
+    warehousePropsGroup.add(alarmBox)
 
     // PPE Station Locker prop ([-4, 0.9, 1])
     const ppeLocker = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2.0, 0.7), new THREE.MeshStandardMaterial({ color: '#0284C7', metalness: 0.5 }))
     ppeLocker.position.set(-4, 1.0, 1)
-    scene.add(ppeLocker)
+    warehousePropsGroup.add(ppeLocker)
 
     // Fire Extinguisher prop ([1.5, 0.8, 2])
     const extBody = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.9, 16), new THREE.MeshStandardMaterial({ color: '#DC2626', roughness: 0.3 }))
     extBody.position.set(1.5, 0.45, 2)
-    scene.add(extBody)
+    warehousePropsGroup.add(extBody)
 
     // Emergency Exit door frame ([-6, 1.5, -5])
     const exitDoor = new THREE.Mesh(new THREE.BoxGeometry(1.6, 3.0, 0.1), new THREE.MeshStandardMaterial({ color: '#16A34A', emissive: '#15803D', emissiveIntensity: 0.6 }))
     exitDoor.position.set(-6, 1.5, -5)
-    scene.add(exitDoor)
+    warehousePropsGroup.add(exitDoor)
 
     // Muster Assembly Point post ([0, 1.0, 10])
     const musterPost = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.5), machineMat)
     musterPost.position.set(0, 1.25, 10)
-    scene.add(musterPost)
+    warehousePropsGroup.add(musterPost)
     const musterSign = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.08), new THREE.MeshStandardMaterial({ color: '#16A34A', emissive: '#15803D', emissiveIntensity: 0.7 }))
     musterSign.position.set(0, 2.4, 10)
-    scene.add(musterSign)
+    warehousePropsGroup.add(musterSign)
+
+    scene.add(warehousePropsGroup)
+    t.warehousePropsGroup = warehousePropsGroup
 
     // ── Evacuation Waypoints (Glowing animated route to Exit Door & Muster Point) ──
     const evacPathGroup = new THREE.Group()
@@ -825,8 +832,106 @@ export default function Scenario() {
       const group = new THREE.Group()
       group.position.set(pos[0], pos[1], pos[2])
 
-      // Main Interactive Orb
-      const orbGeo = new THREE.SphereGeometry(0.42, 24, 24)
+      // ── Human-Scaled 3D Interactive Prop ──────────────────────────────────
+      const propGroup = new THREE.Group()
+      if (idx === 0) {
+        // Step 0: Hazard base / caution floor pad
+        const pad = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.18, 0.20, 0.03, 20),
+          new THREE.MeshStandardMaterial({ color: '#EAB308', metalness: 0.2, roughness: 0.4 })
+        )
+        pad.position.y = -0.06
+        propGroup.add(pad)
+      } else if (idx === 1) {
+        // Step 1: Emergency Alarm Call Box (~25cm tall)
+        const alarmCase = new THREE.Mesh(
+          new THREE.BoxGeometry(0.22, 0.28, 0.08),
+          new THREE.MeshStandardMaterial({ color: '#DC2626', roughness: 0.3 })
+        )
+        propGroup.add(alarmCase)
+        const alarmGlass = new THREE.Mesh(
+          new THREE.BoxGeometry(0.12, 0.10, 0.02),
+          new THREE.MeshStandardMaterial({ color: '#F8FAFC', emissive: '#FFFFFF', emissiveIntensity: 0.2 })
+        )
+        alarmGlass.position.set(0, 0.02, 0.045)
+        propGroup.add(alarmGlass)
+        const strobe = new THREE.Mesh(
+          new THREE.SphereGeometry(0.022, 12, 12),
+          new THREE.MeshStandardMaterial({ color: '#F59E0B', emissive: '#D97706', emissiveIntensity: 2.0 })
+        )
+        strobe.position.set(0, 0.16, 0.02)
+        propGroup.add(strobe)
+      } else if (idx === 2) {
+        // Step 2: PPE Station Kit (~35cm wide)
+        const helmet = new THREE.Mesh(
+          new THREE.SphereGeometry(0.11, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.6),
+          new THREE.MeshStandardMaterial({ color: '#FACC15', metalness: 0.1, roughness: 0.3 })
+        )
+        helmet.position.set(0, 0.08, 0)
+        propGroup.add(helmet)
+        const goggles = new THREE.Mesh(
+          new THREE.BoxGeometry(0.13, 0.03, 0.03),
+          new THREE.MeshStandardMaterial({ color: '#38BDF8', transparent: true, opacity: 0.85 })
+        )
+        goggles.position.set(0, 0.05, 0.09)
+        propGroup.add(goggles)
+        const gloveL = new THREE.Mesh(
+          new THREE.BoxGeometry(0.06, 0.10, 0.025),
+          new THREE.MeshStandardMaterial({ color: '#16A34A', roughness: 0.6 })
+        )
+        gloveL.position.set(-0.09, -0.04, 0.04)
+        propGroup.add(gloveL)
+        const gloveR = gloveL.clone()
+        gloveR.position.x = 0.09
+        propGroup.add(gloveR)
+      } else if (idx === 3) {
+        // Step 3: Industrial CO2 Fire Extinguisher (~40cm tall)
+        const cyl = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.065, 0.065, 0.36, 16),
+          new THREE.MeshStandardMaterial({ color: '#DC2626', metalness: 0.3, roughness: 0.3 })
+        )
+        cyl.position.y = 0.02
+        propGroup.add(cyl)
+        const valve = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.06, 0.04),
+          new THREE.MeshStandardMaterial({ color: '#1E293B', metalness: 0.8 })
+        )
+        valve.position.set(0, 0.22, 0)
+        propGroup.add(valve)
+        const nozzle = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.012, 0.015, 0.16, 8),
+          new THREE.MeshStandardMaterial({ color: '#0F172A' })
+        )
+        nozzle.position.set(0.05, 0.12, 0.03)
+        nozzle.rotation.z = -0.4
+        propGroup.add(nozzle)
+      } else if (idx === 4) {
+        // Step 4: Emergency Fire Exit Sign (~38cm wide)
+        const exitSign = new THREE.Mesh(
+          new THREE.BoxGeometry(0.38, 0.22, 0.04),
+          new THREE.MeshStandardMaterial({ color: '#15803D', emissive: '#16A34A', emissiveIntensity: 0.85 })
+        )
+        exitSign.position.y = 0.06
+        propGroup.add(exitSign)
+      } else if (idx === 5) {
+        // Step 5: Safe Muster Point Beacon (~30cm wide)
+        const musterBox = new THREE.Mesh(
+          new THREE.BoxGeometry(0.30, 0.30, 0.04),
+          new THREE.MeshStandardMaterial({ color: '#15803D', emissive: '#16A34A', emissiveIntensity: 0.85 })
+        )
+        musterBox.position.y = 0.12
+        propGroup.add(musterBox)
+        const post = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.02, 0.02, 0.40, 12),
+          new THREE.MeshStandardMaterial({ color: '#64748B', metalness: 0.5 })
+        )
+        post.position.y = -0.12
+        propGroup.add(post)
+      }
+      group.add(propGroup)
+
+      // Main Interactive Target Orb (Compact 8cm radius)
+      const orbGeo = new THREE.SphereGeometry(0.08, 16, 16)
       const orbMat = new THREE.MeshStandardMaterial({
         color: step.color || '#E05A00',
         emissive: step.color || '#E05A00',
@@ -835,11 +940,12 @@ export default function Scenario() {
         roughness: 0.2,
       })
       const orbMesh = new THREE.Mesh(orbGeo, orbMat)
+      orbMesh.position.y = 0.18
       orbMesh.userData = { stepIndex: idx }
       group.add(orbMesh)
 
-      // Pulsing floor target ring
-      const ringGeo = new THREE.RingGeometry(0.6, 0.9, 32)
+      // Pulsing floor target ring (Compact 14cm - 20cm)
+      const ringGeo = new THREE.RingGeometry(0.14, 0.20, 24)
       const ringMat = new THREE.MeshBasicMaterial({
         color: step.color || '#E05A00',
         side: THREE.DoubleSide,
@@ -848,28 +954,30 @@ export default function Scenario() {
       })
       const ringMesh = new THREE.Mesh(ringGeo, ringMat)
       ringMesh.rotation.x = -Math.PI / 2
-      ringMesh.position.y = -pos[1] + 0.02 // Anchor to floor
+      ringMesh.position.y = -0.16
       group.add(ringMesh)
 
-      // Vertical beacon light beam
-      const beamGeo = new THREE.CylinderGeometry(0.08, 0.35, 4.0, 16)
+      // Vertical beacon light beam (Compact 0.7m)
+      const beamGeo = new THREE.CylinderGeometry(0.015, 0.05, 0.7, 12)
       const beamMat = new THREE.MeshBasicMaterial({
         color: step.color || '#E05A00',
         transparent: true,
         opacity: 0.3,
       })
       const beamMesh = new THREE.Mesh(beamGeo, beamMat)
-      beamMesh.position.y = 2.0
+      beamMesh.position.y = 0.45
       group.add(beamMesh)
 
-      // Floating billboard sprite label
+      // Floating billboard sprite label (Proportionate: 0.72m wide x 0.14m tall)
       const badgeSprite = createStepBadgeSprite(idx + 1, step.label, step.color || '#E05A00')
-      badgeSprite.position.set(0, 1.1, 0)
+      badgeSprite.position.set(0, 0.38, 0)
+      badgeSprite.scale.set(0.72, 0.14, 1)
       group.add(badgeSprite)
 
       scene.add(group)
       stepNodes.push({
         group,
+        propGroup,
         orbMesh,
         ringMesh,
         beamMesh,
@@ -877,6 +985,7 @@ export default function Scenario() {
         stepIndex: idx,
         initialY: pos[1],
         pos,
+        initialPos: [...pos],
       })
     })
     t.stepNodes = stepNodes
@@ -949,58 +1058,53 @@ export default function Scenario() {
         }
       }
 
-      // Animate world-anchored AR fire particle system (BUG 1 + BUG 2 FIX)
+      // Animate world-anchored AR fire particle system (Realistic size: ~0.45m tall)
       if (t.arFireGroup) {
         const inAR = arModeRef.current
         t.arFireGroup.visible = inAR && !t.flameExtinguished
         if (inAR && !t.flameExtinguished && t.arParticles) {
-          // Fire grows urgently over 10-15s to simulate escalating danger
+          // Human-relatable fire scale (~0.5m visual height)
           const timeSinceStart = elapsed - (t.arFireStartTime ?? 0)
-          const urgencyScale = Math.min(1.0 + timeSinceStart / 12.0, 2.8)
+          const urgencyScale = Math.min(0.90 + timeSinceStart / 30.0, 1.15)
           t.arFireGroup.scale.setScalar(urgencyScale)
 
           // Billboard: make each particle face the camera each frame
           t.arParticles.forEach(p => {
             const d = p.userData
-            // Advance lifecycle
             d.life += d.speed
             if (d.life >= 1.0) {
-              // Respawn at base
               d.life = 0
-              p.position.x = (Math.random() - 0.5) * (d.isSmoke ? 0.28 : 0.18)
-              p.position.y = d.isSmoke ? 0.55 + Math.random() * 0.2 : Math.random() * 0.1
-              p.position.z = (Math.random() - 0.5) * (d.isSmoke ? 0.28 : 0.18)
+              p.position.x = (Math.random() - 0.5) * (d.isSmoke ? 0.09 : 0.07)
+              p.position.y = d.isSmoke ? 0.20 + Math.random() * 0.08 : Math.random() * 0.04
+              p.position.z = (Math.random() - 0.5) * (d.isSmoke ? 0.09 : 0.07)
               p.material.opacity = d.initOpacity
             }
 
             // Rise upward + gentle sway
             p.position.y += d.vy
-            p.position.x += d.vx + Math.sin(elapsed * 3.5 + d.swayPhase) * 0.002
+            p.position.x += d.vx + Math.sin(elapsed * 3.5 + d.swayPhase) * 0.0015
             p.position.z += d.vz
 
-            // Fade out toward end of life
             const fadeStart = d.isSmoke ? 0.55 : 0.45
             if (d.life > fadeStart) {
               p.material.opacity = d.initOpacity * (1 - (d.life - fadeStart) / (1 - fadeStart))
             }
 
-            // Billboard: rotate particle to face camera (in group local space)
             const camWorldPos = new THREE.Vector3()
             camera.getWorldPosition(camWorldPos)
             const camLocal = t.arFireGroup.worldToLocal(camWorldPos.clone())
             p.lookAt(camLocal)
           })
 
-          // Flicker the lights
+          // Realistic fire lighting
           if (t.arFireLight) {
-            t.arFireLight.intensity = (6.0 + Math.sin(elapsed * 19) * 3.0 + Math.cos(elapsed * 11) * 1.5) * Math.min(urgencyScale, 1.5)
+            t.arFireLight.intensity = (2.5 + Math.sin(elapsed * 19) * 0.8) * urgencyScale
           }
           if (t.arFireGlow) {
-            t.arFireGlow.intensity = (3.0 + Math.sin(elapsed * 8) * 1.5) * Math.min(urgencyScale, 1.5)
+            t.arFireGlow.intensity = (1.5 + Math.sin(elapsed * 8) * 0.5) * urgencyScale
           }
         }
       }
-
 
       // Animate Evacuation Waypoints (visible on Evacuate & Muster steps)
       if (t.evacPathGroup) {
@@ -1019,12 +1123,9 @@ export default function Scenario() {
       t.stepNodes.forEach((node) => {
         const isActive = node.group.visible && node.stepIndex === currentStepRef.current
         if (isActive) {
-          // Bob up and down
-          node.orbMesh.position.y = Math.sin(elapsed * 4) * 0.15
-          // Rotate pulse ring
+          node.orbMesh.position.y = 0.18 + Math.sin(elapsed * 4) * 0.04
           node.ringMesh.rotation.z = elapsed * 1.5
-          node.ringMesh.scale.setScalar(1 + Math.sin(elapsed * 5) * 0.2)
-          // Pulse beacon beam
+          node.ringMesh.scale.setScalar(1 + Math.sin(elapsed * 5) * 0.15)
           node.beamMesh.material.opacity = 0.25 + Math.sin(elapsed * 6) * 0.15
         }
       })
@@ -1032,7 +1133,6 @@ export default function Scenario() {
       // Handle AR camera orientation vs 3D OrbitControls
       if (arModeRef.current) {
         if (controls) controls.enabled = false
-        // Fixed eye-level viewer position at training room center
         camera.position.set(0, 1.4, 0)
 
         const { alpha, beta, gamma } = t.deviceRot
@@ -1044,10 +1144,26 @@ export default function Scenario() {
         )
         camera.quaternion.setFromEuler(euler)
 
-        // Directional wayfinding cue calculation for Spatial Multi-Location AR
         const activeIdx = currentStepRef.current
         const activeStepObj = steps[activeIdx]
-        if (activeStepObj?.position) {
+
+        if (demoModeRef.current) {
+          // In Presentation Demo Mode: target is placed directly in front of camera (0 degrees)
+          const now = performance.now()
+          if (!t.lastCueUpdate || now - t.lastCueUpdate > 100) {
+            t.lastCueUpdate = now
+            setSpatialDirectionCue({
+              inView: true,
+              turnDirection: 'in-front',
+              angleDeg: 0,
+              distanceMeters: '1.9',
+              stationName: activeStepObj?.label || '',
+              stepIndex: activeIdx,
+              isDemoMode: true,
+            })
+          }
+        } else if (activeStepObj?.position) {
+          // In Realistic Multi-Location Mode: calculate actual compass heading
           const targetPos = new THREE.Vector3(...activeStepObj.position)
           const camWorldPos = new THREE.Vector3()
           camera.getWorldPosition(camWorldPos)
@@ -1065,7 +1181,6 @@ export default function Scenario() {
           const angleRad = Math.acos(dot)
           const angleDeg = Math.round(THREE.MathUtils.radToDeg(angleRad))
 
-          // In Three.js forward is -Z. Cross product Y indicates Left vs Right
           const crossY = camForward.z * toTarget.x - camForward.x * toTarget.z
 
           let turnDirection = 'in-front'
@@ -1089,6 +1204,7 @@ export default function Scenario() {
               distanceMeters: dist.toFixed(1),
               stationName: activeStepObj.label,
               stepIndex: activeIdx,
+              isDemoMode: false,
             })
           }
         }
@@ -1126,6 +1242,8 @@ export default function Scenario() {
   currentStepRef.current = currentStep
   const arModeRef = useRef(arMode)
   arModeRef.current = arMode
+  const demoModeRef = useRef(demoMode)
+  demoModeRef.current = demoMode
 
   // ─── Update Visual State When Step Changes (No WebGL Teardown) ────────────────
   useEffect(() => {
@@ -1137,7 +1255,6 @@ export default function Scenario() {
       const isActive = node.stepIndex === currentStep
 
       if (isCompleted) {
-        // Hide entire group when step is finished
         node.group.visible = false
       } else {
         // Spatial Multi-Location AR: in AR mode, ONLY render the active step's 3D object & beacon.
@@ -1149,15 +1266,56 @@ export default function Scenario() {
 
         if (isActive) {
           node.orbMesh.material.emissiveIntensity = 1.0
-          node.orbMesh.scale.setScalar(1.25)
-          node.badgeSprite.scale.set(4.2, 1.05, 1) // slightly wider so text never truncates
+          node.orbMesh.scale.setScalar(1.0)
+          node.badgeSprite.scale.set(0.72, 0.14, 1)
         } else {
-          // Keep orb small and dim (still raycasting target but invisible badge)
           node.orbMesh.material.emissiveIntensity = 0.05
           node.orbMesh.scale.setScalar(0.6)
         }
       }
     })
+
+    // In AR Presentation Demo Mode (Default ON):
+    // Auto-place the active step's object directly in front of the camera (1.9m)
+    // so the presenter/trainee sees it immediately without turning!
+    const activeNode = t.stepNodes[currentStep]
+    if (arMode && demoMode && t.camera && activeNode) {
+      const camPos = new THREE.Vector3()
+      t.camera.getWorldPosition(camPos)
+
+      const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(t.camera.quaternion)
+      const forwardH = new THREE.Vector3(camForward.x, 0, camForward.z).normalize()
+      if (forwardH.lengthSq() < 0.001) forwardH.set(0, 0, -1)
+
+      const placePos = new THREE.Vector3().copy(camPos).addScaledVector(forwardH, 1.9)
+      placePos.y = camPos.y - 0.15
+
+      activeNode.group.position.copy(placePos)
+      activeNode.group.quaternion.copy(t.camera.quaternion)
+
+      // Also place fire particle system directly in front of camera for Step 0
+      if (currentStep === 0 && t.arFireGroup) {
+        t.arFireGroup.position.copy(placePos)
+        t.arFireGroup.quaternion.copy(t.camera.quaternion)
+      }
+    } else {
+      // In Realistic Multi-Location Mode: restore fixed room coordinates
+      t.stepNodes.forEach(node => {
+        if (node.initialPos) {
+          node.group.position.set(...node.initialPos)
+          node.group.quaternion.set(0, 0, 0, 1)
+        }
+      })
+      if (t.arFireGroup && t.WORLD_FIRE_POS) {
+        t.arFireGroup.position.copy(t.WORLD_FIRE_POS)
+        t.arFireGroup.quaternion.set(0, 0, 0, 1)
+      }
+    }
+
+    // Hide giant warehouse environment meshes in AR mode (user's room is the environment!)
+    if (t.warehousePropsGroup) {
+      t.warehousePropsGroup.visible = !arMode
+    }
 
     // Update scene background and floor visibility for AR vs 3D mode
     if (t.scene) {
@@ -1181,7 +1339,7 @@ export default function Scenario() {
         t.flameLight.intensity = isExtinguished ? 0 : 4.0
       }
     }
-  }, [currentStep, completedSteps, arMode, isFireScenario])
+  }, [currentStep, completedSteps, arMode, isFireScenario, demoMode])
 
   if (isLoading || !cameraChecked) {
     return (
@@ -1219,6 +1377,8 @@ export default function Scenario() {
             onExit={() => navigate('/dashboard')}
             isOnline={isOnline}
             spatialDirectionCue={spatialDirectionCue}
+            demoMode={demoMode}
+            onToggleDemoMode={() => setDemoMode(prev => !prev)}
           />
         </>
       )}
