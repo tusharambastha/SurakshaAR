@@ -37,8 +37,6 @@ import { mockGetScenario, mockCreateSession, mockUpdateSession, mockInsertFeedba
 import { calculateScore } from '../lib/scoring'
 import { queueOfflineAction } from '../lib/indexeddb'
 import { speak } from '../lib/voice'
-import FireDetectionOverlay from '../components/ar/FireDetectionOverlay'
-import GasLeakDetectionOverlay from '../components/ar/GasLeakDetectionOverlay'
 
 // ─── Floating Canvas Text Sprite Helper ────────────────────────────────────────
 function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
@@ -447,82 +445,6 @@ export default function Scenario() {
     }
   }
 
-  // Real-time camera flame detection listener
-  const handleFireDetected = useCallback((result) => {
-    console.log('[FireDetection] Real-time flame detected with confidence:', result.confidence)
-  }, [])
-
-  // Interactive fire safety training response handler
-  const handleFireTaskCompleted = useCallback(async ({ wasCorrect, responseTimeMs }) => {
-    // Record feedback log in mockDb / Supabase
-    if (!isSupabaseConfigured) {
-      await mockInsertFeedbackLog({
-        sessionId,
-        userId: user?.id,
-        stepIndex: 0,
-        feedbackType: wasCorrect ? 'correct' : 'incorrect',
-        message: `AR Fire Hazard Detection: Real-time flame confirmed in camera feed in ${(responseTimeMs / 1000).toFixed(1)}s`,
-      })
-    }
-
-    // If currently on Step 0 (Identify Fire Source), automatically complete it
-    if (currentStep === 0) {
-      const step = scenario?.steps?.[0]
-      const log = {
-        id: crypto.randomUUID(),
-        session_id: sessionId,
-        step_index: 0,
-        was_correct: wasCorrect,
-        time_taken_ms: responseTimeMs,
-        is_ppe_step: step?.is_ppe_step ?? false,
-      }
-      setStepLogs(prev => [...prev, log])
-      setCompletedSteps(prev => (prev.includes(0) ? prev : [...prev, 0]))
-      setCurrentStep(1)
-      setStepStartTime(Date.now())
-      setStepFeedback({ correct: wasCorrect, label: 'Fire Hazard Identified via AR Camera! ✓' })
-      setTimeout(() => setStepFeedback(null), 2500)
-    }
-  }, [sessionId, user, currentStep, scenario])
-
-  // Real-time camera gas leak / smoke plume listener
-  const handleGasDetected = useCallback((result) => {
-    console.log('[GasDetection] Gas leak / smoke plume detected with visual confidence:', result.visualConfidence)
-  }, [])
-
-  // Interactive gas leak safety training response handler
-  const handleGasTaskCompleted = useCallback(async ({ wasCorrect, responseTimeMs }) => {
-    // Record feedback log in mockDb / Supabase
-    if (!isSupabaseConfigured) {
-      await mockInsertFeedbackLog({
-        sessionId,
-        userId: user?.id,
-        stepIndex: 0,
-        feedbackType: wasCorrect ? 'correct' : 'incorrect',
-        message: `AR Gas Leak Hazard: Visible smoke plume recognized via computer vision in ${(responseTimeMs / 1000).toFixed(1)}s`,
-      })
-    }
-
-    // If currently on Step 0 (Identify Gas Leak Warning), automatically complete it
-    if (currentStep === 0) {
-      const step = scenario?.steps?.[0]
-      const log = {
-        id: crypto.randomUUID(),
-        session_id: sessionId,
-        step_index: 0,
-        was_correct: wasCorrect,
-        time_taken_ms: responseTimeMs,
-        is_ppe_step: step?.is_ppe_step ?? false,
-      }
-      setStepLogs(prev => [...prev, log])
-      setCompletedSteps(prev => (prev.includes(0) ? prev : [...prev, 0]))
-      setCurrentStep(1)
-      setStepStartTime(Date.now())
-      setStepFeedback({ correct: wasCorrect, label: 'Gas Leak Training Source Recognized via AR Camera! ✓' })
-      setTimeout(() => setStepFeedback(null), 2500)
-    }
-  }, [sessionId, user, currentStep, scenario])
-
   // ─── Three.js Scene Mounting (ONE TIME ONLY) ────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current
@@ -917,14 +839,12 @@ export default function Scenario() {
     const t = threeRef.current
     if (!t.stepNodes.length) return
 
-    const hide3DInARStep0 = arMode && (isGasScenario || isFireScenario) && currentStep === 0
-
     t.stepNodes.forEach(node => {
       const isCompleted = completedSteps.includes(node.stepIndex)
       const isActive = node.stepIndex === currentStep
 
-      if (isCompleted || hide3DInARStep0) {
-        // Hide during camera scanning or when finished
+      if (isCompleted) {
+        // Hide when finished
         node.group.visible = false
       } else {
         node.group.visible = true
@@ -951,7 +871,7 @@ export default function Scenario() {
         t.scene.background = new THREE.Color('#1F242D') // Crisp slate studio room
       }
     }
-  }, [currentStep, completedSteps, arMode, isGasScenario, isFireScenario])
+  }, [currentStep, completedSteps, arMode])
 
   if (isLoading || !cameraChecked) {
     return (
@@ -971,29 +891,9 @@ export default function Scenario() {
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#1F242D', position: 'relative', overflow: 'hidden' }}>
 
-      {/* Camera Live Feed (AR Mode) with Real-Time Computer Vision Fire Detection */}
+      {/* Camera Live Feed (AR Mode) — Clean AR Training Area */}
       {arMode && cameraAvail && (
-        <>
-          <CameraBackground streamRef={cameraStreamRef} videoRef={cameraVideoRef} />
-          {isFireScenario && (
-            <FireDetectionOverlay
-              videoRef={cameraVideoRef}
-              isActive={arMode}
-              lang={lang}
-              onFireDetected={handleFireDetected}
-              onTaskCompleted={handleFireTaskCompleted}
-            />
-          )}
-          {isGasScenario && (
-            <GasLeakDetectionOverlay
-              videoRef={cameraVideoRef}
-              isActive={arMode}
-              lang={lang}
-              onSourceDetected={handleGasDetected}
-              onTaskCompleted={handleGasTaskCompleted}
-            />
-          )}
-        </>
+        <CameraBackground streamRef={cameraStreamRef} videoRef={cameraVideoRef} />
       )}
 
       {/* Persistent Three.js Canvas */}
@@ -1171,13 +1071,7 @@ export default function Scenario() {
             color: 'white', fontSize: 12, fontWeight: 700,
           }}>
             {arMode ? <Camera size={14} color="var(--color-brand)" /> : <Monitor size={14} color="#0E7C7B" />}
-            {arMode
-              ? (isFireScenario
-                  ? '🔥 Camera AR · Real-Time Fire Detection'
-                  : isGasScenario
-                    ? '💨 Camera AR · Training Marker Recognition'
-                    : '📷 Camera AR Mode')
-              : '🖥️ 3D Simulation Mode'}
+            {arMode ? '📷 Camera AR Mode' : '🖥️ 3D Simulation Mode'}
           </div>
 
           {/* Right Action Controls */}
