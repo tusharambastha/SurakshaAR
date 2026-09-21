@@ -633,6 +633,91 @@ export default function Scenario() {
     scene.add(hazardGroup)
     t.hazardGroup = hazardGroup
 
+    // ── AR Camera-Attached Virtual Fire ──────────────────────────────────────
+    // This fire is a child of the camera so it is ALWAYS visible in AR mode
+    // regardless of gyro orientation. Positioned 2.5 units in front of camera.
+    const arFireGroup = new THREE.Group()
+    arFireGroup.position.set(0, -0.25, -2.5) // slightly below center, in front
+    arFireGroup.visible = false // shown only in AR mode (toggled in render loop)
+
+    // Flame layer 1 — large red/orange base cone
+    const arFlame1 = new THREE.Mesh(
+      new THREE.ConeGeometry(0.22, 0.7, 14),
+      new THREE.MeshStandardMaterial({
+        color: '#FF3300',
+        emissive: '#CC2200',
+        emissiveIntensity: 4.0,
+        transparent: true,
+        opacity: 0.95,
+      })
+    )
+    arFlame1.position.y = 0.35
+    arFireGroup.add(arFlame1)
+
+    // Flame layer 2 — mid orange cone
+    const arFlame2 = new THREE.Mesh(
+      new THREE.ConeGeometry(0.16, 0.55, 12),
+      new THREE.MeshStandardMaterial({
+        color: '#FF8800',
+        emissive: '#EE6600',
+        emissiveIntensity: 4.5,
+        transparent: true,
+        opacity: 0.92,
+      })
+    )
+    arFlame2.position.y = 0.28
+    arFireGroup.add(arFlame2)
+
+    // Flame layer 3 — bright yellow tip
+    const arFlame3 = new THREE.Mesh(
+      new THREE.ConeGeometry(0.09, 0.38, 10),
+      new THREE.MeshStandardMaterial({
+        color: '#FFEE00',
+        emissive: '#FFCC00',
+        emissiveIntensity: 5.0,
+        transparent: true,
+        opacity: 0.90,
+      })
+    )
+    arFlame3.position.y = 0.22
+    arFireGroup.add(arFlame3)
+
+    // Flame base glow disc
+    const arFlameBase = new THREE.Mesh(
+      new THREE.CircleGeometry(0.28, 20),
+      new THREE.MeshStandardMaterial({
+        color: '#FF4400',
+        emissive: '#FF2200',
+        emissiveIntensity: 3.5,
+        transparent: true,
+        opacity: 0.75,
+        side: THREE.DoubleSide,
+      })
+    )
+    arFlameBase.rotation.x = -Math.PI / 2
+    arFlameBase.position.y = 0.01
+    arFireGroup.add(arFlameBase)
+
+    // Glowing point light emanating from the fire
+    const arFireLight = new THREE.PointLight('#FF6600', 6.0, 3.5)
+    arFireLight.position.y = 0.4
+    arFireGroup.add(arFireLight)
+
+    // Second softer ambient glow
+    const arFireGlow = new THREE.PointLight('#FF3300', 3.0, 6.0)
+    arFireGlow.position.y = 0.8
+    arFireGroup.add(arFireGlow)
+
+    // Attach to camera so it always follows camera orientation
+    camera.add(arFireGroup)
+    t.arFireGroup = arFireGroup
+    t.arFlameMeshes = [arFlame1, arFlame2, arFlame3]
+    t.arFlameBase = arFlameBase
+    t.arFireLight = arFireLight
+    t.arFireGlow = arFireGlow
+    // Add camera to scene (required for camera children to render)
+    scene.add(camera)
+
     // Fire Alarm Station prop ([2.5, 2.0, -2])
     const alarmPole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2), machineMat)
     alarmPole.position.set(2.5, 1.1, -2)
@@ -795,6 +880,42 @@ export default function Scenario() {
           t.flameMeshes[1].scale.set(1 + Math.cos(elapsed * 16) * 0.10, 1 + Math.sin(elapsed * 15) * 0.18, 1 + Math.cos(elapsed * 13) * 0.10)
         }
       }
+
+      // Animate camera-attached AR fire (always visible when AR mode is on)
+      if (t.arFireGroup) {
+        const inAR = arModeRef.current
+        t.arFireGroup.visible = inAR && !t.flameExtinguished
+        if (inAR && t.arFlameMeshes) {
+          // Flicker: each cone scales independently with different frequencies
+          t.arFlameMeshes[0].scale.set(
+            1 + Math.sin(elapsed * 13) * 0.18,
+            1 + Math.cos(elapsed * 11) * 0.22 + Math.sin(elapsed * 7) * 0.10,
+            1 + Math.sin(elapsed * 9)  * 0.18
+          )
+          t.arFlameMeshes[1].scale.set(
+            1 + Math.cos(elapsed * 17) * 0.14,
+            1 + Math.sin(elapsed * 14) * 0.25 + Math.cos(elapsed * 9) * 0.08,
+            1 + Math.cos(elapsed * 15) * 0.14
+          )
+          t.arFlameMeshes[2].scale.set(
+            1 + Math.sin(elapsed * 21) * 0.10,
+            1 + Math.cos(elapsed * 19) * 0.30 + Math.sin(elapsed * 11) * 0.12,
+            1 + Math.sin(elapsed * 23) * 0.10
+          )
+          // Pulse the base glow disc opacity
+          if (t.arFlameBase) {
+            t.arFlameBase.material.opacity = 0.6 + Math.sin(elapsed * 8) * 0.25
+          }
+          // Flicker the point lights
+          if (t.arFireLight) {
+            t.arFireLight.intensity = 5.0 + Math.sin(elapsed * 18) * 2.5 + Math.cos(elapsed * 11) * 1.5
+          }
+          if (t.arFireGlow) {
+            t.arFireGlow.intensity = 2.5 + Math.sin(elapsed * 9) * 1.2
+          }
+        }
+      }
+
 
       // Animate step nodes
       t.stepNodes.forEach((node) => {
