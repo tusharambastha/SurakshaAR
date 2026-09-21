@@ -37,6 +37,7 @@ import { mockGetScenario, mockCreateSession, mockUpdateSession, mockInsertFeedba
 import { calculateScore } from '../lib/scoring'
 import { queueOfflineAction } from '../lib/indexeddb'
 import { speak } from '../lib/voice'
+import VirtualARHUD from '../components/ar/VirtualARHUD'
 
 // ─── Floating Canvas Text Sprite Helper ────────────────────────────────────────
 function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
@@ -46,10 +47,10 @@ function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
   const ctx = canvas.getContext('2d')
 
   // Background pill
-  ctx.fillStyle = 'rgba(20, 20, 24, 0.90)'
+  ctx.fillStyle = 'rgba(15, 18, 26, 0.92)'
   ctx.strokeStyle = color
   ctx.lineWidth = 6
-  const r = 60, x = 6, y = 6, w = 500, h = 116
+  const r = 58, x = 6, y = 6, w = 500, h = 116
   ctx.beginPath()
   ctx.moveTo(x + r, y)
   ctx.arcTo(x + w, y, x + w, y + h, r)
@@ -67,26 +68,28 @@ function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
   ctx.fill()
 
   ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.font = '900 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(String(stepNumber), 64, 66)
 
-  // Title text
+  // Title text with industrial marker icon
+  const markerPrefixes = ['⚠ HAZARD: ', '🚨 ALARM: ', '🦺 PPE: ', '🧯 ACTION: ', '🚪 EVACUATE: ']
+  const prefix = markerPrefixes[stepNumber - 1] || '🎯 STEP: '
+  let displayText = prefix + label
+  if (displayText.length > 22) displayText = displayText.substring(0, 20) + '…'
+
   ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.font = 'bold 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  // Truncate if long
-  let displayText = label
-  if (displayText.length > 24) displayText = displayText.substring(0, 22) + '…'
-  ctx.fillText(displayText, 126, 64)
+  ctx.fillText(displayText, 122, 64)
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.minFilter = THREE.LinearFilter
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false })
   const sprite = new THREE.Sprite(material)
-  sprite.scale.set(3.6, 0.9, 1)
+  sprite.scale.set(3.8, 0.95, 1)
   return sprite
 }
 
@@ -546,6 +549,7 @@ export default function Scenario() {
     floor.rotation.x = -Math.PI / 2
     floor.position.y = 0
     scene.add(floor)
+    t.floor = floor
 
     // Machinery Units
     const machineMat = new THREE.MeshStandardMaterial({ color: '#4B5563', metalness: 0.7, roughness: 0.3 })
@@ -622,6 +626,9 @@ export default function Scenario() {
 
       const fLight = new THREE.PointLight('#F97316', 4.0, 9)
       hazardGroup.add(fLight)
+
+      t.flameMeshes = [flameCore, flameInner]
+      t.flameLight = fLight
     }
     scene.add(hazardGroup)
     t.hazardGroup = hazardGroup
@@ -741,7 +748,14 @@ export default function Scenario() {
       if (hits.length > 0) {
         const hit = hits[0].object
         if (hit.userData && hit.userData.stepIndex !== undefined) {
-          handleStepClick(hit.userData.stepIndex)
+          const clicked = hit.userData.stepIndex
+          if (clicked === currentStepRef.current) {
+            handleStepClick(clicked)
+          } else if (clicked > currentStepRef.current) {
+            setStepFeedback({ correct: false, label: 'Out of Sequence: Follow safety protocol in order!' })
+            speak('Action out of sequence. Follow the safety protocol step order.', lang)
+            setTimeout(() => setStepFeedback(null), 2400)
+          }
         }
       }
     }
@@ -774,8 +788,12 @@ export default function Scenario() {
       const elapsed = t.clock.getElapsedTime()
 
       // Animate hazard
-      if (t.hazardGroup) {
+      if (t.hazardGroup && !t.flameExtinguished) {
         t.hazardGroup.scale.setScalar(1 + Math.sin(elapsed * 8) * 0.08)
+        if (t.flameMeshes) {
+          t.flameMeshes[0].scale.set(1 + Math.sin(elapsed * 14) * 0.12, 1 + Math.cos(elapsed * 12) * 0.15, 1 + Math.sin(elapsed * 11) * 0.12)
+          t.flameMeshes[1].scale.set(1 + Math.cos(elapsed * 16) * 0.10, 1 + Math.sin(elapsed * 15) * 0.18, 1 + Math.cos(elapsed * 13) * 0.10)
+        }
       }
 
       // Animate step nodes
@@ -863,15 +881,29 @@ export default function Scenario() {
       }
     })
 
-    // Update scene background for AR vs 3D mode
+    // Update scene background and floor visibility for AR vs 3D mode
     if (t.scene) {
       if (arMode) {
         t.scene.background = null // Transparent for camera view
+        if (t.floor) t.floor.visible = false // Trainee's camera shows real-world floor!
       } else {
         t.scene.background = new THREE.Color('#1F242D') // Crisp slate studio room
+        if (t.floor) t.floor.visible = true
       }
     }
-  }, [currentStep, completedSteps, arMode])
+
+    // Dynamic virtual hazard reactions
+    if (isFireScenario && t.flameMeshes) {
+      const isExtinguished = completedSteps.includes(3)
+      t.flameExtinguished = isExtinguished
+      t.flameMeshes.forEach(mesh => {
+        mesh.visible = !isExtinguished
+      })
+      if (t.flameLight) {
+        t.flameLight.intensity = isExtinguished ? 0 : 4.0
+      }
+    }
+  }, [currentStep, completedSteps, arMode, isFireScenario])
 
   if (isLoading || !cameraChecked) {
     return (
@@ -891,9 +923,25 @@ export default function Scenario() {
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#1F242D', position: 'relative', overflow: 'hidden' }}>
 
-      {/* Camera Live Feed (AR Mode) — Clean AR Training Area */}
+      {/* Camera Live Feed & Virtual AR HUD (AR Mode) */}
       {arMode && cameraAvail && (
-        <CameraBackground streamRef={cameraStreamRef} videoRef={cameraVideoRef} />
+        <>
+          <CameraBackground streamRef={cameraStreamRef} videoRef={cameraVideoRef} />
+          <VirtualARHUD
+            scenario={scenario}
+            currentStep={currentStep}
+            completedSteps={completedSteps}
+            steps={steps}
+            lang={lang}
+            onStepClick={handleStepClick}
+            stepFeedback={stepFeedback}
+            allDone={allDone}
+            saving={saving}
+            onToggleMode={toggleARMode}
+            onExit={() => navigate('/dashboard')}
+            isOnline={isOnline}
+          />
+        </>
       )}
 
       {/* Persistent Three.js Canvas */}
@@ -910,19 +958,6 @@ export default function Scenario() {
           cursor: 'grab',
         }}
       />
-
-      {/* AR Center Reticle / Crosshair */}
-      {arMode && (
-        <div style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          width: 48, height: 48, pointerEvents: 'none', zIndex: 5,
-          border: '2px solid rgba(255, 255, 255, 0.7)',
-          borderRadius: '50%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{ width: 8, height: 8, background: 'var(--color-brand)', borderRadius: '50%' }} />
-        </div>
-      )}
 
       {/* On-Screen Touch / Mouse Camera Helper Controls (Right Side) */}
       {!arMode && (
@@ -1052,151 +1087,151 @@ export default function Scenario() {
         </div>
       )}
 
-      {/* HUD Layer */}
-      <div style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none', display: 'flex', flexDirection: 'column' }}>
+      {/* Desktop 3D Simulation HUD Layer */}
+      {!arMode && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 10, pointerEvents: 'none', display: 'flex', flexDirection: 'column' }}>
 
-        {/* Top Header Bar */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 20px',
-          background: 'linear-gradient(to bottom, rgba(15,18,22,0.95), transparent)',
-          pointerEvents: 'all',
-        }}>
-          {/* Mode Badge */}
+          {/* Top Header Bar */}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: arMode ? 'rgba(224,90,0,0.25)' : 'rgba(14,124,123,0.25)',
-            border: `1.5px solid ${arMode ? 'var(--color-brand)' : '#0E7C7B'}`,
-            borderRadius: 20, padding: '6px 14px',
-            color: 'white', fontSize: 12, fontWeight: 700,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '16px 20px',
+            background: 'linear-gradient(to bottom, rgba(15,18,22,0.95), transparent)',
+            pointerEvents: 'all',
           }}>
-            {arMode ? <Camera size={14} color="var(--color-brand)" /> : <Monitor size={14} color="#0E7C7B" />}
-            {arMode ? '📷 Camera AR Mode' : '🖥️ 3D Simulation Mode'}
+            {/* Mode Badge */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: arMode ? 'rgba(224,90,0,0.25)' : 'rgba(14,124,123,0.25)',
+              border: `1.5px solid ${arMode ? 'var(--color-brand)' : '#0E7C7B'}`,
+              borderRadius: 20, padding: '6px 14px',
+              color: 'white', fontSize: 12, fontWeight: 700,
+            }}>
+              {arMode ? <Camera size={14} color="var(--color-brand)" /> : <Monitor size={14} color="#0E7C7B" />}
+              {arMode ? '📷 Camera AR Mode' : '🖥️ 3D Simulation Mode'}
+            </div>
+
+            {/* Right Action Controls */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {!isOnline && (
+                <div style={{
+                  background: 'rgba(212,136,42,0.9)', borderRadius: 20,
+                  padding: '4px 10px', fontSize: 11, fontWeight: 700, color: 'white',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <WifiOff size={12} /> OFFLINE
+                </div>
+              )}
+
+              <button
+                onClick={toggleARMode}
+                style={{
+                  background: 'rgba(28,32,40,0.9)', border: '1px solid rgba(255,255,255,0.25)',
+                  color: 'white', borderRadius: 20, padding: '8px 16px',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {arMode ? <Monitor size={14} /> : <Camera size={14} />}
+                {arMode ? 'Switch to 3D' : 'Switch to AR'}
+              </button>
+
+              <button
+                onClick={() => navigate('/dashboard')}
+                style={{
+                  background: 'rgba(220,38,38,0.2)', border: '1px solid #DC2626',
+                  color: 'white', borderRadius: 20, padding: '8px 14px',
+                  fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <X size={14} /> {T('exitTraining')}
+              </button>
+            </div>
           </div>
 
-          {/* Right Action Controls */}
-          <div style={{ display: 'flex', gap: 8 }}>
-            {!isOnline && (
-              <div style={{
-                background: 'rgba(212,136,42,0.9)', borderRadius: 20,
-                padding: '4px 10px', fontSize: 11, fontWeight: 700, color: 'white',
-                display: 'flex', alignItems: 'center', gap: 4,
-              }}>
-                <WifiOff size={12} /> OFFLINE
-              </div>
-            )}
-
-            <button
-              onClick={toggleARMode}
-              style={{
-                background: 'rgba(28,32,40,0.9)', border: '1px solid rgba(255,255,255,0.25)',
-                color: 'white', borderRadius: 20, padding: '8px 16px',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}
-            >
-              {arMode ? <Monitor size={14} /> : <Camera size={14} />}
-              {arMode ? 'Switch to 3D' : 'Switch to AR'}
-            </button>
-
-            <button
-              onClick={() => navigate('/dashboard')}
-              style={{
-                background: 'rgba(220,38,38,0.2)', border: '1px solid #DC2626',
-                color: 'white', borderRadius: 20, padding: '8px 14px',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}
-            >
-              <X size={14} /> {T('exitTraining')}
-            </button>
+          {/* Title */}
+          <div style={{ padding: '0 20px', pointerEvents: 'none' }}>
+            <span style={{
+              background: 'rgba(0,0,0,0.6)', padding: '4px 12px', borderRadius: 6,
+              color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: 700,
+            }}>
+              {scenario?.title ?? 'Industrial Training Scenario'}
+            </span>
           </div>
-        </div>
 
-        {/* Title */}
-        <div style={{ padding: '0 20px', pointerEvents: 'none' }}>
-          <span style={{
-            background: 'rgba(0,0,0,0.6)', padding: '4px 12px', borderRadius: 6,
-            color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: 700,
+          <div style={{ flex: 1 }} />
+
+          {/* Bottom Instruction & Action Card */}
+          <div style={{
+            background: 'linear-gradient(to top, rgba(12,14,18,0.96) 80%, transparent)',
+            padding: '24px 20px 20px',
+            pointerEvents: 'all',
+            maxWidth: 680,
+            margin: '0 auto',
+            width: '100%',
           }}>
-            {scenario?.title ?? 'Industrial Training Scenario'}
-          </span>
-        </div>
+            {/* Progress Segmented Bar */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+              {steps.map((_, i) => (
+                <div key={i} style={{
+                  flex: 1, height: 6, borderRadius: 3,
+                  background: completedSteps.includes(i) ? '#10B981'
+                    : i === currentStep ? 'var(--color-brand)' : 'rgba(255,255,255,0.2)',
+                  transition: 'background 0.3s ease',
+                }} />
+              ))}
+            </div>
 
-        <div style={{ flex: 1 }} />
+            {!allDone && activeStep && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ color: 'var(--color-brand)', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {T('step')} {currentStep + 1} / {steps.length}
+                  </span>
+                  <button
+                    onClick={() => speak(getStepText(activeStep, 'instruction'), lang)}
+                    style={{
+                      background: 'transparent', border: 'none', color: '#9CA3AF',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+                    }}
+                  >
+                    <Volume2 size={14} /> {T('listen')}
+                  </button>
+                </div>
 
-        {/* Bottom Instruction & Action Card */}
-        <div style={{
-          background: 'linear-gradient(to top, rgba(12,14,18,0.96) 80%, transparent)',
-          padding: '24px 20px 20px',
-          pointerEvents: 'all',
-          maxWidth: 680,
-          margin: '0 auto',
-          width: '100%',
-        }}>
-          {/* Progress Segmented Bar */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-            {steps.map((_, i) => (
-              <div key={i} style={{
-                flex: 1, height: 6, borderRadius: 3,
-                background: completedSteps.includes(i) ? '#10B981'
-                  : i === currentStep ? 'var(--color-brand)' : 'rgba(255,255,255,0.2)',
-                transition: 'background 0.3s ease',
-              }} />
-            ))}
-          </div>
+                <h2 style={{ color: 'white', fontSize: 'clamp(1.1rem, 2.5vw, 1.35rem)', fontWeight: 800, marginBottom: 6 }}>
+                  {getStepText(activeStep, 'label')}
+                </h2>
 
-          {!allDone && activeStep && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ color: 'var(--color-brand)', fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  {T('step')} {currentStep + 1} / {steps.length}
-                </span>
-                <button
-                  onClick={() => speak(getStepText(activeStep, 'instruction'), lang)}
-                  style={{
-                    background: 'transparent', border: 'none', color: '#9CA3AF',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
-                  }}
-                >
-                  <Volume2 size={14} /> {T('listen')}
-                </button>
-              </div>
+                <p style={{ color: '#D1D5DB', fontSize: 14, lineHeight: 1.5, marginBottom: 14 }}>
+                  {getStepText(activeStep, 'instruction')}
+                </p>
 
-              <h2 style={{ color: 'white', fontSize: 'clamp(1.1rem, 2.5vw, 1.35rem)', fontWeight: 800, marginBottom: 6 }}>
-                {getStepText(activeStep, 'label')}
-              </h2>
+                {/* Direct Action Completion Button (Guarantees 100% usability!) */}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={() => handleStepClick(currentStep)}
+                    style={{
+                      flex: 1,
+                      background: 'var(--color-brand)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 12,
+                      padding: '14px 20px',
+                      fontWeight: 700,
+                      fontSize: 15,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      boxShadow: '0 4px 14px rgba(224,90,0,0.4)',
+                    }}
+                  >
+                    <CheckCircle size={20} />
+                    Complete Action: {activeStep.label}
+                  </button>
 
-              <p style={{ color: '#D1D5DB', fontSize: 14, lineHeight: 1.5, marginBottom: 14 }}>
-                {getStepText(activeStep, 'instruction')}
-              </p>
-
-              {/* Direct Action Completion Button (Guarantees 100% usability!) */}
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button
-                  onClick={() => handleStepClick(currentStep)}
-                  style={{
-                    flex: 1,
-                    background: 'var(--color-brand)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: 12,
-                    padding: '14px 20px',
-                    fontWeight: 700,
-                    fontSize: 15,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    boxShadow: '0 4px 14px rgba(224,90,0,0.4)',
-                  }}
-                >
-                  <CheckCircle size={20} />
-                  Complete Action: {activeStep.label}
-                </button>
-
-                {!arMode && (
                   <button
                     onClick={handleFocusTarget}
                     title="Center view on this target"
@@ -1218,38 +1253,38 @@ export default function Scenario() {
                     <Target size={18} />
                     Locate
                   </button>
-                )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {allDone && (
-            <div style={{ textAlign: 'center', padding: '12px 0' }}>
-              <div style={{
-                width: 48, height: 48, borderRadius: '50%', background: 'rgba(16,185,129,0.2)',
-                color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 10px',
-              }}>
-                <CheckCircle size={28} />
+            {allDone && (
+              <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: '50%', background: 'rgba(16,185,129,0.2)',
+                  color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 10px',
+                }}>
+                  <CheckCircle size={28} />
+                </div>
+                <h3 style={{ color: '#10B981', fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
+                  All Safety Actions Completed!
+                </h3>
+                <p style={{ color: '#9CA3AF', fontSize: 13 }}>
+                  {saving ? 'Saving results and preparing knowledge assessment…' : 'Preparing results…'}
+                </p>
               </div>
-              <h3 style={{ color: '#10B981', fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
-                All Safety Actions Completed!
-              </h3>
-              <p style={{ color: '#9CA3AF', fontSize: 13 }}>
-                {saving ? 'Saving results and preparing knowledge assessment…' : 'Preparing results…'}
-              </p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Step Feedback Popup */}
-      {stepFeedback && (
+      {/* Step Feedback Popup for 3D Mode */}
+      {!arMode && stepFeedback && (
         <div style={{
           position: 'absolute', top: '45%', left: '50%',
           transform: 'translate(-50%, -50%)',
           zIndex: 30,
-          background: 'rgba(16, 185, 129, 0.95)',
+          background: stepFeedback.correct ? 'rgba(16, 185, 129, 0.95)' : 'rgba(239, 68, 68, 0.95)',
           backdropFilter: 'blur(8px)',
           borderRadius: 16, padding: '18px 28px',
           textAlign: 'center', color: 'white',
@@ -1258,7 +1293,7 @@ export default function Scenario() {
         }}>
           <CheckCircle size={32} style={{ margin: '0 auto 6px' }} />
           <p style={{ fontWeight: 800, fontSize: 16 }}>{stepFeedback.label}</p>
-          <p style={{ fontSize: 13, opacity: 0.9 }}>Correct Action Performed! ✓</p>
+          <p style={{ fontSize: 13, opacity: 0.9 }}>{stepFeedback.correct ? 'Correct Action Performed! ✓' : 'Out of Sequence — Follow step order'}</p>
         </div>
       )}
     </div>
