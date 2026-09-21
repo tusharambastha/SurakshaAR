@@ -20,7 +20,7 @@
 <br />
 
 <p align="center">
-  <img src="./public/images/surakshaar-hero-preview.png" alt="SurakshaAR Platform Interface" width="100%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
+  <img src="./public/images/surakshaar-hero-preview-v2.png" alt="SurakshaAR Platform Interface" width="100%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
 </p>
 
 ---
