@@ -134,6 +134,7 @@ export default function Scenario() {
   const [stepStartTime, setStepStartTime] = useState(Date.now())
   const [stepFeedback, setStepFeedback]   = useState(null)
   const [showControlsHelp, setShowControlsHelp] = useState(true)
+  const [spatialDirectionCue, setSpatialDirectionCue] = useState(null)
 
   const canvasRef = useRef(null)
   const cameraStreamRef = useRef(null)
@@ -435,6 +436,13 @@ export default function Scenario() {
       setArMode(true)
     } else if (arMode) {
       setArMode(false)
+      const t = threeRef.current
+      if (t.camera && t.controls) {
+        t.camera.position.set(0, 3.5, 9.5)
+        t.controls.target.set(0, 1.2, 0)
+        t.controls.enabled = true
+        t.controls.update()
+      }
     } else {
       const stream = await requestCameraStream()
       if (stream) {
@@ -442,7 +450,7 @@ export default function Scenario() {
         setCameraAvail(true)
         setArMode(true)
       } else {
-        alert('Camera permission required for Camera AR Fire Detection. Using 3D Simulation Mode.')
+        alert('Camera permission required for Camera AR Mode. Using 3D Simulation Mode.')
       }
     }
   }
@@ -640,12 +648,11 @@ export default function Scenario() {
     // exactly as if a real fire were placed there.
     // (The previous camera.add() approach made the fire follow the screen — WRONG.)
     //
-    // ── BUG 2 FIX: Particle Billboard Flame System ────────────────────────────
-    // Replace plain cones with sprite billboard particles using AdditiveBlending.
-    // Each particle is a PlaneGeometry facing the camera (always), colored
-    // orange/yellow/red, rising upward and respawning — looks like real fire.
-
-    const WORLD_FIRE_POS = new THREE.Vector3(0, 0, 1.8) // fixed world spot
+    // ── Multi-Location World Anchored Fire Particle System ───────────────────
+    // Anchored at the Electrical Control Panel hazard coordinates: (3, 1.3, 2.7).
+    // In AR mode, the camera rotates at room origin, so this fire stays anchored
+    // in physical 3D space near the right corner of the room.
+    const WORLD_FIRE_POS = new THREE.Vector3(3, 1.3, 2.7) // fixed world spot on Control Panel
 
     // Create a procedural flame texture on canvas
     function makeFlameTexture(r, g, b) {
@@ -764,6 +771,51 @@ export default function Scenario() {
     const musterSign = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.08), new THREE.MeshStandardMaterial({ color: '#16A34A', emissive: '#15803D', emissiveIntensity: 0.7 }))
     musterSign.position.set(0, 2.4, 10)
     scene.add(musterSign)
+
+    // ── Evacuation Waypoints (Glowing animated route to Exit Door & Muster Point) ──
+    const evacPathGroup = new THREE.Group()
+    evacPathGroup.visible = false
+    const evacWaypoints = [
+      new THREE.Vector3(2.5, 0.04, 2.2),
+      new THREE.Vector3(1.0, 0.04, 1.0),
+      new THREE.Vector3(-0.8, 0.04, -0.2),
+      new THREE.Vector3(-2.6, 0.04, -1.8),
+      new THREE.Vector3(-4.4, 0.04, -3.4),
+      new THREE.Vector3(-5.8, 0.04, -4.8), // Exit door
+    ]
+    const evacArrowMat = new THREE.MeshBasicMaterial({
+      color: '#22C55E',
+      transparent: true,
+      opacity: 0.85,
+      side: THREE.DoubleSide,
+    })
+    const evacArrows = []
+    for (let i = 0; i < evacWaypoints.length - 1; i++) {
+      const p1 = evacWaypoints[i]
+      const p2 = evacWaypoints[i + 1]
+      const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5)
+      const dir = new THREE.Vector3().subVectors(p2, p1).normalize()
+
+      const shape = new THREE.Shape()
+      shape.moveTo(-0.24, -0.16)
+      shape.lineTo(0, 0.22)
+      shape.lineTo(0.24, -0.16)
+      shape.lineTo(0.12, -0.16)
+      shape.lineTo(0, 0.06)
+      shape.lineTo(-0.12, -0.16)
+      shape.closePath()
+
+      const arrowGeo = new THREE.ShapeGeometry(shape)
+      const arrowMesh = new THREE.Mesh(arrowGeo, evacArrowMat.clone())
+      arrowMesh.rotation.x = -Math.PI / 2
+      arrowMesh.rotation.z = Math.atan2(-dir.x, dir.z) + Math.PI
+      arrowMesh.position.copy(mid)
+      evacPathGroup.add(arrowMesh)
+      evacArrows.push(arrowMesh)
+    }
+    scene.add(evacPathGroup)
+    t.evacPathGroup = evacPathGroup
+    t.evacArrows = evacArrows
 
     // 7. Hotspot Beacons & Floating Badges
     const stepNodes = []
@@ -950,6 +1002,19 @@ export default function Scenario() {
       }
 
 
+      // Animate Evacuation Waypoints (visible on Evacuate & Muster steps)
+      if (t.evacPathGroup) {
+        const isEvacStep = currentStepRef.current >= 4
+        t.evacPathGroup.visible = isEvacStep
+        if (isEvacStep && t.evacArrows) {
+          t.evacArrows.forEach((arr, i) => {
+            const pulse = (Math.sin(elapsed * 6 - i * 0.9) + 1) / 2
+            arr.material.opacity = 0.35 + pulse * 0.6
+            arr.scale.setScalar(0.9 + pulse * 0.25)
+          })
+        }
+      }
+
       // Animate step nodes
       t.stepNodes.forEach((node) => {
         const isActive = node.group.visible && node.stepIndex === currentStepRef.current
@@ -966,6 +1031,10 @@ export default function Scenario() {
 
       // Handle AR camera orientation vs 3D OrbitControls
       if (arModeRef.current) {
+        if (controls) controls.enabled = false
+        // Fixed eye-level viewer position at training room center
+        camera.position.set(0, 1.4, 0)
+
         const { alpha, beta, gamma } = t.deviceRot
         const euler = new THREE.Euler(
           THREE.MathUtils.degToRad(beta - 90),
@@ -974,14 +1043,66 @@ export default function Scenario() {
           'YXZ'
         )
         camera.quaternion.setFromEuler(euler)
-      } else if (controls) {
-        if (autoRotateRef.current) {
-          controls.autoRotate = true
-          controls.autoRotateSpeed = 2.5
-        } else {
-          controls.autoRotate = false
+
+        // Directional wayfinding cue calculation for Spatial Multi-Location AR
+        const activeIdx = currentStepRef.current
+        const activeStepObj = steps[activeIdx]
+        if (activeStepObj?.position) {
+          const targetPos = new THREE.Vector3(...activeStepObj.position)
+          const camWorldPos = new THREE.Vector3()
+          camera.getWorldPosition(camWorldPos)
+
+          const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+          camForward.y = 0
+          camForward.normalize()
+
+          const toTarget = new THREE.Vector3().subVectors(targetPos, camWorldPos)
+          toTarget.y = 0
+          const dist = toTarget.length()
+          toTarget.normalize()
+
+          const dot = Math.min(Math.max(camForward.dot(toTarget), -1), 1)
+          const angleRad = Math.acos(dot)
+          const angleDeg = Math.round(THREE.MathUtils.radToDeg(angleRad))
+
+          // In Three.js forward is -Z. Cross product Y indicates Left vs Right
+          const crossY = camForward.z * toTarget.x - camForward.x * toTarget.z
+
+          let turnDirection = 'in-front'
+          if (angleDeg <= 25) {
+            turnDirection = 'in-front'
+          } else if (angleDeg >= 135) {
+            turnDirection = 'behind'
+          } else if (crossY < 0) {
+            turnDirection = 'right'
+          } else {
+            turnDirection = 'left'
+          }
+
+          const now = performance.now()
+          if (!t.lastCueUpdate || now - t.lastCueUpdate > 100) {
+            t.lastCueUpdate = now
+            setSpatialDirectionCue({
+              inView: angleDeg <= 25,
+              turnDirection,
+              angleDeg,
+              distanceMeters: dist.toFixed(1),
+              stationName: activeStepObj.label,
+              stepIndex: activeIdx,
+            })
+          }
         }
-        controls.update()
+      } else {
+        if (controls) {
+          controls.enabled = true
+          if (autoRotateRef.current) {
+            controls.autoRotate = true
+            controls.autoRotateSpeed = 2.5
+          } else {
+            controls.autoRotate = false
+          }
+          controls.update()
+        }
       }
 
       renderer.render(scene, camera)
@@ -1019,10 +1140,11 @@ export default function Scenario() {
         // Hide entire group when step is finished
         node.group.visible = false
       } else {
-        node.group.visible = true
+        // Spatial Multi-Location AR: in AR mode, ONLY render the active step's 3D object & beacon.
+        // In 3D simulation mode, keep upcoming objects subtly visible for warehouse context.
+        node.group.visible = arMode ? isActive : true
         node.beamMesh.visible = isActive
         node.ringMesh.visible = isActive
-        // BUG 3 FIX: Only show badge for the ACTIVE step — no overlapping badges
         node.badgeSprite.visible = isActive
 
         if (isActive) {
@@ -1096,6 +1218,7 @@ export default function Scenario() {
             onToggleMode={toggleARMode}
             onExit={() => navigate('/dashboard')}
             isOnline={isOnline}
+            spatialDirectionCue={spatialDirectionCue}
           />
         </>
       )}

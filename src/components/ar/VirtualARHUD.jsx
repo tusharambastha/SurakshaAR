@@ -1,5 +1,21 @@
-import { Volume2, CheckCircle2, AlertTriangle, Flame, Wind, Zap, Shield, Target, ArrowRight, Monitor, X, WifiOff } from 'lucide-react'
+import { useState } from 'react'
+import {
+  Volume2, CheckCircle2, AlertTriangle, Flame, Wind, Zap, Shield, Target,
+  ArrowRight, Monitor, X, WifiOff, Printer, Compass, ChevronLeft, ChevronRight,
+  RotateCcw, MapPin, Bell, DoorOpen, Navigation
+} from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { speak } from '../../lib/voice'
+
+// Visual icon lookup for spatial station steps
+const STATION_ICONS = {
+  0: Flame,       // Step 0: Hazard / Fire
+  1: Bell,        // Step 1: Alarm Call Point
+  2: Shield,      // Step 2: PPE Locker
+  3: AlertTriangle,// Step 3: Extinguisher / Action
+  4: DoorOpen,    // Step 4: Fire Exit
+  5: MapPin,      // Step 5: Muster Point
+}
 
 export default function VirtualARHUD({
   scenario,
@@ -14,7 +30,10 @@ export default function VirtualARHUD({
   onToggleMode,
   onExit,
   isOnline,
+  spatialDirectionCue,
 }) {
+  const [trackerExpanded, setTrackerExpanded] = useState(true)
+
   const activeStep = steps[currentStep]
   const isFire = scenario?.hazard_type === 'fire'
   const isGas = scenario?.hazard_type === 'gas_leak'
@@ -52,6 +71,11 @@ export default function VirtualARHUD({
   const stepLabel = getStepText(activeStep, 'label')
   const stepInstruction = getStepText(activeStep, 'instruction')
 
+  const inView = spatialDirectionCue?.inView ?? true
+  const turnDirection = spatialDirectionCue?.turnDirection ?? 'in-front'
+  const angleDeg = spatialDirectionCue?.angleDeg ?? 0
+  const distanceMeters = spatialDirectionCue?.distanceMeters ?? '2.0'
+
   return (
     <div
       aria-label="Virtual AR Heads-Up Display"
@@ -63,128 +87,365 @@ export default function VirtualARHUD({
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        padding: 'env(safe-area-inset-top, 12px) 16px env(safe-area-inset-bottom, 16px)',
+        padding: 'env(safe-area-inset-top, 10px) 12px env(safe-area-inset-bottom, 14px)',
         boxSizing: 'border-box',
       }}
     >
-      {/* ── Top AR Status Banner ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 8,
-          pointerEvents: 'all',
-        }}
-      >
-        {/* Scenario & Hazard Badge */}
+      {/* ── TOP SECTION: Header Controls + Mini-Map + Spatial Guidance ── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'all' }}>
+        {/* Top AR Status Banner */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
             gap: 8,
-            background: 'rgba(15, 18, 24, 0.88)',
-            backdropFilter: 'blur(8px)',
-            border: `1px solid ${hazardMarker.color}55`,
-            borderRadius: '24px',
-            padding: '6px 14px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
           }}
         >
-          {hazardMarker.icon}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: hazardMarker.color, letterSpacing: '0.04em' }}>
-              {hazardMarker.label}
-            </span>
-            <span style={{ fontSize: '0.62rem', color: '#9CA3AF' }}>
-              {hazardMarker.subtext}
-            </span>
-          </div>
-        </div>
-
-        {/* Top Right Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Live AR Feed Indicator */}
+          {/* Scenario & Hazard Badge */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              background: 'rgba(15, 18, 24, 0.88)',
+              gap: 8,
+              background: 'rgba(15, 18, 24, 0.90)',
               backdropFilter: 'blur(8px)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              borderRadius: '20px',
-              padding: '5px 10px',
+              border: `1px solid ${hazardMarker.color}55`,
+              borderRadius: '24px',
+              padding: '6px 12px',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
             }}
           >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: '#10B981',
-                boxShadow: '0 0 8px #10B981',
-              }}
-            />
-            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#F3F4F6' }}>
-              AR VIEW
-            </span>
+            {hazardMarker.icon}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: hazardMarker.color, letterSpacing: '0.04em' }}>
+                {hazardMarker.label}
+              </span>
+              <span style={{ fontSize: '0.62rem', color: '#9CA3AF' }}>
+                {hazardMarker.subtext}
+              </span>
+            </div>
           </div>
 
-          {onToggleMode && (
-            <button
-              type="button"
-              onClick={onToggleMode}
-              title="Switch to 3D Simulation Mode"
+          {/* Top Right Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Printable Markers Setup Guide Link */}
+            <a
+              href="#/setup-guide"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View & Print Room Station Markers"
               style={{
                 background: 'rgba(28, 32, 40, 0.90)',
                 border: '1px solid rgba(255, 255, 255, 0.25)',
-                color: '#FFFFFF',
+                color: '#E05A00',
                 borderRadius: '20px',
-                padding: '5px 10px',
+                padding: '5px 9px',
                 fontSize: '0.72rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-              }}
-            >
-              <Monitor size={13} />
-              <span>3D</span>
-            </button>
-          )}
-
-          {onExit && (
-            <button
-              type="button"
-              onClick={onExit}
-              title="Exit training"
-              style={{
-                background: 'rgba(220, 38, 38, 0.25)',
-                border: '1px solid #DC2626',
-                color: '#FFFFFF',
-                borderRadius: '20px',
-                padding: '5px 8px',
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                cursor: 'pointer',
+                fontWeight: 700,
+                textDecoration: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 4,
               }}
             >
-              <X size={13} />
+              <Printer size={13} />
+              <span>Markers</span>
+            </a>
+
+            {/* Live AR Feed Indicator */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                background: 'rgba(15, 18, 24, 0.90)',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: '20px',
+                padding: '5px 9px',
+              }}
+            >
+              <span
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: '#10B981',
+                  boxShadow: '0 0 8px #10B981',
+                }}
+              />
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#F3F4F6' }}>
+                SPATIAL AR
+              </span>
+            </div>
+
+            {onToggleMode && (
+              <button
+                type="button"
+                onClick={onToggleMode}
+                title="Switch to 3D Simulation Mode"
+                style={{
+                  background: 'rgba(28, 32, 40, 0.90)',
+                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  color: '#FFFFFF',
+                  borderRadius: '20px',
+                  padding: '5px 9px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <Monitor size={13} />
+                <span>3D</span>
+              </button>
+            )}
+
+            {onExit && (
+              <button
+                type="button"
+                onClick={onExit}
+                title="Exit training"
+                style={{
+                  background: 'rgba(220, 38, 38, 0.25)',
+                  border: '1px solid #DC2626',
+                  color: '#FFFFFF',
+                  borderRadius: '20px',
+                  padding: '5px 8px',
+                  fontSize: '0.72rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── 2D Top Mini-Map / Spatial Step Tracker ── */}
+        <div
+          style={{
+            background: 'rgba(15, 20, 30, 0.92)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '14px',
+            padding: '8px 12px',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          {/* Tracker Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Navigation size={13} color="#E05A00" />
+              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#F3F4F6' }}>
+                Step {currentStep + 1} of {steps.length}: <span style={{ color: '#E05A00' }}>{stepLabel}</span>
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setTrackerExpanded(!trackerExpanded)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94A3B8',
+                fontSize: '0.65rem',
+                cursor: 'pointer',
+                padding: '2px 4px',
+              }}
+            >
+              {trackerExpanded ? 'Hide Map' : 'Show Map'}
             </button>
+          </div>
+
+          {/* Station Stations Mini-Map Chips */}
+          {trackerExpanded && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${steps.length || 6}, 1fr)`,
+                gap: 4,
+              }}
+            >
+              {steps.map((s, idx) => {
+                const isCompleted = completedSteps.includes(idx)
+                const isActive = idx === currentStep
+                const Icon = STATION_ICONS[idx] || Target
+
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      padding: '4px 2px',
+                      borderRadius: 8,
+                      background: isActive
+                        ? 'rgba(224, 90, 0, 0.25)'
+                        : isCompleted
+                        ? 'rgba(16, 185, 129, 0.15)'
+                        : 'rgba(255, 255, 255, 0.05)',
+                      border: isActive
+                        ? '1.5px solid #E05A00'
+                        : isCompleted
+                        ? '1px solid #10B981'
+                        : '1px solid rgba(255, 255, 255, 0.08)',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {isCompleted ? (
+                        <CheckCircle2 size={12} color="#10B981" />
+                      ) : (
+                        <Icon size={12} color={isActive ? '#E05A00' : '#94A3B8'} />
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '0.58rem',
+                        fontWeight: isActive ? 800 : 600,
+                        color: isActive ? '#FFFFFF' : isCompleted ? '#10B981' : '#94A3B8',
+                        marginTop: 2,
+                        textAlign: 'center',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      {idx + 1}. {s.label.split(' ')[0]}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
+
+        {/* ── Spatial Wayfinding Direction Banner ── */}
+        {!allDone && (
+          <div
+            style={{
+              background: inView
+                ? 'rgba(16, 185, 129, 0.90)'
+                : 'rgba(224, 90, 0, 0.92)',
+              backdropFilter: 'blur(8px)',
+              borderRadius: '12px',
+              padding: '6px 12px',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              boxShadow: inView
+                ? '0 4px 16px rgba(16, 185, 129, 0.4)'
+                : '0 4px 16px rgba(224, 90, 0, 0.4)',
+              transition: 'background 0.2s ease',
+            }}
+          >
+            {inView ? (
+              <>
+                <Target size={16} />
+                <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>
+                  🎯 TARGET IN SIGHT ({distanceMeters}m) — Aim Reticle & Perform Action
+                </span>
+              </>
+            ) : turnDirection === 'right' ? (
+              <>
+                <Compass size={16} />
+                <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>
+                  Turn Right ➡ ({angleDeg}°) to locate {stepLabel}
+                </span>
+                <ChevronRight size={16} />
+              </>
+            ) : turnDirection === 'left' ? (
+              <>
+                <ChevronLeft size={16} />
+                <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>
+                  ⬅ Turn Left ({angleDeg}°) to locate {stepLabel}
+                </span>
+                <Compass size={16} />
+              </>
+            ) : (
+              <>
+                <RotateCcw size={16} />
+                <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>
+                  🔄 Turn Around ({angleDeg}°) — Station is behind you!
+                </span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ── Center Crosshairs & Active AR Target Reticle ── */}
+      {/* ── Off-Screen Perimeter Directional Indicators ── */}
+      {!allDone && !inView && (
+        <>
+          {turnDirection === 'left' && (
+            <div
+              style={{
+                position: 'absolute',
+                left: 10,
+                top: '46%',
+                transform: 'translateY(-50%)',
+                background: 'rgba(224, 90, 0, 0.92)',
+                color: 'white',
+                borderRadius: '24px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontWeight: 800,
+                fontSize: '0.8rem',
+                boxShadow: '0 0 20px rgba(224, 90, 0, 0.8)',
+                animation: 'pulse 1s infinite alternate',
+                pointerEvents: 'none',
+              }}
+            >
+              <ChevronLeft size={20} />
+              <span>{angleDeg}° LEFT</span>
+            </div>
+          )}
+
+          {turnDirection === 'right' && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 10,
+                top: '46%',
+                transform: 'translateY(-50%)',
+                background: 'rgba(224, 90, 0, 0.92)',
+                color: 'white',
+                borderRadius: '24px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontWeight: 800,
+                fontSize: '0.8rem',
+                boxShadow: '0 0 20px rgba(224, 90, 0, 0.8)',
+                animation: 'pulse 1s infinite alternate',
+                pointerEvents: 'none',
+              }}
+            >
+              <span>{angleDeg}° RIGHT</span>
+              <ChevronRight size={20} />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Center Reticle Target ── */}
       <div
         style={{
           position: 'absolute',
-          top: '46%',
+          top: '48%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
           display: 'flex',
@@ -193,27 +454,27 @@ export default function VirtualARHUD({
           pointerEvents: 'none',
         }}
       >
-        {/* Floating Hazard Target Pill */}
+        {/* Floating Reticle Status Pill */}
         <div
           style={{
-            marginBottom: 10,
-            background: 'rgba(20, 24, 33, 0.90)',
+            marginBottom: 8,
+            background: inView ? 'rgba(16, 185, 129, 0.90)' : 'rgba(20, 24, 33, 0.85)',
             backdropFilter: 'blur(6px)',
-            border: `1.5px solid ${hazardMarker.color}`,
+            border: `1.5px solid ${inView ? '#10B981' : hazardMarker.color}`,
             borderRadius: '16px',
-            padding: '4px 12px',
-            fontSize: '0.68rem',
+            padding: '3px 10px',
+            fontSize: '0.64rem',
             fontWeight: 800,
             color: '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            boxShadow: `0 0 16px ${hazardMarker.color}44`,
+            boxShadow: `0 0 16px ${inView ? '#10B98188' : hazardMarker.color + '44'}`,
             whiteSpace: 'nowrap',
           }}
         >
-          <Target size={13} color={hazardMarker.color} />
-          <span>VIRTUAL TRAINING OBJECT IN VIEW</span>
+          <Target size={12} color={inView ? '#FFFFFF' : hazardMarker.color} />
+          <span>{inView ? '🎯 OBJECT ANCHORED IN VIEW' : 'SCAN ROOM FOR MARKER'}</span>
         </div>
 
         {/* Precision Industrial Reticle */}
@@ -228,10 +489,10 @@ export default function VirtualARHUD({
           }}
         >
           {/* Outer Corner Brackets */}
-          <div style={{ position: 'absolute', top: 0, left: 0, width: 14, height: 14, borderTop: `2px solid ${hazardMarker.color}`, borderLeft: `2px solid ${hazardMarker.color}` }} />
-          <div style={{ position: 'absolute', top: 0, right: 0, width: 14, height: 14, borderTop: `2px solid ${hazardMarker.color}`, borderRight: `2px solid ${hazardMarker.color}` }} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, width: 14, height: 14, borderBottom: `2px solid ${hazardMarker.color}`, borderLeft: `2px solid ${hazardMarker.color}` }} />
-          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 14, height: 14, borderBottom: `2px solid ${hazardMarker.color}`, borderRight: `2px solid ${hazardMarker.color}` }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, width: 14, height: 14, borderTop: `2px solid ${inView ? '#10B981' : hazardMarker.color}`, borderLeft: `2px solid ${inView ? '#10B981' : hazardMarker.color}` }} />
+          <div style={{ position: 'absolute', top: 0, right: 0, width: 14, height: 14, borderTop: `2px solid ${inView ? '#10B981' : hazardMarker.color}`, borderRight: `2px solid ${inView ? '#10B981' : hazardMarker.color}` }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, width: 14, height: 14, borderBottom: `2px solid ${inView ? '#10B981' : hazardMarker.color}`, borderLeft: `2px solid ${inView ? '#10B981' : hazardMarker.color}` }} />
+          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 14, height: 14, borderBottom: `2px solid ${inView ? '#10B981' : hazardMarker.color}`, borderRight: `2px solid ${inView ? '#10B981' : hazardMarker.color}` }} />
 
           {/* Center Crosshair Dot */}
           <div
@@ -239,8 +500,8 @@ export default function VirtualARHUD({
               width: 8,
               height: 8,
               borderRadius: '50%',
-              background: '#FFFFFF',
-              boxShadow: '0 0 8px rgba(255,255,255,0.9)',
+              background: inView ? '#10B981' : '#FFFFFF',
+              boxShadow: inView ? '0 0 10px #10B981' : '0 0 8px rgba(255,255,255,0.9)',
             }}
           />
         </div>
@@ -256,12 +517,12 @@ export default function VirtualARHUD({
           backdropFilter: 'blur(12px)',
           border: '1.5px solid rgba(255, 255, 255, 0.16)',
           borderRadius: '20px',
-          padding: '16px 18px',
+          padding: '14px 16px',
           boxShadow: '0 12px 36px rgba(0, 0, 0, 0.55)',
           pointerEvents: 'all',
           display: 'flex',
           flexDirection: 'column',
-          gap: 12,
+          gap: 10,
         }}
       >
         {/* Progress Bar */}
@@ -300,10 +561,10 @@ export default function VirtualARHUD({
                     letterSpacing: '0.04em',
                   }}
                 >
-                  STEP {currentStep + 1} OF {steps.length}
+                  STATION {currentStep + 1} OF {steps.length}
                 </span>
                 <span style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>
-                  Standard Operating Protocol
+                  Safety Protocol Sequence
                 </span>
               </div>
 
@@ -340,7 +601,7 @@ export default function VirtualARHUD({
               </p>
             </div>
 
-            {/* Primary Action Button (Mobile Friendly & Direct Raycast Support) */}
+            {/* Primary Action Button (Works on both 3D object tap & screen button) */}
             <button
               type="button"
               onClick={() => onStepClick(currentStep)}
@@ -388,7 +649,7 @@ export default function VirtualARHUD({
               <CheckCircle2 size={26} />
             </div>
             <h3 style={{ color: '#10B981', fontSize: '1rem', fontWeight: 800, margin: '0 0 4px' }}>
-              Virtual AR Training Completed!
+              Spatial AR Training Completed!
             </h3>
             <p style={{ color: '#9CA3AF', fontSize: '0.78rem', margin: 0 }}>
               {saving ? 'Evaluating response times and saving score...' : 'Preparing safety readiness certificate...'}
@@ -426,7 +687,7 @@ export default function VirtualARHUD({
             {stepFeedback.label}
           </div>
           <div style={{ fontSize: '0.78rem', opacity: 0.95 }}>
-            {stepFeedback.correct ? 'Correct Safety Protocol Performed! ✓' : 'Action Out of Sequence — Review Safety Protocol'}
+            {stepFeedback.correct ? 'Correct Safety Station Reached! ✓' : 'Action Out of Sequence — Follow Protocol Order'}
           </div>
         </div>
       )}
