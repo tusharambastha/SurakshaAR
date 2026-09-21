@@ -42,15 +42,15 @@ import VirtualARHUD from '../components/ar/VirtualARHUD'
 // ─── Floating Canvas Text Sprite Helper ────────────────────────────────────────
 function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
   const canvas = document.createElement('canvas')
-  canvas.width = 512
-  canvas.height = 128
+  canvas.width = 768  // wider: full text never truncated
+  canvas.height = 140
   const ctx = canvas.getContext('2d')
 
   // Background pill
-  ctx.fillStyle = 'rgba(15, 18, 26, 0.92)'
+  ctx.fillStyle = 'rgba(15, 18, 26, 0.94)'
   ctx.strokeStyle = color
   ctx.lineWidth = 6
-  const r = 58, x = 6, y = 6, w = 500, h = 116
+  const r = 58, x = 6, y = 6, w = 756, h = 128
   ctx.beginPath()
   ctx.moveTo(x + r, y)
   ctx.arcTo(x + w, y, x + w, y + h, r)
@@ -64,32 +64,31 @@ function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
   // Circular step number badge
   ctx.fillStyle = color
   ctx.beginPath()
-  ctx.arc(64, 64, 42, 0, Math.PI * 2)
+  ctx.arc(70, 70, 46, 0, Math.PI * 2)
   ctx.fill()
 
   ctx.fillStyle = '#FFFFFF'
-  ctx.font = '900 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.font = '900 48px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
-  ctx.fillText(String(stepNumber), 64, 66)
+  ctx.fillText(String(stepNumber), 70, 72)
 
-  // Title text with industrial marker icon
+  // Title text with industrial marker icon — NO truncation
   const markerPrefixes = ['⚠ HAZARD: ', '🚨 ALARM: ', '🦺 PPE: ', '🧯 ACTION: ', '🚪 EVACUATE: ']
   const prefix = markerPrefixes[stepNumber - 1] || '🎯 STEP: '
-  let displayText = prefix + label
-  if (displayText.length > 22) displayText = displayText.substring(0, 20) + '…'
+  const displayText = prefix + label // full text, no cut-off
 
   ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.font = 'bold 30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
-  ctx.fillText(displayText, 122, 64)
+  ctx.fillText(displayText, 132, 70)
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.minFilter = THREE.LinearFilter
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false })
   const sprite = new THREE.Sprite(material)
-  sprite.scale.set(3.8, 0.95, 1)
+  sprite.scale.set(4.8, 1.10, 1) // wider to match wider canvas
   return sprite
 }
 
@@ -633,90 +632,107 @@ export default function Scenario() {
     scene.add(hazardGroup)
     t.hazardGroup = hazardGroup
 
-    // ── AR Camera-Attached Virtual Fire ──────────────────────────────────────
-    // This fire is a child of the camera so it is ALWAYS visible in AR mode
-    // regardless of gyro orientation. Positioned 2.5 units in front of camera.
+    // ── BUG 1 FIX: World-Anchored AR Fire Particle System ─────────────────────
+    // The fire lives at a FIXED WORLD POSITION in the Three.js scene (0, 0, 1.8).
+    // In AR mode the gyroscope rotates the Three.js CAMERA — not the scene.
+    // So objects at world positions stay anchored to that real-world spot:
+    // physically walking around the fire will show it from different angles,
+    // exactly as if a real fire were placed there.
+    // (The previous camera.add() approach made the fire follow the screen — WRONG.)
+    //
+    // ── BUG 2 FIX: Particle Billboard Flame System ────────────────────────────
+    // Replace plain cones with sprite billboard particles using AdditiveBlending.
+    // Each particle is a PlaneGeometry facing the camera (always), colored
+    // orange/yellow/red, rising upward and respawning — looks like real fire.
+
+    const WORLD_FIRE_POS = new THREE.Vector3(0, 0, 1.8) // fixed world spot
+
+    // Create a procedural flame texture on canvas
+    function makeFlameTexture(r, g, b) {
+      const fc = document.createElement('canvas')
+      fc.width = 64; fc.height = 64
+      const fctx = fc.getContext('2d')
+      const grad = fctx.createRadialGradient(32, 40, 2, 32, 32, 30)
+      grad.addColorStop(0,   `rgba(${r},${g},${b},1)`)
+      grad.addColorStop(0.4, `rgba(${r},${g},${b},0.7)`)
+      grad.addColorStop(1,   `rgba(${r},${g},${b},0)`)
+      fctx.fillStyle = grad
+      fctx.fillRect(0, 0, 64, 64)
+      return new THREE.CanvasTexture(fc)
+    }
+
     const arFireGroup = new THREE.Group()
-    arFireGroup.position.set(0, -0.25, -2.5) // slightly below center, in front
-    arFireGroup.visible = false // shown only in AR mode (toggled in render loop)
+    arFireGroup.position.copy(WORLD_FIRE_POS)
+    arFireGroup.visible = false
+    scene.add(arFireGroup) // scene child, NOT camera child → world-anchored
 
-    // Flame layer 1 — large red/orange base cone
-    const arFlame1 = new THREE.Mesh(
-      new THREE.ConeGeometry(0.22, 0.7, 14),
-      new THREE.MeshStandardMaterial({
-        color: '#FF3300',
-        emissive: '#CC2200',
-        emissiveIntensity: 4.0,
-        transparent: true,
-        opacity: 0.95,
-      })
-    )
-    arFlame1.position.y = 0.35
-    arFireGroup.add(arFlame1)
+    // ── Particle definitions: 30 flame particles + 10 smoke particles ──────────
+    const PARTICLE_COUNT = 30
+    const SMOKE_COUNT = 10
+    const particles = []
+    const smokeParts = []
 
-    // Flame layer 2 — mid orange cone
-    const arFlame2 = new THREE.Mesh(
-      new THREE.ConeGeometry(0.16, 0.55, 12),
-      new THREE.MeshStandardMaterial({
-        color: '#FF8800',
-        emissive: '#EE6600',
-        emissiveIntensity: 4.5,
-        transparent: true,
-        opacity: 0.92,
-      })
-    )
-    arFlame2.position.y = 0.28
-    arFireGroup.add(arFlame2)
+    const flameTex1 = makeFlameTexture(255, 80, 0)   // deep orange
+    const flameTex2 = makeFlameTexture(255, 160, 0)  // bright orange
+    const flameTex3 = makeFlameTexture(255, 230, 30) // yellow
 
-    // Flame layer 3 — bright yellow tip
-    const arFlame3 = new THREE.Mesh(
-      new THREE.ConeGeometry(0.09, 0.38, 10),
-      new THREE.MeshStandardMaterial({
-        color: '#FFEE00',
-        emissive: '#FFCC00',
-        emissiveIntensity: 5.0,
+    function makeParticle(isSmoke) {
+      const tex = isSmoke ? null : [flameTex1, flameTex2, flameTex3][Math.floor(Math.random() * 3)]
+      const size = isSmoke ? 0.18 + Math.random() * 0.14 : 0.08 + Math.random() * 0.18
+      const mat = new THREE.MeshBasicMaterial({
+        map: isSmoke ? null : tex,
+        color: isSmoke ? new THREE.Color(0.18, 0.18, 0.18) : new THREE.Color(1, 1, 1),
         transparent: true,
-        opacity: 0.90,
-      })
-    )
-    arFlame3.position.y = 0.22
-    arFireGroup.add(arFlame3)
-
-    // Flame base glow disc
-    const arFlameBase = new THREE.Mesh(
-      new THREE.CircleGeometry(0.28, 20),
-      new THREE.MeshStandardMaterial({
-        color: '#FF4400',
-        emissive: '#FF2200',
-        emissiveIntensity: 3.5,
-        transparent: true,
-        opacity: 0.75,
+        opacity: isSmoke ? 0.18 + Math.random() * 0.12 : 0.65 + Math.random() * 0.35,
+        blending: isSmoke ? THREE.NormalBlending : THREE.AdditiveBlending,
+        depthWrite: false,
         side: THREE.DoubleSide,
       })
-    )
-    arFlameBase.rotation.x = -Math.PI / 2
-    arFlameBase.position.y = 0.01
-    arFireGroup.add(arFlameBase)
+      const geo = new THREE.PlaneGeometry(size, size * 1.4)
+      const mesh = new THREE.Mesh(geo, mat)
 
-    // Glowing point light emanating from the fire
-    const arFireLight = new THREE.PointLight('#FF6600', 6.0, 3.5)
-    arFireLight.position.y = 0.4
+      // Random spawn position in a small cluster around fire base
+      const rx = (Math.random() - 0.5) * 0.22
+      const rz = (Math.random() - 0.5) * 0.22
+      const startY = isSmoke ? 0.55 + Math.random() * 0.3 : Math.random() * 0.3
+      mesh.position.set(rx, startY, rz)
+
+      // Per-particle velocities and lifecycle
+      mesh.userData = {
+        vx: (Math.random() - 0.5) * 0.004,
+        vy: isSmoke ? 0.006 + Math.random() * 0.006 : 0.018 + Math.random() * 0.022,
+        vz: (Math.random() - 0.5) * 0.004,
+        life: Math.random(), // 0..1 normalised lifecycle position
+        speed: isSmoke ? 0.003 + Math.random() * 0.003 : 0.005 + Math.random() * 0.008,
+        initOpacity: mat.opacity,
+        initSize: size,
+        isSmoke,
+        swayPhase: Math.random() * Math.PI * 2,
+      }
+
+      arFireGroup.add(mesh)
+      return mesh
+    }
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(makeParticle(false))
+    for (let i = 0; i < SMOKE_COUNT; i++) smokeParts.push(makeParticle(true))
+    t.arParticles = [...particles, ...smokeParts]
+
+    // Urgent-growth start time
+    t.arFireStartTime = t.clock.getElapsedTime()
+
+    // Glowing point light — world-anchored at fire position
+    const arFireLight = new THREE.PointLight('#FF6600', 7.0, 4.5)
+    arFireLight.position.set(0, 0.5, 0)
     arFireGroup.add(arFireLight)
-
-    // Second softer ambient glow
-    const arFireGlow = new THREE.PointLight('#FF3300', 3.0, 6.0)
-    arFireGlow.position.y = 0.8
+    const arFireGlow = new THREE.PointLight('#FF3300', 3.5, 7.0)
+    arFireGlow.position.set(0, 1.0, 0)
     arFireGroup.add(arFireGlow)
 
-    // Attach to camera so it always follows camera orientation
-    camera.add(arFireGroup)
     t.arFireGroup = arFireGroup
-    t.arFlameMeshes = [arFlame1, arFlame2, arFlame3]
-    t.arFlameBase = arFlameBase
     t.arFireLight = arFireLight
     t.arFireGlow = arFireGlow
-    // Add camera to scene (required for camera children to render)
-    scene.add(camera)
+    t.WORLD_FIRE_POS = WORLD_FIRE_POS
 
     // Fire Alarm Station prop ([2.5, 2.0, -2])
     const alarmPole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2), machineMat)
@@ -881,37 +897,54 @@ export default function Scenario() {
         }
       }
 
-      // Animate camera-attached AR fire (always visible when AR mode is on)
+      // Animate world-anchored AR fire particle system (BUG 1 + BUG 2 FIX)
       if (t.arFireGroup) {
         const inAR = arModeRef.current
         t.arFireGroup.visible = inAR && !t.flameExtinguished
-        if (inAR && t.arFlameMeshes) {
-          // Flicker: each cone scales independently with different frequencies
-          t.arFlameMeshes[0].scale.set(
-            1 + Math.sin(elapsed * 13) * 0.18,
-            1 + Math.cos(elapsed * 11) * 0.22 + Math.sin(elapsed * 7) * 0.10,
-            1 + Math.sin(elapsed * 9)  * 0.18
-          )
-          t.arFlameMeshes[1].scale.set(
-            1 + Math.cos(elapsed * 17) * 0.14,
-            1 + Math.sin(elapsed * 14) * 0.25 + Math.cos(elapsed * 9) * 0.08,
-            1 + Math.cos(elapsed * 15) * 0.14
-          )
-          t.arFlameMeshes[2].scale.set(
-            1 + Math.sin(elapsed * 21) * 0.10,
-            1 + Math.cos(elapsed * 19) * 0.30 + Math.sin(elapsed * 11) * 0.12,
-            1 + Math.sin(elapsed * 23) * 0.10
-          )
-          // Pulse the base glow disc opacity
-          if (t.arFlameBase) {
-            t.arFlameBase.material.opacity = 0.6 + Math.sin(elapsed * 8) * 0.25
-          }
-          // Flicker the point lights
+        if (inAR && !t.flameExtinguished && t.arParticles) {
+          // Fire grows urgently over 10-15s to simulate escalating danger
+          const timeSinceStart = elapsed - (t.arFireStartTime ?? 0)
+          const urgencyScale = Math.min(1.0 + timeSinceStart / 12.0, 2.8)
+          t.arFireGroup.scale.setScalar(urgencyScale)
+
+          // Billboard: make each particle face the camera each frame
+          t.arParticles.forEach(p => {
+            const d = p.userData
+            // Advance lifecycle
+            d.life += d.speed
+            if (d.life >= 1.0) {
+              // Respawn at base
+              d.life = 0
+              p.position.x = (Math.random() - 0.5) * (d.isSmoke ? 0.28 : 0.18)
+              p.position.y = d.isSmoke ? 0.55 + Math.random() * 0.2 : Math.random() * 0.1
+              p.position.z = (Math.random() - 0.5) * (d.isSmoke ? 0.28 : 0.18)
+              p.material.opacity = d.initOpacity
+            }
+
+            // Rise upward + gentle sway
+            p.position.y += d.vy
+            p.position.x += d.vx + Math.sin(elapsed * 3.5 + d.swayPhase) * 0.002
+            p.position.z += d.vz
+
+            // Fade out toward end of life
+            const fadeStart = d.isSmoke ? 0.55 : 0.45
+            if (d.life > fadeStart) {
+              p.material.opacity = d.initOpacity * (1 - (d.life - fadeStart) / (1 - fadeStart))
+            }
+
+            // Billboard: rotate particle to face camera (in group local space)
+            const camWorldPos = new THREE.Vector3()
+            camera.getWorldPosition(camWorldPos)
+            const camLocal = t.arFireGroup.worldToLocal(camWorldPos.clone())
+            p.lookAt(camLocal)
+          })
+
+          // Flicker the lights
           if (t.arFireLight) {
-            t.arFireLight.intensity = 5.0 + Math.sin(elapsed * 18) * 2.5 + Math.cos(elapsed * 11) * 1.5
+            t.arFireLight.intensity = (6.0 + Math.sin(elapsed * 19) * 3.0 + Math.cos(elapsed * 11) * 1.5) * Math.min(urgencyScale, 1.5)
           }
           if (t.arFireGlow) {
-            t.arFireGlow.intensity = 2.5 + Math.sin(elapsed * 9) * 1.2
+            t.arFireGlow.intensity = (3.0 + Math.sin(elapsed * 8) * 1.5) * Math.min(urgencyScale, 1.5)
           }
         }
       }
@@ -983,21 +1016,23 @@ export default function Scenario() {
       const isActive = node.stepIndex === currentStep
 
       if (isCompleted) {
-        // Hide when finished
+        // Hide entire group when step is finished
         node.group.visible = false
       } else {
         node.group.visible = true
         node.beamMesh.visible = isActive
         node.ringMesh.visible = isActive
+        // BUG 3 FIX: Only show badge for the ACTIVE step — no overlapping badges
+        node.badgeSprite.visible = isActive
 
         if (isActive) {
           node.orbMesh.material.emissiveIntensity = 1.0
           node.orbMesh.scale.setScalar(1.25)
-          node.badgeSprite.scale.set(3.8, 0.95, 1)
+          node.badgeSprite.scale.set(4.2, 1.05, 1) // slightly wider so text never truncates
         } else {
-          node.orbMesh.material.emissiveIntensity = 0.2
-          node.orbMesh.scale.setScalar(0.85)
-          node.badgeSprite.scale.set(2.8, 0.7, 1)
+          // Keep orb small and dim (still raycasting target but invisible badge)
+          node.orbMesh.material.emissiveIntensity = 0.05
+          node.orbMesh.scale.setScalar(0.6)
         }
       }
     })
