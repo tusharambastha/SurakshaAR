@@ -3,6 +3,11 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 
+if (typeof window !== 'undefined') {
+  window.React = React
+  window.ReactDOM = ReactDOM
+}
+
 try {
   const rootEl = document.getElementById('root')
   if (rootEl) {

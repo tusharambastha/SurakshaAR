@@ -303,7 +303,10 @@ function ModuleCard({ scenario, sessions, onStart, T, lang }) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-md)', background: 'var(--color-brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-brand)', flexShrink: 0 }}>
-          {React.createElement(HAZARD_ICONS[scenario.hazard_type] || AlertTriangle, { size: 18 })}
+          {(() => {
+            const Icon = HAZARD_ICONS[scenario.hazard_type] || AlertTriangle
+            return <Icon size={18} />
+          })()}
         </div>
         <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700 }}>{localTitle}</h3>
       </div>

@@ -8,7 +8,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { AdminRoute } from './components/auth/AdminRoute'
 import OfflineBanner from './components/ui/OfflineBanner'
 import SafetyChatbot from './components/chatbot/SafetyChatbot'
-import React from 'react'
+import React, { Component } from 'react'
 
 // Pages
 import Landing     from './pages/Landing'
@@ -39,7 +39,7 @@ const queryClient = new QueryClient({
   },
 })
 
-class ErrorBoundary extends React.Component {
+class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
     this.state = { hasError: false, error: null }
