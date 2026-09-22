@@ -17,33 +17,66 @@
     <title>SurakshaAR — Immersive Safety Training</title>
     <script>
       (function() {
+        var RETRY_KEY = 'sar_retry_' + 'v3';
+        
+        function forceBustUrl(targetHash) {
+          var origin = window.location.origin || '';
+          var pathname = window.location.pathname || '/SurakshaAR/';
+          var hash = targetHash !== undefined ? targetHash : (window.location.hash || '');
+          var url = origin + pathname + '?_sar_v=' + Date.now() + hash;
+          return url;
+        }
+
+        window.__sarForceReload = function() {
+          try { sessionStorage.clear(); localStorage.clear(); } catch(e) {}
+          window.location.href = forceBustUrl();
+        };
+
+        window.__sarResetHome = function() {
+          try { sessionStorage.clear(); localStorage.clear(); } catch(e) {}
+          window.location.href = forceBustUrl('#/landing');
+        };
+
         function renderFatal(title, msg, stack) {
           var root = document.getElementById('root');
-          var target = root || document.body || document.documentElement;
+          // If app has already rendered something meaningful, do not block UI
+          if (root && root.children.length > 0) return;
+          if (document.getElementById('sar-fatal-box')) return;
+
+          var target = document.body || document.documentElement;
           var card = document.createElement('div');
           card.id = 'sar-fatal-box';
           card.style.cssText = 'position:fixed;inset:0;background:#FDF8F6;color:#1F2937;padding:24px;z-index:9999999;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;box-sizing:border-box;';
-          card.innerHTML = '<div style="max-width:540px;width:100%;background:#FFFFFF;border:1.5px solid #FCA5A5;border-radius:16px;padding:32px;box-shadow:0 12px 36px rgba(0,0,0,0.12);text-align:center;">' +
-            '<div style="font-size:44px;margin-bottom:12px;">⚠️</div>' +
-            '<h2 style="color:#DC2626;font-size:1.3rem;font-weight:800;margin:0 0 10px;">' + title + '</h2>' +
-            '<p style="font-size:0.92rem;color:#4B5563;line-height:1.6;margin:0 0 16px;word-break:break-word;">' + (msg || 'An issue occurred during application initialization.') + '</p>' +
-            (stack ? '<pre style="text-align:left;background:#F3F4F6;color:#374151;padding:12px;border-radius:8px;font-size:11px;overflow:auto;max-height:160px;white-space:pre-wrap;margin:0 0 20px;">' + stack + '</pre>' : '') +
+          card.innerHTML = '<div style="max-width:520px;width:100%;background:#FFFFFF;border:1.5px solid #FCA5A5;border-radius:16px;padding:28px 24px;box-shadow:0 12px 36px rgba(0,0,0,0.12);text-align:center;">' +
+            '<div style="font-size:40px;margin-bottom:10px;">⚠️</div>' +
+            '<h2 style="color:#DC2626;font-size:1.25rem;font-weight:800;margin:0 0 10px;">' + title + '</h2>' +
+            '<p style="font-size:0.92rem;color:#4B5563;line-height:1.55;margin:0 0 16px;word-break:break-word;">' + (msg || 'An issue occurred during initialization.') + '</p>' +
+            (stack ? '<pre style="text-align:left;background:#F3F4F6;color:#374151;padding:10px;border-radius:8px;font-size:11px;overflow:auto;max-height:140px;white-space:pre-wrap;margin:0 0 18px;">' + stack + '</pre>' : '') +
             '<div style="display:flex;flex-direction:column;gap:10px;">' +
-              '<button onclick="window.location.reload(true);" style="background:#E05A00;color:#FFFFFF;border:none;padding:12px 20px;border-radius:10px;font-weight:700;font-size:0.95rem;cursor:pointer;width:100%;">Hard Reload Application</button>' +
-              '<button onclick="try{localStorage.clear();sessionStorage.clear();}catch(e){}window.location.hash=\'#/landing\';window.location.reload(true);" style="background:#F3F4F6;color:#374151;border:1px solid #D1D5DB;padding:10px 20px;border-radius:10px;font-weight:600;font-size:0.88rem;cursor:pointer;width:100%;">Reset Cache & Go to Home</button>' +
+              '<button onclick="window.__sarForceReload();" style="background:#E05A00;color:#FFFFFF;border:none;padding:12px 18px;border-radius:10px;font-weight:700;font-size:0.92rem;cursor:pointer;width:100%;box-shadow:0 2px 8px rgba(224,90,0,0.3);">Force Fresh Reload (Clear Cache)</button>' +
+              '<button onclick="window.__sarResetHome();" style="background:#F3F4F6;color:#374151;border:1px solid #D1D5DB;padding:10px 18px;border-radius:10px;font-weight:600;font-size:0.86rem;cursor:pointer;width:100%;">Reset Cache & Go to Home</button>' +
             '</div>' +
           '</div>';
           target.appendChild(card);
         }
 
-        // Capture resource loading errors (scripts, stylesheets) using capture: true
+        // Auto-recover once on subresource loading errors (e.g. during CDN propagation)
         window.addEventListener('error', function(e) {
           if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
             var url = e.target.src || e.target.href || '';
-            renderFatal('Resource Loading Issue', 'Could not load asset: ' + url + '. Your browser may have cached an outdated build of SurakshaAR.');
+            var lastRetry = sessionStorage.getItem(RETRY_KEY);
+            // If not retried within the last 12 seconds, perform automatic cache-busting reload
+            if (!lastRetry || (Date.now() - parseInt(lastRetry, 10)) > 12000) {
+              sessionStorage.setItem(RETRY_KEY, Date.now().toString());
+              window.location.replace(forceBustUrl());
+              return;
+            }
+            renderFatal('Update in Progress', 'A new version of SurakshaAR was deployed. Please tap below to load the fresh update.');
             return;
           }
-          renderFatal('Startup Error', (e.message || 'Script error') + (e.filename ? ' (' + e.filename + ':' + e.lineno + ')' : ''), e.error && e.error.stack);
+          if (e.message) {
+            renderFatal('Startup Error', (e.message || 'Script error') + (e.filename ? ' (' + e.filename + ':' + e.lineno + ')' : ''), e.error && e.error.stack);
+          }
         }, true);
 
         window.addEventListener('unhandledrejection', function(e) {
@@ -51,13 +84,13 @@
           renderFatal('Application Initialization Error', reason);
         });
 
-        // Watchdog: If nothing has rendered inside #root after 3.8s, provide an immediate refresh helper
+        // Watchdog: If nothing has rendered inside #root after 4.5s, offer fresh reload
         setTimeout(function() {
           var r = document.getElementById('root');
           if (r && (!r.children.length || r.innerHTML.trim() === '') && !document.getElementById('sar-fatal-box')) {
-            renderFatal('Loading Taking Longer Than Expected', 'The application is taking time to start. Please reload to sync the latest training assets.');
+            renderFatal('Ready for Fresh Update', 'The application is ready to load the latest safety modules. Tap below to sync.');
           }
-        }, 3800);
+        }, 4500);
       })();
     </script>
     <script type="module" crossorigin src="/SurakshaAR/assets/index-DjRmahUc.js"></script>
