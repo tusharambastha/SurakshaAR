@@ -93,6 +93,719 @@ function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
   return sprite
 }
 
+// ─── Procedural Web Audio Ambient Fire Sound Synthesizer ─────────────────────
+class ProceduralFireAudio {
+  constructor() {
+    this.ctx = null
+    this.gainNode = null
+    this.noiseSource = null
+    this.isPlaying = false
+    this.intervalId = null
+  }
+
+  start() {
+    if (this.isPlaying) return
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      if (!this.ctx) {
+        this.ctx = new AudioCtx()
+      }
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {})
+      }
+
+      this.gainNode = this.ctx.createGain()
+      this.gainNode.gain.setValueAtTime(0.01, this.ctx.currentTime)
+      this.gainNode.gain.exponentialRampToValueAtTime(0.18, this.ctx.currentTime + 0.8)
+      this.gainNode.connect(this.ctx.destination)
+
+      // Low frequency fire roar (pink/brown noise generator buffer)
+      const bufferSize = Math.floor(this.ctx.sampleRate * 2)
+      const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate)
+      const output = noiseBuffer.getChannelData(0)
+      let b0 = 0, b1 = 0, b2 = 0
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1
+        b0 = 0.99 * b0 + white * 0.05
+        b1 = 0.95 * b1 + white * 0.10
+        b2 = 0.85 * b2 + white * 0.25
+        output[i] = (b0 + b1 + b2) * 0.22
+      }
+
+      this.noiseSource = this.ctx.createBufferSource()
+      this.noiseSource.buffer = noiseBuffer
+      this.noiseSource.loop = true
+
+      const filter = this.ctx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.setValueAtTime(360, this.ctx.currentTime)
+
+      this.noiseSource.connect(filter)
+      filter.connect(this.gainNode)
+      this.noiseSource.start()
+
+      // Randomized crisp crackle / pop bursts
+      this.intervalId = setInterval(() => {
+        if (!this.isPlaying || !this.ctx || this.ctx.state !== 'running') return
+        if (Math.random() < 0.65) {
+          const osc = this.ctx.createOscillator()
+          const popGain = this.ctx.createGain()
+          const burstDur = 0.010 + Math.random() * 0.025
+          osc.type = Math.random() < 0.5 ? 'triangle' : 'sawtooth'
+          osc.frequency.setValueAtTime(400 + Math.random() * 1200, this.ctx.currentTime)
+          osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + burstDur)
+
+          popGain.gain.setValueAtTime(0.05 + Math.random() * 0.08, this.ctx.currentTime)
+          popGain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + burstDur)
+
+          osc.connect(popGain)
+          popGain.connect(this.gainNode)
+          osc.start()
+          osc.stop(this.ctx.currentTime + burstDur)
+        }
+      }, 75)
+
+      this.isPlaying = true
+    } catch (e) {
+      console.warn('[SurakshaAR] Fire sound initialization deferred:', e)
+    }
+  }
+
+  stop() {
+    if (!this.isPlaying) return
+    try {
+      if (this.intervalId) {
+        clearInterval(this.intervalId)
+        this.intervalId = null
+      }
+      if (this.gainNode && this.ctx && this.ctx.state === 'running') {
+        this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, this.ctx.currentTime)
+        this.gainNode.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.3)
+        setTimeout(() => {
+          if (this.noiseSource) {
+            try { this.noiseSource.stop() } catch {}
+          }
+          this.isPlaying = false
+        }, 350)
+      } else {
+        this.isPlaying = false
+      }
+    } catch {
+      this.isPlaying = false
+    }
+  }
+}
+
+// ─── Procedural Canvas Textures for Signage & Labels (Zero 404s) ───────────────
+function createAlarmFaceTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256; canvas.height = 320
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#DC2626'
+  ctx.fillRect(0, 0, 256, 320)
+
+  // White header banner
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(14, 14, 228, 56)
+  ctx.fillStyle = '#DC2626'
+  ctx.font = '900 26px -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('FIRE ALARM', 128, 52)
+
+  // Break glass window outline
+  ctx.fillStyle = '#F8FAFC'
+  ctx.fillRect(36, 90, 184, 115)
+  ctx.strokeStyle = '#1E293B'
+  ctx.lineWidth = 4
+  ctx.strokeRect(36, 90, 184, 115)
+
+  ctx.fillStyle = '#DC2626'
+  ctx.font = 'bold 16px sans-serif'
+  ctx.fillText('BREAK GLASS', 128, 140)
+  ctx.fillText('PULL LEVER', 128, 170)
+
+  // Bottom pull down arrow
+  ctx.fillStyle = '#FACC15'
+  ctx.beginPath()
+  ctx.moveTo(128, 275)
+  ctx.lineTo(95, 235)
+  ctx.lineTo(161, 235)
+  ctx.closePath()
+  ctx.fill()
+
+  const tex = new THREE.CanvasTexture(canvas)
+  return tex
+}
+
+function createExtinguisherLabelTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 512; canvas.height = 256
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#0F172A'
+  ctx.fillRect(0, 0, 512, 256)
+
+  // Red header
+  ctx.fillStyle = '#DC2626'
+  ctx.fillRect(8, 8, 496, 58)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = '900 32px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('CO₂ FIRE EXTINGUISHER', 256, 50)
+
+  // Step instructions
+  ctx.fillStyle = '#F8FAFC'
+  ctx.font = 'bold 20px sans-serif'
+  ctx.textAlign = 'left'
+  ctx.fillText('1. PULL SAFETY PIN', 25, 105)
+  ctx.fillText('2. AIM NOZZLE AT BASE OF FIRE', 25, 140)
+  ctx.fillText('3. SQUEEZE LEVER & SWEEP', 25, 175)
+
+  // Rating badges
+  ctx.fillStyle = '#3B82F6'
+  ctx.fillRect(25, 202, 135, 36)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = 'bold 17px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('CLASS B (FLUID)', 92, 226)
+
+  ctx.fillStyle = '#EAB308'
+  ctx.fillRect(175, 202, 145, 36)
+  ctx.fillStyle = '#000000'
+  ctx.fillText('CLASS C (ELEC)', 247, 226)
+
+  const tex = new THREE.CanvasTexture(canvas)
+  return tex
+}
+
+function createExitSignTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 512; canvas.height = 256
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#15803D'
+  ctx.fillRect(0, 0, 512, 256)
+  ctx.strokeStyle = '#22C55E'
+  ctx.lineWidth = 12
+  ctx.strokeRect(6, 6, 500, 244)
+
+  // Running man silhouette
+  ctx.fillStyle = '#FFFFFF'
+  ctx.beginPath()
+  ctx.arc(115, 68, 22, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(112, 92)
+  ctx.lineTo(132, 136)
+  ctx.lineTo(118, 170)
+  ctx.lineTo(100, 145)
+  ctx.lineTo(92, 102)
+  ctx.closePath()
+  ctx.fill()
+
+  // Door outline
+  ctx.strokeStyle = '#FFFFFF'
+  ctx.lineWidth = 8
+  ctx.strokeRect(45, 58, 44, 132)
+
+  // "EXIT" text
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = '900 80px -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('EXIT', 310, 144)
+
+  // Right arrow
+  ctx.beginPath()
+  ctx.moveTo(415, 128)
+  ctx.lineTo(460, 128)
+  ctx.lineTo(445, 113)
+  ctx.moveTo(460, 128)
+  ctx.lineTo(445, 143)
+  ctx.strokeStyle = '#FFFFFF'
+  ctx.lineWidth = 8
+  ctx.stroke()
+
+  const tex = new THREE.CanvasTexture(canvas)
+  return tex
+}
+
+function createMusterSignTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 384; canvas.height = 384
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#15803D'
+  ctx.fillRect(0, 0, 384, 384)
+  ctx.strokeStyle = '#FFFFFF'
+  ctx.lineWidth = 10
+  ctx.strokeRect(8, 8, 368, 368)
+
+  // 4 corner inward arrows
+  ctx.fillStyle = '#FFFFFF'
+  ctx.beginPath(); ctx.moveTo(45, 45); ctx.lineTo(105, 45); ctx.lineTo(45, 105); ctx.closePath(); ctx.fill()
+  ctx.beginPath(); ctx.moveTo(339, 45); ctx.lineTo(279, 45); ctx.lineTo(339, 105); ctx.closePath(); ctx.fill()
+  ctx.beginPath(); ctx.moveTo(45, 339); ctx.lineTo(105, 339); ctx.lineTo(45, 279); ctx.closePath(); ctx.fill()
+  ctx.beginPath(); ctx.moveTo(339, 339); ctx.lineTo(279, 339); ctx.lineTo(339, 279); ctx.closePath(); ctx.fill()
+
+  // Center figures
+  ctx.beginPath(); ctx.arc(192, 135, 22, 0, Math.PI * 2); ctx.fill()
+  ctx.beginPath(); ctx.arc(145, 155, 18, 0, Math.PI * 2); ctx.fill()
+  ctx.beginPath(); ctx.arc(239, 155, 18, 0, Math.PI * 2); ctx.fill()
+
+  ctx.fillRect(174, 162, 36, 75)
+  ctx.fillRect(132, 178, 26, 60)
+  ctx.fillRect(226, 178, 26, 60)
+
+  ctx.font = '900 28px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('ASSEMBLY POINT', 192, 310)
+
+  const tex = new THREE.CanvasTexture(canvas)
+  return tex
+}
+
+// ─── Realistic 3D Fire Object Generator (Warm Glow, Volumetric Cones, Embers) ─
+function createRealisticFireGroup() {
+  const fireGroup = new THREE.Group()
+
+  // 1. Scorched Ground Mark (circular burnt soot decal)
+  const scorchCanvas = document.createElement('canvas')
+  scorchCanvas.width = 256; scorchCanvas.height = 256
+  const sctx = scorchCanvas.getContext('2d')
+  const sGrad = sctx.createRadialGradient(128, 128, 15, 128, 128, 120)
+  sGrad.addColorStop(0, 'rgba(12, 12, 14, 0.98)')
+  sGrad.addColorStop(0.45, 'rgba(35, 20, 10, 0.88)')
+  sGrad.addColorStop(0.85, 'rgba(130, 35, 5, 0.40)')
+  sGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+  sctx.fillStyle = sGrad
+  sctx.beginPath()
+  sctx.arc(128, 128, 120, 0, Math.PI * 2)
+  sctx.fill()
+
+  // Burnt ember specks
+  for (let i = 0; i < 45; i++) {
+    const angle = Math.random() * Math.PI * 2
+    const dist = Math.random() * 95
+    sctx.fillStyle = Math.random() < 0.6 ? '#FF4400' : '#FFB700'
+    sctx.beginPath()
+    sctx.arc(128 + Math.cos(angle) * dist, 128 + Math.sin(angle) * dist, 1.2 + Math.random() * 2, 0, Math.PI * 2)
+    sctx.fill()
+  }
+
+  const scorchTex = new THREE.CanvasTexture(scorchCanvas)
+  const scorchMesh = new THREE.Mesh(
+    new THREE.CircleGeometry(0.38, 32),
+    new THREE.MeshBasicMaterial({ map: scorchTex, transparent: true, opacity: 0.92, depthWrite: false, side: THREE.DoubleSide })
+  )
+  scorchMesh.rotation.x = -Math.PI / 2
+  scorchMesh.position.y = -0.01
+  fireGroup.add(scorchMesh)
+
+  // 2. Heavy charred industrial equipment base ring
+  const pad = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.24, 0.27, 0.035, 24),
+    new THREE.MeshStandardMaterial({ color: '#1E293B', metalness: 0.8, roughness: 0.4 })
+  )
+  pad.position.y = 0.015
+  fireGroup.add(pad)
+
+  // 3. Volumetric Animated Flame Cones (Realistic ~0.62m waist-height)
+  // (a) Outer flame body (Crimson / Deep Orange) ~0.60m tall
+  const flameOuter = new THREE.Mesh(
+    new THREE.ConeGeometry(0.24, 0.62, 16),
+    new THREE.MeshStandardMaterial({
+      color: '#FF3B00',
+      emissive: '#FF2200',
+      emissiveIntensity: 2.8,
+      roughness: 0.2,
+      transparent: true,
+      opacity: 0.90,
+    })
+  )
+  flameOuter.position.y = 0.32
+  fireGroup.add(flameOuter)
+
+  // (b) Mid flame body (Golden Yellow) ~0.50m tall
+  const flameMid = new THREE.Mesh(
+    new THREE.ConeGeometry(0.17, 0.50, 14),
+    new THREE.MeshStandardMaterial({
+      color: '#FFB800',
+      emissive: '#FF9500',
+      emissiveIntensity: 3.4,
+      roughness: 0.1,
+      transparent: true,
+      opacity: 0.95,
+    })
+  )
+  flameMid.position.y = 0.26
+  fireGroup.add(flameMid)
+
+  // (c) Core flame (White-Hot Center) ~0.35m tall
+  const flameCore = new THREE.Mesh(
+    new THREE.ConeGeometry(0.095, 0.35, 12),
+    new THREE.MeshStandardMaterial({
+      color: '#FFFDF5',
+      emissive: '#FFFFFF',
+      emissiveIntensity: 4.2,
+      roughness: 0.1,
+    })
+  )
+  flameCore.position.y = 0.19
+  fireGroup.add(flameCore)
+
+  // 4. Procedural texture for flame particle embers
+  const ptCanvas = document.createElement('canvas')
+  ptCanvas.width = 64; ptCanvas.height = 64
+  const ptctx = ptCanvas.getContext('2d')
+  const ptGrad = ptctx.createRadialGradient(32, 40, 2, 32, 32, 28)
+  ptGrad.addColorStop(0, 'rgba(255, 255, 240, 1)')
+  ptGrad.addColorStop(0.35, 'rgba(255, 180, 0, 0.9)')
+  ptGrad.addColorStop(0.7, 'rgba(255, 50, 0, 0.5)')
+  ptGrad.addColorStop(1, 'rgba(200, 0, 0, 0)')
+  ptctx.fillStyle = ptGrad
+  ptctx.fillRect(0, 0, 64, 64)
+  const emberTex = new THREE.CanvasTexture(ptCanvas)
+
+  // 5. Rising Ember Particles
+  const embers = []
+  const emberMat = new THREE.MeshBasicMaterial({
+    map: emberTex,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  })
+  for (let i = 0; i < 28; i++) {
+    const size = 0.042 + Math.random() * 0.045
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 1.4), emberMat.clone())
+    mesh.position.set(
+      (Math.random() - 0.5) * 0.22,
+      0.08 + Math.random() * 0.50,
+      (Math.random() - 0.5) * 0.22
+    )
+    mesh.userData = {
+      vx: (Math.random() - 0.5) * 0.003,
+      vy: 0.008 + Math.random() * 0.009,
+      vz: (Math.random() - 0.5) * 0.003,
+      life: Math.random(),
+      speed: 0.008 + Math.random() * 0.010,
+      baseOpacity: 0.88,
+      swayPhase: Math.random() * Math.PI * 2,
+    }
+    fireGroup.add(mesh)
+    embers.push(mesh)
+  }
+
+  // 6. Soft Smoke Puffs
+  const smokeParticles = []
+  const smokeMat = new THREE.MeshBasicMaterial({
+    color: '#222226',
+    transparent: true,
+    opacity: 0.22,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  })
+  for (let i = 0; i < 8; i++) {
+    const size = 0.08 + Math.random() * 0.07
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), smokeMat.clone())
+    mesh.position.set(
+      (Math.random() - 0.5) * 0.16,
+      0.45 + Math.random() * 0.35,
+      (Math.random() - 0.5) * 0.16
+    )
+    mesh.userData = {
+      vy: 0.004 + Math.random() * 0.004,
+      life: Math.random(),
+      speed: 0.005 + Math.random() * 0.005,
+      baseOpacity: 0.24,
+    }
+    fireGroup.add(mesh)
+    smokeParticles.push(mesh)
+  }
+
+  // 7. Dynamic PointLights with Warm Fire Glow
+  const fireLight = new THREE.PointLight('#FF6A00', 4.5, 4.0)
+  fireLight.position.set(0, 0.40, 0)
+  fireGroup.add(fireLight)
+
+  const fireGlow = new THREE.PointLight('#FF2E00', 2.0, 5.0)
+  fireGlow.position.set(0, 0.65, 0)
+  fireGroup.add(fireGlow)
+
+  return {
+    group: fireGroup,
+    flameOuter,
+    flameMid,
+    flameCore,
+    embers,
+    smokeParticles,
+    fireLight,
+    fireGlow,
+  }
+}
+
+// ─── 3D Props for Training Station Steps ───────────────────────────────────────
+function createAlarmBoxProp() {
+  const propGroup = new THREE.Group()
+
+  // Red wall box
+  const alarmBox = new THREE.Mesh(
+    new THREE.BoxGeometry(0.26, 0.32, 0.09),
+    new THREE.MeshStandardMaterial({ color: '#DC2626', roughness: 0.3, metalness: 0.2 })
+  )
+  propGroup.add(alarmBox)
+
+  // Faceplate with FIRE ALARM canvas texture
+  const faceTex = createAlarmFaceTexture()
+  const faceplate = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.24, 0.30),
+    new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.4 })
+  )
+  faceplate.position.set(0, 0, 0.048)
+  propGroup.add(faceplate)
+
+  // Pull lever handle
+  const lever = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.03, 0.04),
+    new THREE.MeshStandardMaterial({ color: '#1E293B', metalness: 0.8 })
+  )
+  lever.position.set(0, -0.06, 0.07)
+  propGroup.add(lever)
+
+  // Pulsing Emergency Amber/Red Strobe on top
+  const strobeBase = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.035, 0.03, 16),
+    new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.8 })
+  )
+  strobeBase.position.set(0, 0.175, 0)
+  propGroup.add(strobeBase)
+
+  const strobe = new THREE.Mesh(
+    new THREE.SphereGeometry(0.028, 16, 16),
+    new THREE.MeshStandardMaterial({ color: '#F59E0B', emissive: '#D97706', emissiveIntensity: 2.5 })
+  )
+  strobe.position.set(0, 0.20, 0)
+  propGroup.add(strobe)
+
+  const strobeLight = new THREE.PointLight('#F59E0B', 1.8, 2.5)
+  strobeLight.position.set(0, 0.22, 0)
+  propGroup.add(strobeLight)
+
+  propGroup.userData = { strobe, strobeLight }
+  return propGroup
+}
+
+function createPPEStationProp() {
+  const propGroup = new THREE.Group()
+
+  // Brushed aluminum stand & circular base
+  const standBase = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.18, 0.03, 24),
+    new THREE.MeshStandardMaterial({ color: '#475569', metalness: 0.8, roughness: 0.3 })
+  )
+  standBase.position.y = -0.16
+  propGroup.add(standBase)
+
+  const standPole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.015, 0.015, 0.38, 16),
+    new THREE.MeshStandardMaterial({ color: '#64748B', metalness: 0.8, roughness: 0.2 })
+  )
+  standPole.position.y = 0.03
+  propGroup.add(standPole)
+
+  // Industrial Yellow Safety Helmet (IS 2925)
+  const helmetDome = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.58),
+    new THREE.MeshStandardMaterial({ color: '#FACC15', metalness: 0.2, roughness: 0.3, side: THREE.DoubleSide })
+  )
+  helmetDome.position.set(0, 0.16, 0)
+  propGroup.add(helmetDome)
+
+  // Helmet brim
+  const helmetBrim = new THREE.Mesh(
+    new THREE.TorusGeometry(0.125, 0.016, 12, 24),
+    new THREE.MeshStandardMaterial({ color: '#EAB308', roughness: 0.3 })
+  )
+  helmetBrim.rotation.x = Math.PI / 2
+  helmetBrim.position.set(0, 0.15, 0)
+  propGroup.add(helmetBrim)
+
+  // Safety Goggles with Cyan reflective visor
+  const gogglesFrame = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, 0.045, 0.03),
+    new THREE.MeshStandardMaterial({ color: '#0F172A', roughness: 0.6 })
+  )
+  gogglesFrame.position.set(0, 0.10, 0.08)
+  propGroup.add(gogglesFrame)
+
+  const gogglesLens = new THREE.Mesh(
+    new THREE.BoxGeometry(0.13, 0.038, 0.01),
+    new THREE.MeshStandardMaterial({ color: '#38BDF8', emissive: '#0284C7', emissiveIntensity: 0.6, transparent: true, opacity: 0.85 })
+  )
+  gogglesLens.position.set(0, 0.10, 0.095)
+  propGroup.add(gogglesLens)
+
+  // Heavy duty safety gloves (pair)
+  const gloveMat = new THREE.MeshStandardMaterial({ color: '#16A34A', roughness: 0.6 })
+  const gloveL = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.12, 0.03), gloveMat)
+  gloveL.position.set(-0.09, -0.02, 0.04)
+  propGroup.add(gloveL)
+
+  const gloveR = gloveL.clone()
+  gloveR.position.x = 0.09
+  propGroup.add(gloveR)
+
+  return propGroup
+}
+
+function createExtinguisherProp() {
+  const propGroup = new THREE.Group()
+
+  // Red cylinder body
+  const cyl = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.07, 0.42, 24),
+    new THREE.MeshStandardMaterial({ color: '#DC2626', metalness: 0.35, roughness: 0.25 })
+  )
+  cyl.position.y = 0.03
+  propGroup.add(cyl)
+
+  // Dome top
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(0.07, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.5),
+    new THREE.MeshStandardMaterial({ color: '#DC2626', metalness: 0.35, roughness: 0.25 })
+  )
+  dome.position.y = 0.24
+  propGroup.add(dome)
+
+  // Rounded base foot ring
+  const baseRing = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.074, 0.074, 0.03, 24),
+    new THREE.MeshStandardMaterial({ color: '#1E293B', roughness: 0.6 })
+  )
+  baseRing.position.y = -0.18
+  propGroup.add(baseRing)
+
+  // Printed instructional label band
+  const labelTex = createExtinguisherLabelTexture()
+  const labelMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.071, 0.071, 0.22, 24, 1, true, 0, Math.PI),
+    new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.4 })
+  )
+  labelMesh.position.set(0, 0.03, 0)
+  labelMesh.rotation.y = Math.PI * 0.5
+  propGroup.add(labelMesh)
+
+  // Valve body & squeeze handle
+  const valve = new THREE.Mesh(
+    new THREE.BoxGeometry(0.045, 0.06, 0.045),
+    new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.85 })
+  )
+  valve.position.set(0, 0.28, 0)
+  propGroup.add(valve)
+
+  const handle = new THREE.Mesh(
+    new THREE.BoxGeometry(0.10, 0.015, 0.03),
+    new THREE.MeshStandardMaterial({ color: '#DC2626', metalness: 0.3 })
+  )
+  handle.position.set(-0.04, 0.32, 0)
+  handle.rotation.z = -0.25
+  propGroup.add(handle)
+
+  // Pressure gauge
+  const gauge = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.018, 0.012, 16),
+    new THREE.MeshStandardMaterial({ color: '#E2E8F0', emissive: '#22C55E', emissiveIntensity: 0.4 })
+  )
+  gauge.position.set(0.04, 0.28, 0.02)
+  gauge.rotation.x = Math.PI / 2
+  propGroup.add(gauge)
+
+  // Black discharge horn & hose
+  const horn = new THREE.Mesh(
+    new THREE.ConeGeometry(0.032, 0.18, 16),
+    new THREE.MeshStandardMaterial({ color: '#0F172A', roughness: 0.6 })
+  )
+  horn.position.set(0.09, 0.15, 0.03)
+  horn.rotation.z = -0.55
+  propGroup.add(horn)
+
+  return propGroup
+}
+
+function createExitSignProp() {
+  const propGroup = new THREE.Group()
+
+  // Sign housing
+  const casing = new THREE.Mesh(
+    new THREE.BoxGeometry(0.44, 0.24, 0.05),
+    new THREE.MeshStandardMaterial({ color: '#0F172A', roughness: 0.5 })
+  )
+  propGroup.add(casing)
+
+  // Glowing faceplate with Running Man & EXIT text
+  const exitTex = createExitSignTexture()
+  const faceplate = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.42, 0.22),
+    new THREE.MeshStandardMaterial({
+      map: exitTex,
+      emissive: '#15803D',
+      emissiveIntensity: 0.95,
+      roughness: 0.2,
+    })
+  )
+  faceplate.position.set(0, 0, 0.027)
+  propGroup.add(faceplate)
+
+  // Subtle emergency green glow light
+  const exitLight = new THREE.PointLight('#22C55E', 1.6, 2.5)
+  exitLight.position.set(0, 0, 0.12)
+  propGroup.add(exitLight)
+
+  return propGroup
+}
+
+function createMusterPointProp() {
+  const propGroup = new THREE.Group()
+
+  // Aluminum support pole
+  const post = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, 0.65, 16),
+    new THREE.MeshStandardMaterial({ color: '#64748B', metalness: 0.7, roughness: 0.3 })
+  )
+  post.position.y = -0.05
+  propGroup.add(post)
+
+  // ISO 7010 Muster Sign Board
+  const musterTex = createMusterSignTexture()
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(0.36, 0.36, 0.035),
+    new THREE.MeshStandardMaterial({ color: '#0F172A' })
+  )
+  board.position.y = 0.22
+  propGroup.add(board)
+
+  const faceplate = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.34, 0.34),
+    new THREE.MeshStandardMaterial({
+      map: musterTex,
+      emissive: '#15803D',
+      emissiveIntensity: 0.9,
+      roughness: 0.2,
+    })
+  )
+  faceplate.position.set(0, 0.22, 0.02)
+  propGroup.add(faceplate)
+
+  // Safe floor muster ring on ground
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.35, 0.42, 32),
+    new THREE.MeshBasicMaterial({ color: '#22C55E', side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
+  )
+  ring.rotation.x = -Math.PI / 2
+  ring.position.y = -0.37
+  propGroup.add(ring)
+
+  return propGroup
+}
+
 // ─── Camera AR Live Video Background ──────────────────────────────────────────
 function CameraBackground({ streamRef, videoRef }) {
   useEffect(() => {
@@ -141,6 +854,7 @@ export default function Scenario() {
   const canvasRef = useRef(null)
   const cameraStreamRef = useRef(null)
   const cameraVideoRef = useRef(null)
+  const fireAudioRef = useRef(new ProceduralFireAudio())
 
   // Three.js persistent references
   const threeRef = useRef({
@@ -149,10 +863,13 @@ export default function Scenario() {
     renderer: null,
     controls: null,
     animId: null,
-    stepNodes: [], // { group, orbMesh, ringMesh, beamMesh, badgeSprite, stepIndex, pos }
+    stepNodes: [], // { group, propGroup, orbMesh, ringMesh, beamMesh, badgeSprite, stepIndex, pos }
     hazardGroup: null,
+    fireVisual: null,
     clock: new THREE.Clock(),
     deviceRot: { alpha: 0, beta: 90, gamma: 0 },
+    anchoredStep: -1,
+    anchoredMode: null,
   })
 
   // Fetch scenario details
@@ -643,106 +1360,8 @@ export default function Scenario() {
     scene.add(hazardGroup)
     t.hazardGroup = hazardGroup
 
-    // ── BUG 1 FIX: World-Anchored AR Fire Particle System ─────────────────────
-    // The fire lives at a FIXED WORLD POSITION in the Three.js scene (0, 0, 1.8).
-    // In AR mode the gyroscope rotates the Three.js CAMERA — not the scene.
-    // So objects at world positions stay anchored to that real-world spot:
-    // physically walking around the fire will show it from different angles,
-    // exactly as if a real fire were placed there.
-    // (The previous camera.add() approach made the fire follow the screen — WRONG.)
-    //
-    // ── Multi-Location World Anchored Fire Particle System ───────────────────
-    // Anchored at the Electrical Control Panel hazard coordinates: (3, 1.3, 2.7).
-    // In AR mode, the camera rotates at room origin, so this fire stays anchored
-    // in physical 3D space near the right corner of the room.
-    const WORLD_FIRE_POS = new THREE.Vector3(3, 1.3, 2.7) // fixed world spot on Control Panel
-
-    // Create a procedural flame texture on canvas
-    function makeFlameTexture(r, g, b) {
-      const fc = document.createElement('canvas')
-      fc.width = 64; fc.height = 64
-      const fctx = fc.getContext('2d')
-      const grad = fctx.createRadialGradient(32, 40, 2, 32, 32, 30)
-      grad.addColorStop(0,   `rgba(${r},${g},${b},1)`)
-      grad.addColorStop(0.4, `rgba(${r},${g},${b},0.7)`)
-      grad.addColorStop(1,   `rgba(${r},${g},${b},0)`)
-      fctx.fillStyle = grad
-      fctx.fillRect(0, 0, 64, 64)
-      return new THREE.CanvasTexture(fc)
-    }
-
-    const arFireGroup = new THREE.Group()
-    arFireGroup.position.copy(WORLD_FIRE_POS)
-    arFireGroup.visible = false
-    scene.add(arFireGroup) // scene child, NOT camera child → world-anchored
-
-    // ── Particle definitions: 30 flame particles + 10 smoke particles ──────────
-    const PARTICLE_COUNT = 30
-    const SMOKE_COUNT = 10
-    const particles = []
-    const smokeParts = []
-
-    const flameTex1 = makeFlameTexture(255, 80, 0)   // deep orange
-    const flameTex2 = makeFlameTexture(255, 160, 0)  // bright orange
-    const flameTex3 = makeFlameTexture(255, 230, 30) // yellow
-
-    function makeParticle(isSmoke) {
-      const tex = isSmoke ? null : [flameTex1, flameTex2, flameTex3][Math.floor(Math.random() * 3)]
-      // Human-relatable flame flake: 4.5 to 8 cm
-      const size = isSmoke ? 0.05 + Math.random() * 0.035 : 0.038 + Math.random() * 0.038
-      const mat = new THREE.MeshBasicMaterial({
-        map: isSmoke ? null : tex,
-        color: isSmoke ? new THREE.Color(0.2, 0.2, 0.2) : new THREE.Color(1, 1, 1),
-        transparent: true,
-        opacity: isSmoke ? 0.15 + Math.random() * 0.10 : 0.70 + Math.random() * 0.25,
-        blending: isSmoke ? THREE.NormalBlending : THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      })
-      const geo = new THREE.PlaneGeometry(size, size * 1.5)
-      const mesh = new THREE.Mesh(geo, mat)
-
-      // Compact 8cm cluster around fire base
-      const rx = (Math.random() - 0.5) * 0.08
-      const rz = (Math.random() - 0.5) * 0.08
-      const startY = isSmoke ? 0.20 + Math.random() * 0.08 : Math.random() * 0.04
-      mesh.position.set(rx, startY, rz)
-
-      // Per-particle velocities and lifecycle
-      mesh.userData = {
-        vx: (Math.random() - 0.5) * 0.002,
-        vy: isSmoke ? 0.004 + Math.random() * 0.004 : 0.008 + Math.random() * 0.008,
-        vz: (Math.random() - 0.5) * 0.002,
-        life: Math.random(),
-        speed: isSmoke ? 0.004 + Math.random() * 0.003 : 0.006 + Math.random() * 0.008,
-        initOpacity: mat.opacity,
-        initSize: size,
-        isSmoke,
-        swayPhase: Math.random() * Math.PI * 2,
-      }
-
-      arFireGroup.add(mesh)
-      return mesh
-    }
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) particles.push(makeParticle(false))
-    for (let i = 0; i < SMOKE_COUNT; i++) smokeParts.push(makeParticle(true))
-    t.arParticles = [...particles, ...smokeParts]
-
-    // Urgent-growth start time
-    t.arFireStartTime = t.clock.getElapsedTime()
-
-    // Glowing point lights — realistic human-relatable intensity
-    const arFireLight = new THREE.PointLight('#FF6600', 2.8, 3.0)
-    arFireLight.position.set(0, 0.25, 0)
-    arFireGroup.add(arFireLight)
-    const arFireGlow = new THREE.PointLight('#FF3300', 1.8, 3.5)
-    arFireGlow.position.set(0, 0.45, 0)
-    arFireGroup.add(arFireGlow)
-
-    t.arFireGroup = arFireGroup
-    t.arFireLight = arFireLight
-    t.arFireGlow = arFireGlow
+    // Fixed World Coordinates for Scenario Spatial Stations
+    const WORLD_FIRE_POS = new THREE.Vector3(3, 1.3, 2.7)
     t.WORLD_FIRE_POS = WORLD_FIRE_POS
 
     // Fire Alarm Station prop ([2.5, 2.0, -2])
@@ -833,100 +1452,31 @@ export default function Scenario() {
       group.position.set(pos[0], pos[1], pos[2])
 
       // ── Human-Scaled 3D Interactive Prop ──────────────────────────────────
-      const propGroup = new THREE.Group()
+      let propGroup = new THREE.Group()
       if (idx === 0) {
-        // Step 0: Hazard base / caution floor pad
-        const pad = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.18, 0.20, 0.03, 20),
-          new THREE.MeshStandardMaterial({ color: '#EAB308', metalness: 0.2, roughness: 0.4 })
-        )
-        pad.position.y = -0.06
-        propGroup.add(pad)
+        if (isFireScenario) {
+          const fireVis = createRealisticFireGroup()
+          propGroup.add(fireVis.group)
+          t.fireVisual = fireVis
+        } else {
+          // Hazard base / caution floor pad for non-fire
+          const pad = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.24, 0.27, 0.04, 24),
+            new THREE.MeshStandardMaterial({ color: '#EAB308', metalness: 0.2, roughness: 0.4 })
+          )
+          pad.position.y = -0.06
+          propGroup.add(pad)
+        }
       } else if (idx === 1) {
-        // Step 1: Emergency Alarm Call Box (~25cm tall)
-        const alarmCase = new THREE.Mesh(
-          new THREE.BoxGeometry(0.22, 0.28, 0.08),
-          new THREE.MeshStandardMaterial({ color: '#DC2626', roughness: 0.3 })
-        )
-        propGroup.add(alarmCase)
-        const alarmGlass = new THREE.Mesh(
-          new THREE.BoxGeometry(0.12, 0.10, 0.02),
-          new THREE.MeshStandardMaterial({ color: '#F8FAFC', emissive: '#FFFFFF', emissiveIntensity: 0.2 })
-        )
-        alarmGlass.position.set(0, 0.02, 0.045)
-        propGroup.add(alarmGlass)
-        const strobe = new THREE.Mesh(
-          new THREE.SphereGeometry(0.022, 12, 12),
-          new THREE.MeshStandardMaterial({ color: '#F59E0B', emissive: '#D97706', emissiveIntensity: 2.0 })
-        )
-        strobe.position.set(0, 0.16, 0.02)
-        propGroup.add(strobe)
+        propGroup = createAlarmBoxProp()
       } else if (idx === 2) {
-        // Step 2: PPE Station Kit (~35cm wide)
-        const helmet = new THREE.Mesh(
-          new THREE.SphereGeometry(0.11, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.6),
-          new THREE.MeshStandardMaterial({ color: '#FACC15', metalness: 0.1, roughness: 0.3 })
-        )
-        helmet.position.set(0, 0.08, 0)
-        propGroup.add(helmet)
-        const goggles = new THREE.Mesh(
-          new THREE.BoxGeometry(0.13, 0.03, 0.03),
-          new THREE.MeshStandardMaterial({ color: '#38BDF8', transparent: true, opacity: 0.85 })
-        )
-        goggles.position.set(0, 0.05, 0.09)
-        propGroup.add(goggles)
-        const gloveL = new THREE.Mesh(
-          new THREE.BoxGeometry(0.06, 0.10, 0.025),
-          new THREE.MeshStandardMaterial({ color: '#16A34A', roughness: 0.6 })
-        )
-        gloveL.position.set(-0.09, -0.04, 0.04)
-        propGroup.add(gloveL)
-        const gloveR = gloveL.clone()
-        gloveR.position.x = 0.09
-        propGroup.add(gloveR)
+        propGroup = createPPEStationProp()
       } else if (idx === 3) {
-        // Step 3: Industrial CO2 Fire Extinguisher (~40cm tall)
-        const cyl = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.065, 0.065, 0.36, 16),
-          new THREE.MeshStandardMaterial({ color: '#DC2626', metalness: 0.3, roughness: 0.3 })
-        )
-        cyl.position.y = 0.02
-        propGroup.add(cyl)
-        const valve = new THREE.Mesh(
-          new THREE.BoxGeometry(0.04, 0.06, 0.04),
-          new THREE.MeshStandardMaterial({ color: '#1E293B', metalness: 0.8 })
-        )
-        valve.position.set(0, 0.22, 0)
-        propGroup.add(valve)
-        const nozzle = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.012, 0.015, 0.16, 8),
-          new THREE.MeshStandardMaterial({ color: '#0F172A' })
-        )
-        nozzle.position.set(0.05, 0.12, 0.03)
-        nozzle.rotation.z = -0.4
-        propGroup.add(nozzle)
+        propGroup = createExtinguisherProp()
       } else if (idx === 4) {
-        // Step 4: Emergency Fire Exit Sign (~38cm wide)
-        const exitSign = new THREE.Mesh(
-          new THREE.BoxGeometry(0.38, 0.22, 0.04),
-          new THREE.MeshStandardMaterial({ color: '#15803D', emissive: '#16A34A', emissiveIntensity: 0.85 })
-        )
-        exitSign.position.y = 0.06
-        propGroup.add(exitSign)
+        propGroup = createExitSignProp()
       } else if (idx === 5) {
-        // Step 5: Safe Muster Point Beacon (~30cm wide)
-        const musterBox = new THREE.Mesh(
-          new THREE.BoxGeometry(0.30, 0.30, 0.04),
-          new THREE.MeshStandardMaterial({ color: '#15803D', emissive: '#16A34A', emissiveIntensity: 0.85 })
-        )
-        musterBox.position.y = 0.12
-        propGroup.add(musterBox)
-        const post = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.02, 0.02, 0.40, 12),
-          new THREE.MeshStandardMaterial({ color: '#64748B', metalness: 0.5 })
-        )
-        post.position.y = -0.12
-        propGroup.add(post)
+        propGroup = createMusterPointProp()
       }
       group.add(propGroup)
 
@@ -1004,21 +1554,18 @@ export default function Scenario() {
       mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1
 
       raycaster.setFromCamera(mouse, camera)
-      const interactableMeshes = stepNodes.map(s => s.orbMesh)
-      const hits = raycaster.intersectObjects(interactableMeshes, false)
+      const activeNode = stepNodes[currentStepRef.current]
+      const interactableTargets = []
+      stepNodes.forEach(s => {
+        if (s.orbMesh) interactableTargets.push(s.orbMesh)
+      })
+      if (activeNode?.group) {
+        interactableTargets.push(activeNode.group)
+      }
+      const hits = raycaster.intersectObjects(interactableTargets, true)
 
       if (hits.length > 0) {
-        const hit = hits[0].object
-        if (hit.userData && hit.userData.stepIndex !== undefined) {
-          const clicked = hit.userData.stepIndex
-          if (clicked === currentStepRef.current) {
-            handleStepClick(clicked)
-          } else if (clicked > currentStepRef.current) {
-            setStepFeedback({ correct: false, label: 'Out of Sequence: Follow safety protocol in order!' })
-            speak('Action out of sequence. Follow the safety protocol step order.', lang)
-            setTimeout(() => setStepFeedback(null), 2400)
-          }
-        }
+        handleStepClick(currentStepRef.current)
       }
     }
 
@@ -1058,52 +1605,76 @@ export default function Scenario() {
         }
       }
 
-      // Animate world-anchored AR fire particle system (Realistic size: ~0.45m tall)
-      if (t.arFireGroup) {
-        const inAR = arModeRef.current
-        t.arFireGroup.visible = inAR && !t.flameExtinguished
-        if (inAR && !t.flameExtinguished && t.arParticles) {
-          // Human-relatable fire scale (~0.5m visual height)
-          const timeSinceStart = elapsed - (t.arFireStartTime ?? 0)
-          const urgencyScale = Math.min(0.90 + timeSinceStart / 30.0, 1.15)
-          t.arFireGroup.scale.setScalar(urgencyScale)
+      // Animate Realistic Fire Visual (Volumetric Cones, Embers, Smoke, Dynamic Lighting)
+      if (t.fireVisual && !t.flameExtinguished) {
+        const f = t.fireVisual
+        const breath = 1.0 + Math.sin(elapsed * 4.0) * 0.05 + Math.sin(elapsed * 12.0) * 0.04
+        const flickerX = 1.0 + Math.sin(elapsed * 16.0) * 0.08
+        const flickerZ = 1.0 + Math.cos(elapsed * 19.0) * 0.08
 
-          // Billboard: make each particle face the camera each frame
-          t.arParticles.forEach(p => {
+        if (f.flameOuter) f.flameOuter.scale.set(flickerX * breath, breath * (1.0 + Math.cos(elapsed * 14.0) * 0.06), flickerZ * breath)
+        if (f.flameMid) f.flameMid.scale.set(flickerZ * breath, breath * (1.0 + Math.sin(elapsed * 18.0) * 0.08), flickerX * breath)
+        if (f.flameCore) f.flameCore.scale.set(breath, breath * (1.0 + Math.sin(elapsed * 22.0) * 0.05), breath)
+
+        // Floating glowing embers
+        if (f.embers) {
+          const camWorldPos = new THREE.Vector3()
+          camera.getWorldPosition(camWorldPos)
+          const camLocal = f.group.worldToLocal(camWorldPos.clone())
+
+          f.embers.forEach(p => {
             const d = p.userData
             d.life += d.speed
             if (d.life >= 1.0) {
               d.life = 0
-              p.position.x = (Math.random() - 0.5) * (d.isSmoke ? 0.09 : 0.07)
-              p.position.y = d.isSmoke ? 0.20 + Math.random() * 0.08 : Math.random() * 0.04
-              p.position.z = (Math.random() - 0.5) * (d.isSmoke ? 0.09 : 0.07)
-              p.material.opacity = d.initOpacity
+              p.position.x = (Math.random() - 0.5) * 0.22
+              p.position.y = 0.08 + Math.random() * 0.12
+              p.position.z = (Math.random() - 0.5) * 0.22
+              p.material.opacity = d.baseOpacity
             }
-
-            // Rise upward + gentle sway
             p.position.y += d.vy
-            p.position.x += d.vx + Math.sin(elapsed * 3.5 + d.swayPhase) * 0.0015
+            p.position.x += d.vx + Math.sin(elapsed * 5.0 + d.swayPhase) * 0.002
             p.position.z += d.vz
 
-            const fadeStart = d.isSmoke ? 0.55 : 0.45
-            if (d.life > fadeStart) {
-              p.material.opacity = d.initOpacity * (1 - (d.life - fadeStart) / (1 - fadeStart))
+            if (d.life > 0.5) {
+              p.material.opacity = d.baseOpacity * (1 - (d.life - 0.5) / 0.5)
             }
-
-            const camWorldPos = new THREE.Vector3()
-            camera.getWorldPosition(camWorldPos)
-            const camLocal = t.arFireGroup.worldToLocal(camWorldPos.clone())
             p.lookAt(camLocal)
           })
-
-          // Realistic fire lighting
-          if (t.arFireLight) {
-            t.arFireLight.intensity = (2.5 + Math.sin(elapsed * 19) * 0.8) * urgencyScale
-          }
-          if (t.arFireGlow) {
-            t.arFireGlow.intensity = (1.5 + Math.sin(elapsed * 8) * 0.5) * urgencyScale
-          }
         }
+
+        // Rising subtle smoke puffs
+        if (f.smokeParticles) {
+          f.smokeParticles.forEach(s => {
+            const d = s.userData
+            d.life += d.speed
+            if (d.life >= 1.0) {
+              d.life = 0
+              s.position.x = (Math.random() - 0.5) * 0.18
+              s.position.y = 0.45 + Math.random() * 0.10
+              s.position.z = (Math.random() - 0.5) * 0.18
+              s.scale.setScalar(1.0)
+              s.material.opacity = d.baseOpacity
+            }
+            s.position.y += d.vy
+            s.scale.multiplyScalar(1.008)
+            s.material.opacity = d.baseOpacity * Math.max(1.0 - d.life, 0)
+          })
+        }
+
+        // Multi-frequency warm fire light flicker
+        if (f.fireLight) {
+          f.fireLight.intensity = 4.2 + Math.sin(elapsed * 18.0) * 0.9 + Math.cos(elapsed * 27.0) * 0.6
+        }
+        if (f.fireGlow) {
+          f.fireGlow.intensity = 2.0 + Math.sin(elapsed * 9.0) * 0.5
+        }
+      }
+
+      // Animate Step 1 Alarm Strobe LED
+      if (currentStepRef.current === 1 && t.stepNodes[1]?.propGroup?.userData?.strobeLight) {
+        const strobePulse = (Math.sin(elapsed * 14) + 1) / 2
+        t.stepNodes[1].propGroup.userData.strobeLight.intensity = strobePulse > 0.6 ? 2.8 : 0.15
       }
 
       // Animate Evacuation Waypoints (visible on Evacuate & Muster steps)
@@ -1123,14 +1694,14 @@ export default function Scenario() {
       t.stepNodes.forEach((node) => {
         const isActive = node.group.visible && node.stepIndex === currentStepRef.current
         if (isActive) {
-          node.orbMesh.position.y = 0.18 + Math.sin(elapsed * 4) * 0.04
+          node.orbMesh.position.y = 0.22 + Math.sin(elapsed * 4) * 0.04
           node.ringMesh.rotation.z = elapsed * 1.5
           node.ringMesh.scale.setScalar(1 + Math.sin(elapsed * 5) * 0.15)
           node.beamMesh.material.opacity = 0.25 + Math.sin(elapsed * 6) * 0.15
         }
       })
 
-      // Handle AR camera orientation vs 3D OrbitControls
+      // Handle AR camera orientation & World Anchoring
       if (arModeRef.current) {
         if (controls) controls.enabled = false
         camera.position.set(0, 1.4, 0)
@@ -1145,26 +1716,48 @@ export default function Scenario() {
         camera.quaternion.setFromEuler(euler)
 
         const activeIdx = currentStepRef.current
-        const activeStepObj = steps[activeIdx]
+        const activeNode = t.stepNodes[activeIdx]
 
+        // ── Presentation Demo Mode Anchoring ──
         if (demoModeRef.current) {
-          // In Presentation Demo Mode: target is placed directly in front of camera (0 degrees)
-          const now = performance.now()
-          if (!t.lastCueUpdate || now - t.lastCueUpdate > 100) {
-            t.lastCueUpdate = now
-            setSpatialDirectionCue({
-              inView: true,
-              turnDirection: 'in-front',
-              angleDeg: 0,
-              distanceMeters: '1.9',
-              stationName: activeStepObj?.label || '',
-              stepIndex: activeIdx,
-              isDemoMode: true,
-            })
+          if (t.anchoredStep !== activeIdx || t.anchoredMode !== true) {
+            const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+            const forwardH = new THREE.Vector3(camForward.x, 0, camForward.z).normalize()
+            if (forwardH.lengthSq() < 0.001) forwardH.set(0, 0, -1)
+
+            if (activeNode) {
+              const anchorDist = 1.7
+              const anchorPos = new THREE.Vector3()
+                .copy(camera.position)
+                .addScaledVector(forwardH, anchorDist)
+              anchorPos.y = activeIdx === 0 ? camera.position.y - 0.40 : camera.position.y - 0.25
+
+              activeNode.group.position.copy(anchorPos)
+              activeNode.group.lookAt(camera.position.x, anchorPos.y, camera.position.z)
+              activeNode.group.visible = true
+            }
+            t.anchoredStep = activeIdx
+            t.anchoredMode = true
           }
-        } else if (activeStepObj?.position) {
-          // In Realistic Multi-Location Mode: calculate actual compass heading
-          const targetPos = new THREE.Vector3(...activeStepObj.position)
+        } else {
+          // Realistic Multi-Location Mode: restore fixed room coordinates
+          if (t.anchoredMode !== false) {
+            t.stepNodes.forEach((node) => {
+              if (node.initialPos) {
+                node.group.position.set(...node.initialPos)
+                node.group.quaternion.set(0, 0, 0, 1)
+              }
+            })
+            t.anchoredMode = false
+            t.anchoredStep = activeIdx
+          }
+        }
+
+        // Spatial Direction & Distance Guidance (Calculated to the live world target!)
+        if (activeNode) {
+          const targetWorldPos = new THREE.Vector3()
+          activeNode.group.getWorldPosition(targetWorldPos)
+
           const camWorldPos = new THREE.Vector3()
           camera.getWorldPosition(camWorldPos)
 
@@ -1172,7 +1765,7 @@ export default function Scenario() {
           camForward.y = 0
           camForward.normalize()
 
-          const toTarget = new THREE.Vector3().subVectors(targetPos, camWorldPos)
+          const toTarget = new THREE.Vector3().subVectors(targetWorldPos, camWorldPos)
           toTarget.y = 0
           const dist = toTarget.length()
           toTarget.normalize()
@@ -1202,9 +1795,9 @@ export default function Scenario() {
               turnDirection,
               angleDeg,
               distanceMeters: dist.toFixed(1),
-              stationName: activeStepObj.label,
+              stationName: steps[activeIdx]?.label || '',
               stepIndex: activeIdx,
-              isDemoMode: false,
+              isDemoMode: demoModeRef.current,
             })
           }
         }
@@ -1231,6 +1824,7 @@ export default function Scenario() {
       canvas.removeEventListener('click', handlePointerInteract)
       window.removeEventListener('resize', onResize)
       window.removeEventListener('deviceorientation', onDeviceRot)
+      fireAudioRef.current.stop()
       controls.dispose()
       renderer.dispose()
       scene.clear()
@@ -1248,7 +1842,10 @@ export default function Scenario() {
   // ─── Update Visual State When Step Changes (No WebGL Teardown) ────────────────
   useEffect(() => {
     const t = threeRef.current
-    if (!t.stepNodes.length) return
+    if (!t.stepNodes || !t.stepNodes.length) return
+
+    // Signal renderLoop to re-anchor active object to live camera orientation
+    t.anchoredStep = -1
 
     t.stepNodes.forEach(node => {
       const isCompleted = completedSteps.includes(node.stepIndex)
@@ -1263,6 +1860,7 @@ export default function Scenario() {
         node.beamMesh.visible = isActive
         node.ringMesh.visible = isActive
         node.badgeSprite.visible = isActive
+        if (node.propGroup) node.propGroup.visible = true
 
         if (isActive) {
           node.orbMesh.material.emissiveIntensity = 1.0
@@ -1274,43 +1872,6 @@ export default function Scenario() {
         }
       }
     })
-
-    // In AR Presentation Demo Mode (Default ON):
-    // Auto-place the active step's object directly in front of the camera (1.9m)
-    // so the presenter/trainee sees it immediately without turning!
-    const activeNode = t.stepNodes[currentStep]
-    if (arMode && demoMode && t.camera && activeNode) {
-      const camPos = new THREE.Vector3()
-      t.camera.getWorldPosition(camPos)
-
-      const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(t.camera.quaternion)
-      const forwardH = new THREE.Vector3(camForward.x, 0, camForward.z).normalize()
-      if (forwardH.lengthSq() < 0.001) forwardH.set(0, 0, -1)
-
-      const placePos = new THREE.Vector3().copy(camPos).addScaledVector(forwardH, 1.9)
-      placePos.y = camPos.y - 0.15
-
-      activeNode.group.position.copy(placePos)
-      activeNode.group.quaternion.copy(t.camera.quaternion)
-
-      // Also place fire particle system directly in front of camera for Step 0
-      if (currentStep === 0 && t.arFireGroup) {
-        t.arFireGroup.position.copy(placePos)
-        t.arFireGroup.quaternion.copy(t.camera.quaternion)
-      }
-    } else {
-      // In Realistic Multi-Location Mode: restore fixed room coordinates
-      t.stepNodes.forEach(node => {
-        if (node.initialPos) {
-          node.group.position.set(...node.initialPos)
-          node.group.quaternion.set(0, 0, 0, 1)
-        }
-      })
-      if (t.arFireGroup && t.WORLD_FIRE_POS) {
-        t.arFireGroup.position.copy(t.WORLD_FIRE_POS)
-        t.arFireGroup.quaternion.set(0, 0, 0, 1)
-      }
-    }
 
     // Hide giant warehouse environment meshes in AR mode (user's room is the environment!)
     if (t.warehousePropsGroup) {
@@ -1328,16 +1889,33 @@ export default function Scenario() {
       }
     }
 
-    // Dynamic virtual hazard reactions
-    if (isFireScenario && t.flameMeshes) {
-      const isExtinguished = completedSteps.includes(3)
-      t.flameExtinguished = isExtinguished
+    // Dynamic virtual hazard reactions & realistic fire extinction
+    const isExtinguished = completedSteps.includes(3)
+    t.flameExtinguished = isExtinguished
+    if (t.fireVisual) {
+      t.fireVisual.flameOuter.visible = !isExtinguished
+      t.fireVisual.flameMid.visible = !isExtinguished
+      t.fireVisual.flameCore.visible = !isExtinguished
+      t.fireVisual.embers.forEach(e => { e.visible = !isExtinguished })
+      t.fireVisual.smokeParticles.forEach(s => { s.visible = !isExtinguished })
+      if (t.fireVisual.fireLight) t.fireVisual.fireLight.intensity = isExtinguished ? 0 : 4.5
+      if (t.fireVisual.fireGlow) t.fireVisual.fireGlow.intensity = isExtinguished ? 0 : 2.0
+    }
+    if (t.flameMeshes) {
       t.flameMeshes.forEach(mesh => {
         mesh.visible = !isExtinguished
       })
       if (t.flameLight) {
         t.flameLight.intensity = isExtinguished ? 0 : 4.0
       }
+    }
+
+    // Ambient Fire Crackling Audio (Web Audio API)
+    // Plays when Step 0 is active and fire is not extinguished
+    if (isFireScenario && !isExtinguished && currentStep === 0) {
+      fireAudioRef.current.start()
+    } else {
+      fireAudioRef.current.stop()
     }
   }, [currentStep, completedSteps, arMode, isFireScenario, demoMode])
 
