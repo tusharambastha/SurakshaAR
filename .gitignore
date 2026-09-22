@@ -31,4 +31,6 @@ npm-debug.log*
 bin/
 scratch/
 assemble_demo.py
+.vite/
+
 

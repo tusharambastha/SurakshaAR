@@ -757,6 +757,430 @@ function createMusterPointProp() {
   return propGroup
 }
 
+// ─── Machinery Scenario 3D Props & Textures ──────────────────────────────────
+function createNipPointWarningTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 384; canvas.height = 160
+  const ctx = canvas.getContext('2d')
+  ctx.fillStyle = '#F59E0B'
+  ctx.fillRect(0, 0, 384, 160)
+
+  // Top & bottom hazard diagonal warning stripes
+  ctx.fillStyle = '#0F172A'
+  for (let i = -160; i < 400; i += 28) {
+    ctx.beginPath()
+    ctx.moveTo(i, 0); ctx.lineTo(i + 14, 0); ctx.lineTo(i - 6, 24); ctx.lineTo(i - 20, 24); ctx.closePath(); ctx.fill()
+    ctx.beginPath()
+    ctx.moveTo(i, 136); ctx.lineTo(i + 14, 136); ctx.lineTo(i - 6, 160); ctx.lineTo(i - 20, 160); ctx.closePath(); ctx.fill()
+  }
+
+  ctx.fillStyle = '#0F172A'
+  ctx.font = '900 24px -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('⚠ DANGER ⚠', 192, 58)
+  ctx.font = '800 20px -apple-system, sans-serif'
+  ctx.fillText('PINCH / NIP POINT', 192, 88)
+  ctx.font = '700 14px -apple-system, sans-serif'
+  ctx.fillText('KEEP HANDS & CLOTHING CLEAR', 192, 116)
+
+  return new THREE.CanvasTexture(canvas)
+}
+
+function createEStopFaceTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256; canvas.height = 256
+  const ctx = canvas.getContext('2d')
+
+  // Yellow legend ring
+  ctx.fillStyle = '#FACC15'
+  ctx.beginPath()
+  ctx.arc(128, 128, 124, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = '#CA8A04'
+  ctx.lineWidth = 6
+  ctx.stroke()
+
+  // Legend text
+  ctx.fillStyle = '#0F172A'
+  ctx.font = '900 22px -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('EMERGENCY', 128, 44)
+  ctx.fillText('STOP', 128, 230)
+
+  ctx.font = '900 16px sans-serif'
+  ctx.fillText('◀ PUSH', 46, 134)
+  ctx.fillText('STOP ▶', 210, 134)
+
+  return new THREE.CanvasTexture(canvas)
+}
+
+function createLOTOTagTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256; canvas.height = 384
+  const ctx = canvas.getContext('2d')
+
+  // White tag background
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fillRect(0, 0, 256, 384)
+  ctx.strokeStyle = '#DC2626'
+  ctx.lineWidth = 8
+  ctx.strokeRect(4, 4, 248, 376)
+
+  // Red DANGER banner
+  ctx.fillStyle = '#DC2626'
+  ctx.beginPath()
+  ctx.roundRect(12, 14, 232, 68, 8)
+  ctx.fill()
+
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = '900 32px -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('DANGER', 128, 58)
+
+  // Text details
+  ctx.fillStyle = '#0F172A'
+  ctx.font = '900 22px -apple-system, sans-serif'
+  ctx.fillText('DO NOT', 128, 122)
+  ctx.fillText('OPERATE', 128, 150)
+
+  ctx.strokeStyle = '#CBD5E1'
+  ctx.lineWidth = 2
+  ctx.beginPath(); ctx.moveTo(24, 172); ctx.lineTo(232, 172); ctx.stroke()
+
+  ctx.font = '800 15px -apple-system, sans-serif'
+  ctx.fillStyle = '#DC2626'
+  ctx.fillText('EQUIPMENT LOCKED OUT', 128, 202)
+
+  ctx.fillStyle = '#475569'
+  ctx.font = '600 13px -apple-system, sans-serif'
+  ctx.fillText('BY: SURAKSHA TRAINEE', 128, 236)
+  ctx.fillText('DEPT: ROTATING MACHINERY', 128, 266)
+  ctx.fillText('STATUS: LOCKED / TAGGED', 128, 296)
+
+  // Bottom warning stripe
+  ctx.fillStyle = '#DC2626'
+  ctx.fillRect(12, 332, 232, 34)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = '800 14px -apple-system, sans-serif'
+  ctx.fillText('LIFE DEPENDS ON IT', 128, 355)
+
+  return new THREE.CanvasTexture(canvas)
+}
+
+function createZeroEnergyGaugeTexture() {
+  const canvas = document.createElement('canvas')
+  canvas.width = 384; canvas.height = 192
+  const ctx = canvas.getContext('2d')
+
+  // Digital dark screen
+  ctx.fillStyle = '#051A0E'
+  ctx.fillRect(0, 0, 384, 192)
+  ctx.strokeStyle = '#10B981'
+  ctx.lineWidth = 4
+  ctx.strokeRect(4, 4, 376, 184)
+
+  // Header status
+  ctx.fillStyle = '#34D399'
+  ctx.font = '700 16px -apple-system, monospace'
+  ctx.textAlign = 'left'
+  ctx.fillText('ISO 14118 ZERO-ENERGY TEST', 18, 32)
+
+  // Digital reading
+  ctx.fillStyle = '#10B981'
+  ctx.font = '900 52px -apple-system, monospace'
+  ctx.fillText('0.00 V', 22, 98)
+
+  // Safe badge
+  ctx.fillStyle = '#064E3B'
+  ctx.beginPath()
+  ctx.roundRect(238, 58, 128, 46, 6)
+  ctx.fill()
+  ctx.fillStyle = '#6EE7B7'
+  ctx.font = '800 18px -apple-system, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('0.0V SAFE', 302, 88)
+
+  ctx.textAlign = 'left'
+  ctx.font = '700 15px -apple-system, monospace'
+  ctx.fillStyle = '#34D399'
+  ctx.fillText('RESIDUAL PRESSURE: 0.00 BAR [SAFE]', 18, 144)
+  ctx.fillText('ISOLATION STATUS: VERIFIED ZERO', 18, 168)
+
+  return new THREE.CanvasTexture(canvas)
+}
+
+function createMachineryNipPointProp() {
+  const propGroup = new THREE.Group()
+
+  // 1. Cast iron machinery bed base
+  const base = new THREE.Mesh(
+    new THREE.BoxGeometry(0.44, 0.05, 0.28),
+    new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.8, roughness: 0.3 })
+  )
+  base.position.y = -0.05
+  propGroup.add(base)
+
+  // 2. Front caution warning decal
+  const warnTex = createNipPointWarningTexture()
+  const warnPlate = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.36, 0.15),
+    new THREE.MeshStandardMaterial({ map: warnTex, roughness: 0.4 })
+  )
+  warnPlate.position.set(0, 0.06, 0.142)
+  propGroup.add(warnPlate)
+
+  // 3. Side bearing blocks
+  const blockMat = new THREE.MeshStandardMaterial({ color: '#475569', metalness: 0.7, roughness: 0.35 })
+  const blockL = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.18), blockMat)
+  blockL.position.set(-0.19, 0.08, 0)
+  propGroup.add(blockL)
+
+  const blockR = blockL.clone()
+  blockR.position.x = 0.19
+  propGroup.add(blockR)
+
+  // 4. Counter-rotating steel nip rollers
+  const rollerMat = new THREE.MeshStandardMaterial({ color: '#CBD5E1', metalness: 0.9, roughness: 0.18 })
+  const roller1 = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.32, 24), rollerMat)
+  roller1.rotation.z = Math.PI / 2
+  roller1.position.set(0, 0.13, -0.04)
+  propGroup.add(roller1)
+
+  const roller2 = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.32, 24), rollerMat)
+  roller2.rotation.z = Math.PI / 2
+  roller2.position.set(0, 0.05, 0.04)
+  propGroup.add(roller2)
+
+  // 5. Nip pinch point warning light
+  const pinchLight = new THREE.PointLight('#F59E0B', 2.8, 3.0)
+  pinchLight.position.set(0, 0.09, 0)
+  propGroup.add(pinchLight)
+
+  propGroup.userData = { rollers: [roller1, roller2], pinchLight }
+  return propGroup
+}
+
+function createEStopButtonProp() {
+  const propGroup = new THREE.Group()
+
+  // 1. Industrial yellow push-button enclosure
+  const casing = new THREE.Mesh(
+    new THREE.BoxGeometry(0.24, 0.28, 0.10),
+    new THREE.MeshStandardMaterial({ color: '#EAB308', metalness: 0.25, roughness: 0.4 })
+  )
+  propGroup.add(casing)
+
+  // 2. Yellow circular legend faceplate
+  const faceTex = createEStopFaceTexture()
+  const faceplate = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.22, 0.22),
+    new THREE.MeshStandardMaterial({ map: faceTex, roughness: 0.35 })
+  )
+  faceplate.position.set(0, 0, 0.052)
+  propGroup.add(faceplate)
+
+  // 3. E-Stop Button stem & red mushroom head
+  const stem = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.032, 0.032, 0.04, 16),
+    new THREE.MeshStandardMaterial({ color: '#0F172A', metalness: 0.8 })
+  )
+  stem.rotation.x = Math.PI / 2
+  stem.position.set(0, 0, 0.07)
+  propGroup.add(stem)
+
+  const mushroomCap = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.075, 0.065, 0.038, 24),
+    new THREE.MeshStandardMaterial({
+      color: '#DC2626',
+      emissive: '#B91C1C',
+      emissiveIntensity: 0.5,
+      metalness: 0.3,
+      roughness: 0.25,
+    })
+  )
+  mushroomCap.rotation.x = Math.PI / 2
+  mushroomCap.position.set(0, 0, 0.095)
+  propGroup.add(mushroomCap)
+
+  // 4. Red status glow light
+  const eLight = new THREE.PointLight('#EF4444', 2.0, 2.5)
+  eLight.position.set(0, 0, 0.15)
+  propGroup.add(eLight)
+
+  return propGroup
+}
+
+function createLOTOStationProp() {
+  const propGroup = new THREE.Group()
+
+  // 1. Steel disconnect breaker enclosure
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.36, 0.10),
+    new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.75, roughness: 0.35 })
+  )
+  propGroup.add(box)
+
+  // 2. Disconnect rotary switch handle in OFF position
+  const handle = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.035, 0.04),
+    new THREE.MeshStandardMaterial({ color: '#0F172A', metalness: 0.9 })
+  )
+  handle.position.set(0, 0.04, 0.07)
+  propGroup.add(handle)
+
+  // 3. Red Steel Lockout Hasp
+  const hasp = new THREE.Mesh(
+    new THREE.TorusGeometry(0.04, 0.008, 12, 24),
+    new THREE.MeshStandardMaterial({ color: '#DC2626', metalness: 0.5 })
+  )
+  hasp.position.set(0, 0.02, 0.09)
+  propGroup.add(hasp)
+
+  // 4. MasterLock Safety Padlock
+  const padBody = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.07, 0.03),
+    new THREE.MeshStandardMaterial({ color: '#DC2626', metalness: 0.3, roughness: 0.3 })
+  )
+  padBody.position.set(0, -0.04, 0.10)
+  propGroup.add(padBody)
+
+  const padShackle = new THREE.Mesh(
+    new THREE.TorusGeometry(0.022, 0.005, 8, 16, Math.PI),
+    new THREE.MeshStandardMaterial({ color: '#E2E8F0', metalness: 0.95, roughness: 0.1 })
+  )
+  padShackle.position.set(0, -0.005, 0.10)
+  propGroup.add(padShackle)
+
+  // 5. Hanging DANGER DO NOT OPERATE Tag
+  const tagTex = createLOTOTagTexture()
+  const tagMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.12, 0.18),
+    new THREE.MeshStandardMaterial({ map: tagTex, roughness: 0.4, side: THREE.DoubleSide })
+  )
+  tagMesh.position.set(0.03, -0.16, 0.11)
+  tagMesh.rotation.z = -0.08
+  propGroup.add(tagMesh)
+
+  const lotoLight = new THREE.PointLight('#DC2626', 1.8, 2.5)
+  lotoLight.position.set(0, -0.04, 0.16)
+  propGroup.add(lotoLight)
+
+  return propGroup
+}
+
+function createZeroEnergyPanelProp() {
+  const propGroup = new THREE.Group()
+
+  // 1. Instrumentation box
+  const panel = new THREE.Mesh(
+    new THREE.BoxGeometry(0.34, 0.24, 0.08),
+    new THREE.MeshStandardMaterial({ color: '#1E293B', metalness: 0.6, roughness: 0.4 })
+  )
+  propGroup.add(panel)
+
+  // 2. Digital display screen with 0.00V SAFE reading
+  const screenTex = createZeroEnergyGaugeTexture()
+  const screenMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.32, 0.16),
+    new THREE.MeshStandardMaterial({
+      map: screenTex,
+      emissive: '#064E3B',
+      emissiveIntensity: 0.6,
+      roughness: 0.2,
+    })
+  )
+  screenMesh.position.set(0, 0.01, 0.042)
+  propGroup.add(screenMesh)
+
+  // 3. Test probe terminal sockets
+  const probeRed = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.02, 16),
+    new THREE.MeshStandardMaterial({ color: '#EF4444' })
+  )
+  probeRed.rotation.x = Math.PI / 2
+  probeRed.position.set(-0.08, -0.085, 0.045)
+  propGroup.add(probeRed)
+
+  const probeBlack = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.02, 16),
+    new THREE.MeshStandardMaterial({ color: '#0F172A' })
+  )
+  probeBlack.rotation.x = Math.PI / 2
+  probeBlack.position.set(-0.03, -0.085, 0.045)
+  propGroup.add(probeBlack)
+
+  // 4. Glowing Zero-Energy Green LED
+  const greenLed = new THREE.Mesh(
+    new THREE.SphereGeometry(0.015, 12, 12),
+    new THREE.MeshStandardMaterial({ color: '#10B981', emissive: '#059669', emissiveIntensity: 3.5 })
+  )
+  greenLed.position.set(0.12, -0.085, 0.045)
+  propGroup.add(greenLed)
+
+  const zeroLight = new THREE.PointLight('#10B981', 2.2, 2.5)
+  zeroLight.position.set(0, 0, 0.12)
+  propGroup.add(zeroLight)
+
+  return propGroup
+}
+
+function createMachineGuardProp() {
+  const propGroup = new THREE.Group()
+
+  // 1. Safety yellow barrier frame
+  const frameMat = new THREE.MeshStandardMaterial({ color: '#EAB308', metalness: 0.4, roughness: 0.35 })
+  const frameTop = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.03, 0.03), frameMat)
+  frameTop.position.set(0, 0.20, 0)
+  propGroup.add(frameTop)
+
+  const frameBottom = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.03, 0.03), frameMat)
+  frameBottom.position.set(0, -0.20, 0)
+  propGroup.add(frameBottom)
+
+  const frameL = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.40, 0.03), frameMat)
+  frameL.position.set(-0.175, 0, 0)
+  propGroup.add(frameL)
+
+  const frameR = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.40, 0.03), frameMat)
+  frameR.position.set(0.175, 0, 0)
+  propGroup.add(frameR)
+
+  // 2. Protective wire mesh lattice bars
+  const barMat = new THREE.MeshStandardMaterial({ color: '#64748B', metalness: 0.8, roughness: 0.3 })
+  for (let i = -0.14; i <= 0.14; i += 0.04) {
+    const vBar = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.38, 8), barMat)
+    vBar.position.set(i, 0, 0)
+    propGroup.add(vBar)
+  }
+  for (let j = -0.16; j <= 0.16; j += 0.04) {
+    const hBar = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.34, 8), barMat)
+    hBar.rotation.z = Math.PI / 2
+    hBar.position.set(0, j, 0)
+    propGroup.add(hBar)
+  }
+
+  // 3. Safety Interlock Switch sensor
+  const interlockBox = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05, 0.08, 0.04),
+    new THREE.MeshStandardMaterial({ color: '#DC2626', roughness: 0.3 })
+  )
+  interlockBox.position.set(0.175, 0.05, 0.02)
+  propGroup.add(interlockBox)
+
+  const interlockLed = new THREE.Mesh(
+    new THREE.SphereGeometry(0.012, 12, 12),
+    new THREE.MeshStandardMaterial({ color: '#22C55E', emissive: '#16A34A', emissiveIntensity: 3.0 })
+  )
+  interlockLed.position.set(0.175, 0.07, 0.045)
+  propGroup.add(interlockLed)
+
+  const guardLight = new THREE.PointLight('#EAB308', 1.8, 2.5)
+  guardLight.position.set(0, 0, 0.10)
+  propGroup.add(guardLight)
+
+  return propGroup
+}
+
 // ─── Camera AR Live Video Background ──────────────────────────────────────────
 function CameraBackground({ streamRef, videoRef }) {
   useEffect(() => {
@@ -836,6 +1260,7 @@ export default function Scenario() {
 
   const isFireScenario = scenario?.hazard_type === 'fire' || scenario?.id?.includes('0001') || (scenario?.title && /fire/i.test(scenario.title))
   const isGasScenario  = scenario?.hazard_type === 'gas_leak'
+  const isMachineryScenario = scenario?.hazard_type === 'machinery' || scenario?.id?.includes('0003') || (scenario?.title && /machinery/i.test(scenario.title))
 
   const getStepText = useCallback((s, field) => {
     if (!s) return ''
@@ -1285,6 +1710,29 @@ export default function Scenario() {
       const ppeLight = new THREE.PointLight('#EAB308', 3.5, 8)
       ppeLight.position.y = 0.3
       hazardGroup.add(ppeLight)
+    } else if (scenario.hazard_type === 'machinery') {
+      hazardGroup.position.set(3, 1.2, 3)
+      // Rotating Industrial Nip Rollers with yellow warning guard
+      const machBase = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 1.2), machineMat)
+      machBase.position.y = -0.3
+      hazardGroup.add(machBase)
+
+      const rollerMat = new THREE.MeshStandardMaterial({ color: '#94A3B8', metalness: 0.85, roughness: 0.25 })
+      const r1 = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 1.2, 24), rollerMat)
+      r1.rotation.z = Math.PI / 2
+      r1.position.set(0, 0.25, -0.22)
+      hazardGroup.add(r1)
+
+      const r2 = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 1.2, 24), rollerMat)
+      r2.rotation.z = Math.PI / 2
+      r2.position.set(0, 0.25, 0.22)
+      hazardGroup.add(r2)
+
+      const mLight = new THREE.PointLight('#F59E0B', 3.0, 7)
+      mLight.position.y = 0.5
+      hazardGroup.add(mLight)
+
+      t.machineryEnvRollers = [r1, r2]
     } else {
       hazardGroup.position.set(3, 1.4, 2.3)
       // Flame cones and core
@@ -1404,18 +1852,34 @@ export default function Scenario() {
 
       // ── Human-Scaled 3D Interactive Prop ──────────────────────────────────
       let propGroup = new THREE.Group()
-      if (idx === 0) {
-        propGroup = isFireScenario ? createFireSourceProp() : createHazardPadProp()
-      } else if (idx === 1) {
-        propGroup = createAlarmBoxProp()
-      } else if (idx === 2) {
-        propGroup = createPPEStationProp()
-      } else if (idx === 3) {
-        propGroup = createExtinguisherProp()
-      } else if (idx === 4) {
-        propGroup = createExitSignProp()
-      } else if (idx === 5) {
-        propGroup = createMusterPointProp()
+      if (isMachineryScenario) {
+        if (idx === 0) {
+          propGroup = createMachineryNipPointProp()
+        } else if (idx === 1) {
+          propGroup = createEStopButtonProp()
+        } else if (idx === 2) {
+          propGroup = createLOTOStationProp()
+        } else if (idx === 3) {
+          propGroup = createZeroEnergyPanelProp()
+        } else if (idx === 4) {
+          propGroup = createMachineGuardProp()
+        } else if (idx === 5) {
+          propGroup = createMusterPointProp()
+        }
+      } else {
+        if (idx === 0) {
+          propGroup = isFireScenario ? createFireSourceProp() : createHazardPadProp()
+        } else if (idx === 1) {
+          propGroup = createAlarmBoxProp()
+        } else if (idx === 2) {
+          propGroup = createPPEStationProp()
+        } else if (idx === 3) {
+          propGroup = createExtinguisherProp()
+        } else if (idx === 4) {
+          propGroup = createExitSignProp()
+        } else if (idx === 5) {
+          propGroup = createMusterPointProp()
+        }
       }
       group.add(propGroup)
 
@@ -1562,6 +2026,19 @@ export default function Scenario() {
       if (currentStepRef.current === 1 && t.stepNodes[1]?.propGroup?.userData?.strobeLight) {
         const strobePulse = (Math.sin(elapsed * 14) + 1) / 2
         t.stepNodes[1].propGroup.userData.strobeLight.intensity = strobePulse > 0.6 ? 2.8 : 0.15
+      }
+
+      // Animate Machinery Rollers (Env & Step 0 Nip Hazard)
+      if (t.machineryEnvRollers) {
+        const speed = currentStepRef.current >= 1 ? 0 : 0.05
+        t.machineryEnvRollers[0].rotation.x += speed
+        t.machineryEnvRollers[1].rotation.x -= speed
+      }
+      if (t.stepNodes[0]?.propGroup?.userData?.rollers) {
+        const speed = currentStepRef.current >= 1 ? 0 : 0.06
+        const [r1, r2] = t.stepNodes[0].propGroup.userData.rollers
+        if (r1) r1.rotation.x += speed
+        if (r2) r2.rotation.x -= speed
       }
 
       // Animate Evacuation Waypoints (visible on Evacuate & Muster steps)

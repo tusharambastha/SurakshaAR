@@ -54,7 +54,7 @@ values
       {"index": 4, "label": "Equip Steel-Toe Safety Boots", "instruction": "Wear puncture-resistant, electrical-hazard rated steel-toe boots before entering active work floor", "position": [-1.5, 0.5, 2], "color": "#8b5cf6", "is_ppe_step": true},
       {"index": 5, "label": "Complete Safety Checklist Verification", "instruction": "Verify all mandatory PPE fitment at supervisor safety checkpoint and confirm readiness for site entry", "position": [0, 1.0, 10], "color": "#a855f7", "is_ppe_step": false}
     ]'::jsonb,
-    false
+    true
   ),
   (
     'a1b2c3d4-0005-0005-0005-000000000005',
@@ -69,12 +69,19 @@ values
   (
     'a1b2c3d4-0003-0003-0003-000000000003',
     'Heavy Industrial Machinery & Nip-Point Guarding',
-    'Learn to safely isolate machinery before maintenance using LOTO procedures. Master rotating nip-point guarding and physical barrier interlocks.',
+    'Learn to safely isolate machinery before maintenance using LOTO procedures. Master rotating nip-point guarding, E-stop triggers, zero-energy state verification, and physical barrier interlocks.',
     'machinery',
-    'advanced',
-    150000,
-    '[]'::jsonb,
-    true
+    'intermediate',
+    120000,
+    '[
+      {"index": 0, "label": "Identify Nip-Point Hazard", "instruction": "Locate the in-running rotating rollers and identify the nip-point pinch hazard", "position": [3, 1.2, 3], "color": "#f59e0b", "is_ppe_step": false},
+      {"index": 1, "label": "Hit Emergency Stop (E-Stop)", "instruction": "Press the prominent red mushroom E-Stop button immediately to kill power to the motor drive", "position": [2.5, 2.0, -2], "color": "#ef4444", "is_ppe_step": false},
+      {"index": 2, "label": "Apply Lockout / Tagout (LOTO)", "instruction": "Place red padlock and warning tag on the electrical disconnect switch to prevent accidental restart", "position": [-4, 0.9, 1], "color": "#dc2626", "is_ppe_step": false},
+      {"index": 3, "label": "Verify Zero Energy State", "instruction": "Test system controls and meter to confirm 0.0V residual electrical and mechanical stored energy", "position": [1.5, 0.8, 2], "color": "#22c55e", "is_ppe_step": false},
+      {"index": 4, "label": "Install Interlocked Safety Guard", "instruction": "Fit and engage the physical protective mesh guard and interlock switch around the nip rollers", "position": [-6, 1.5, -5], "color": "#3b82f6", "is_ppe_step": false},
+      {"index": 5, "label": "Supervisor Clearance Sign-Off", "instruction": "Meet supervisor at inspection muster point to confirm LOTO logbook sign-off and safe operation clearance", "position": [0, 1.0, 10], "color": "#a855f7", "is_ppe_step": false}
+    ]'::jsonb,
+    false
   )
 on conflict (id) do nothing;
 

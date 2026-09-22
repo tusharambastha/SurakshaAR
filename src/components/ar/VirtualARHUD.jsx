@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   Volume2, CheckCircle2, AlertTriangle, Flame, Wind, Zap, Shield, Target,
   ArrowRight, Monitor, X, WifiOff, Printer, Compass, ChevronLeft, ChevronRight,
-  RotateCcw, MapPin, Bell, DoorOpen, Navigation
+  RotateCcw, MapPin, Bell, DoorOpen, Navigation, Cog, Lock
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { speak } from '../../lib/voice'
@@ -15,6 +15,15 @@ const STATION_ICONS = {
   3: AlertTriangle,// Step 3: Extinguisher / Action
   4: DoorOpen,    // Step 4: Fire Exit
   5: MapPin,      // Step 5: Muster Point
+}
+
+const MACHINERY_STATION_ICONS = {
+  0: Cog,           // Step 0: Nip-Point Hazard
+  1: AlertTriangle, // Step 1: E-Stop Button
+  2: Lock,          // Step 2: LOTO Padlock
+  3: Zap,           // Step 3: Zero Energy Verification
+  4: Shield,        // Step 4: Safety Guard
+  5: MapPin,        // Step 5: Supervisor Sign-Off
 }
 
 export default function VirtualARHUD({
@@ -39,6 +48,7 @@ export default function VirtualARHUD({
   const activeStep = steps[currentStep]
   const isFire = scenario?.hazard_type === 'fire'
   const isGas = scenario?.hazard_type === 'gas_leak'
+  const isMachinery = scenario?.hazard_type === 'machinery'
   const isPPE = scenario?.hazard_type === 'ppe'
 
   // Hazard details and interactive AR marker badge
@@ -55,6 +65,13 @@ export default function VirtualARHUD({
         subtext: 'High Pressure Pipe Rupture · Evacuation Area',
         color: '#84CC16',
         icon: <Wind size={16} color="#84CC16" />,
+      }
+    : isMachinery
+    ? {
+        label: '⚠ ROTATING MACHINERY NIP-POINT',
+        subtext: 'Live High-Torque Rollers · LOTO Required',
+        color: '#F59E0B',
+        icon: <Cog size={16} color="#F59E0B" />,
       }
     : {
         label: '⚠ INDUSTRIAL PPE REQUIRED',
@@ -303,7 +320,7 @@ export default function VirtualARHUD({
               {steps.map((s, idx) => {
                 const isCompleted = completedSteps.includes(idx)
                 const isActive = idx === currentStep
-                const Icon = STATION_ICONS[idx] || Target
+                const Icon = isMachinery ? (MACHINERY_STATION_ICONS[idx] || Target) : (STATION_ICONS[idx] || Target)
 
                 return (
                   <div
