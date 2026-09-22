@@ -415,121 +415,286 @@ function createMusterSignTexture() {
   return tex
 }
 
+// ─── Procedural Canvas Textures for Realistic Fire & Smoke Particles ─────────
+let _flameTex = null
+function getFlameParticleTexture() {
+  if (_flameTex) return _flameTex
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')
+
+  // Smooth radial gradient with white-hot core, vivid orange mid, and soft red feathered edge
+  const grad = ctx.createRadialGradient(64, 76, 4, 64, 64, 60)
+  grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)')
+  grad.addColorStop(0.18, 'rgba(255, 240, 140, 0.95)')
+  grad.addColorStop(0.42, 'rgba(255, 130, 20, 0.88)')
+  grad.addColorStop(0.70, 'rgba(235, 45, 5, 0.55)')
+  grad.addColorStop(0.90, 'rgba(180, 15, 0, 0.18)')
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)')
+
+  ctx.fillStyle = grad
+  ctx.beginPath()
+  ctx.arc(64, 64, 60, 0, Math.PI * 2)
+  ctx.fill()
+
+  _flameTex = new THREE.CanvasTexture(canvas)
+  return _flameTex
+}
+
+let _smokeTex = null
+function getSmokeParticleTexture() {
+  if (_smokeTex) return _smokeTex
+  const canvas = document.createElement('canvas')
+  canvas.width = 128
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')
+
+  // Soft billowing smoke puff with feathered edges
+  const grad = ctx.createRadialGradient(64, 64, 6, 64, 64, 60)
+  grad.addColorStop(0.0, 'rgba(55, 60, 70, 0.65)')
+  grad.addColorStop(0.38, 'rgba(48, 52, 60, 0.40)')
+  grad.addColorStop(0.72, 'rgba(40, 44, 50, 0.15)')
+  grad.addColorStop(1.0, 'rgba(20, 22, 25, 0.0)')
+
+  ctx.fillStyle = grad
+  ctx.beginPath()
+  ctx.arc(64, 64, 60, 0, Math.PI * 2)
+  ctx.fill()
+
+  _smokeTex = new THREE.CanvasTexture(canvas)
+  return _smokeTex
+}
+
 // ─── Realistic 3D Fire Object Generator (Step 0 Station Prop) ────────────────
 function createFireSourceProp() {
   const propGroup = new THREE.Group()
 
-  // 1. Heavy industrial charred steel hazard base
-  const baseRing = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.24, 0.27, 0.04, 24),
-    new THREE.MeshStandardMaterial({ color: '#1E293B', metalness: 0.8, roughness: 0.4 })
+  // 1. Heavy industrial charred steel electrical junction box
+  const boxBase = new THREE.Mesh(
+    new THREE.BoxGeometry(0.52, 0.22, 0.36),
+    new THREE.MeshStandardMaterial({ color: '#161920', metalness: 0.75, roughness: 0.45 })
   )
-  baseRing.position.y = 0.02
-  propGroup.add(baseRing)
+  boxBase.position.y = 0.11
+  propGroup.add(boxBase)
 
-  // 2. Charred coal rocks & glowing embers surrounding base
+  // Open charred enclosure door panel angled outward
+  const doorPanel = new THREE.Mesh(
+    new THREE.BoxGeometry(0.24, 0.30, 0.02),
+    new THREE.MeshStandardMaterial({ color: '#1E232B', metalness: 0.65, roughness: 0.55 })
+  )
+  doorPanel.position.set(-0.28, 0.15, 0.12)
+  doorPanel.rotation.y = 0.82
+  propGroup.add(doorPanel)
+
+  // Burnt industrial wiring and severed copper cable ends
+  const wireMatRed = new THREE.MeshStandardMaterial({ color: '#991B1B', roughness: 0.4 })
+  const wireMatChar = new THREE.MeshStandardMaterial({ color: '#18181B', roughness: 0.9 })
+  const wireMatCop = new THREE.MeshStandardMaterial({ color: '#B45309', metalness: 0.6, roughness: 0.3 })
+  for (let w = 0; w < 5; w++) {
+    const mat = w % 2 === 0 ? wireMatRed : (w === 1 ? wireMatChar : wireMatCop)
+    const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.16, 8), mat)
+    wire.position.set(-0.12 + w * 0.06, 0.18, 0.02 + (w % 2) * 0.04)
+    wire.rotation.z = (w - 2) * 0.22
+    propGroup.add(wire)
+  }
+
+  // Yellow & black safety hazard warning chevron stripe
+  const stripe = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.46, 0.045),
+    new THREE.MeshStandardMaterial({ color: '#F59E0B', emissive: '#B45309', emissiveIntensity: 0.6, roughness: 0.4 })
+  )
+  stripe.position.set(0, 0.08, 0.182)
+  propGroup.add(stripe)
+
+  // Charred coal rocks & glowing embers around the base
   const coalMat = new THREE.MeshStandardMaterial({ color: '#18181B', roughness: 0.9 })
-  const glowMat = new THREE.MeshStandardMaterial({ color: '#FF3B00', emissive: '#FF2200', emissiveIntensity: 3.2 })
+  const glowMat = new THREE.MeshStandardMaterial({ color: '#FF3B00', emissive: '#FF2200', emissiveIntensity: 3.5 })
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2
-    const dist = 0.18 + (i % 3) * 0.025
-    const coal = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(0.035 + (i % 2) * 0.015),
-      coalMat
-    )
+    const dist = 0.22 + (i % 3) * 0.03
+    const coal = new THREE.Mesh(new THREE.DodecahedronGeometry(0.032 + (i % 2) * 0.015), coalMat)
     coal.position.set(Math.cos(angle) * dist, 0.03, Math.sin(angle) * dist)
     coal.rotation.set(i, i * 1.5, i * 0.7)
     propGroup.add(coal)
 
-    const ember = new THREE.Mesh(
-      new THREE.SphereGeometry(0.016, 8, 8),
-      glowMat
-    )
-    ember.position.set(Math.cos(angle + 0.3) * (dist * 0.85), 0.035, Math.sin(angle + 0.3) * (dist * 0.85))
+    const ember = new THREE.Mesh(new THREE.SphereGeometry(0.015, 8, 8), glowMat)
+    ember.position.set(Math.cos(angle + 0.3) * (dist * 0.9), 0.035, Math.sin(angle + 0.3) * (dist * 0.9))
     propGroup.add(ember)
   }
 
-  // 3. Volumetric Vibrant Flame Geometries (Opaque & High Emissive for Solid AR Visibility)
-  // (a) Main Central Flame Cone (~0.46m tall)
-  const flameOuter = new THREE.Mesh(
-    new THREE.ConeGeometry(0.20, 0.46, 16),
-    new THREE.MeshStandardMaterial({
-      color: '#FF3B00',
-      emissive: '#FF2200',
-      emissiveIntensity: 2.8,
-      roughness: 0.2,
-      side: THREE.DoubleSide,
-    })
-  )
-  flameOuter.position.y = 0.23
-  propGroup.add(flameOuter)
+  // 2. Procedural Canvas Textures for Flame & Smoke Billboards
+  const flameTex = getFlameParticleTexture()
+  const smokeTex = getSmokeParticleTexture()
 
-  // (b) Secondary Left Flame Lobe (~0.36m tall, angled)
-  const flameLobeL = new THREE.Mesh(
-    new THREE.ConeGeometry(0.12, 0.36, 14),
-    new THREE.MeshStandardMaterial({
-      color: '#FF5500',
-      emissive: '#FF3300',
-      emissiveIntensity: 3.0,
-      roughness: 0.2,
-      side: THREE.DoubleSide,
-    })
-  )
-  flameLobeL.position.set(-0.08, 0.18, 0.03)
-  flameLobeL.rotation.z = 0.18
-  propGroup.add(flameLobeL)
+  // 3. Flame Billboard Sprites (28 particles for organic, volumetric fire)
+  const flameCount = 28
+  const flameParticles = []
+  const flameGroup = new THREE.Group()
+  propGroup.add(flameGroup)
 
-  // (c) Secondary Right Flame Lobe (~0.38m tall, angled)
-  const flameLobeR = new THREE.Mesh(
-    new THREE.ConeGeometry(0.13, 0.38, 14),
-    new THREE.MeshStandardMaterial({
-      color: '#FF5500',
-      emissive: '#FF3300',
-      emissiveIntensity: 3.0,
-      roughness: 0.2,
-      side: THREE.DoubleSide,
+  for (let i = 0; i < flameCount; i++) {
+    const mat = new THREE.SpriteMaterial({
+      map: flameTex,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
     })
-  )
-  flameLobeR.position.set(0.08, 0.19, -0.02)
-  flameLobeR.rotation.z = -0.16
-  propGroup.add(flameLobeR)
+    const sprite = new THREE.Sprite(mat)
+    const particle = {
+      sprite,
+      mat,
+      life: (i / flameCount),
+      speed: 0.55 + (i % 5) * 0.12,
+      baseRadius: 0.04 + (i % 4) * 0.03,
+      angle: i * 2.39996, // golden angle spiral
+      wobbleSpeed: 8 + (i % 6) * 3,
+      wobblePhase: i * 1.5,
+      baseScale: 0.30 + (i % 3) * 0.09,
+    }
+    flameGroup.add(sprite)
+    flameParticles.push(particle)
+  }
 
-  // (d) Mid Flame Body (Golden Yellow ~0.34m tall)
-  const flameMid = new THREE.Mesh(
-    new THREE.ConeGeometry(0.14, 0.34, 14),
-    new THREE.MeshStandardMaterial({
-      color: '#FFB800',
-      emissive: '#FF9500',
-      emissiveIntensity: 3.4,
-      roughness: 0.1,
-      side: THREE.DoubleSide,
-    })
-  )
-  flameMid.position.y = 0.19
-  propGroup.add(flameMid)
+  // 4. Rising Smoke Particles (14 particles)
+  const smokeCount = 14
+  const smokeParticles = []
+  const smokeGroup = new THREE.Group()
+  propGroup.add(smokeGroup)
 
-  // (e) White-Hot Core (~0.24m tall)
-  const flameCore = new THREE.Mesh(
-    new THREE.ConeGeometry(0.08, 0.24, 12),
-    new THREE.MeshStandardMaterial({
-      color: '#FFFDF5',
-      emissive: '#FFFFFF',
-      emissiveIntensity: 4.5,
-      roughness: 0.1,
-      side: THREE.DoubleSide,
+  for (let i = 0; i < smokeCount; i++) {
+    const mat = new THREE.SpriteMaterial({
+      map: smokeTex,
+      transparent: true,
+      opacity: 0.35,
+      depthWrite: false,
     })
-  )
-  flameCore.position.y = 0.14
+    const sprite = new THREE.Sprite(mat)
+    const particle = {
+      sprite,
+      mat,
+      life: i / smokeCount,
+      speed: 0.32 + (i % 3) * 0.08,
+      baseRadius: 0.07 + (i % 3) * 0.04,
+      angle: i * 1.7,
+      driftX: ((i % 5) - 2) * 0.05,
+      driftZ: (((i + 2) % 5) - 2) * 0.05,
+      baseScale: 0.36 + (i % 4) * 0.12,
+    }
+    smokeGroup.add(sprite)
+    smokeParticles.push(particle)
+  }
+
+  // 5. White-Hot Central Flame Core & Inner Flame Body
+  const coreMat = new THREE.MeshStandardMaterial({
+    color: '#FFFDF5',
+    emissive: '#FFEDD5',
+    emissiveIntensity: 4.8,
+    roughness: 0.1,
+    side: THREE.DoubleSide,
+  })
+  const flameCore = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.34, 16), coreMat)
+  flameCore.position.set(0, 0.32, 0)
   propGroup.add(flameCore)
 
-  // 4. Warm Dynamic Fire PointLight
-  const fireLight = new THREE.PointLight('#FF6A00', 3.5, 3.5)
-  fireLight.position.set(0, 0.26, 0)
+  const innerFlameMat = new THREE.MeshStandardMaterial({
+    color: '#F97316',
+    emissive: '#EA580C',
+    emissiveIntensity: 3.5,
+    roughness: 0.2,
+    transparent: true,
+    opacity: 0.9,
+    side: THREE.DoubleSide,
+  })
+  const innerFlame = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.48, 16), innerFlameMat)
+  innerFlame.position.set(0, 0.36, 0)
+  propGroup.add(innerFlame)
+
+  // 6. Dynamic Flickering PointLight (Synchronized to Fire)
+  const fireLight = new THREE.PointLight('#FF5500', 4.5, 4.5)
+  fireLight.position.set(0, 0.42, 0)
   propGroup.add(fireLight)
 
+  // 7. Dynamic Per-Frame Animation Update Routine
+  function updateFire(elapsed, isEscalated) {
+    const scaleMult = isEscalated ? 2.25 : 1.0
+
+    // Animate Inner Flame Meshes
+    const coreBreath = (1.0 + Math.sin(elapsed * 9.0) * 0.08) * scaleMult
+    flameCore.scale.set(
+      coreBreath * (1.0 + Math.sin(elapsed * 17.0) * 0.10),
+      coreBreath * (1.0 + Math.cos(elapsed * 14.0) * 0.12),
+      coreBreath * (1.0 + Math.cos(elapsed * 19.0) * 0.10)
+    )
+    innerFlame.scale.set(
+      coreBreath * (1.0 + Math.cos(elapsed * 15.0) * 0.10),
+      coreBreath * (1.0 + Math.sin(elapsed * 12.0) * 0.14),
+      coreBreath * (1.0 + Math.sin(elapsed * 18.0) * 0.10)
+    )
+
+    // Animate Flame Billboard Particles
+    for (let i = 0; i < flameParticles.length; i++) {
+      const p = flameParticles[i]
+      p.life += 0.016 * p.speed
+      if (p.life > 1.0) p.life -= 1.0
+
+      // Height rises from top of box (y = 0.22) to y = 0.76 * scaleMult
+      const curY = 0.22 + p.life * (0.54 * scaleMult)
+
+      // Radius tapers as it rises to tip
+      const taper = (1.0 - p.life * 0.7)
+      const rad = p.baseRadius * taper * scaleMult
+      const wobble = Math.sin(elapsed * p.wobbleSpeed + p.wobblePhase) * 0.035 * scaleMult
+      const curX = Math.cos(p.angle) * rad + wobble
+      const curZ = Math.sin(p.angle) * rad + Math.cos(elapsed * p.wobbleSpeed) * 0.03 * scaleMult
+
+      p.sprite.position.set(curX, curY, curZ)
+
+      // Scale grows in mid-flame and tapers at tip
+      const sizeCurve = Math.sin(p.life * Math.PI)
+      const curScale = p.baseScale * (0.5 + sizeCurve * 0.8) * scaleMult
+      p.sprite.scale.set(curScale, curScale * 1.35, 1)
+
+      // Opacity fades smoothly near the flame top
+      p.mat.opacity = (1.0 - Math.pow(p.life, 2.5)) * (isEscalated ? 0.95 : 0.82)
+    }
+
+    // Animate Rising Smoke Particles
+    for (let i = 0; i < smokeParticles.length; i++) {
+      const p = smokeParticles[i]
+      p.life += 0.012 * p.speed
+      if (p.life > 1.0) p.life -= 1.0
+
+      // Rises above flames from y = 0.48 to y = 1.35 * scaleMult
+      const curY = 0.48 + p.life * (0.85 * scaleMult)
+      const driftMult = p.life * 1.2
+      const curX = Math.cos(p.angle) * p.baseRadius + p.driftX * driftMult + Math.sin(elapsed * 2.5 + i) * 0.05
+      const curZ = Math.sin(p.angle) * p.baseRadius + p.driftZ * driftMult + Math.cos(elapsed * 2.0 + i) * 0.05
+
+      p.sprite.position.set(curX, curY, curZ)
+
+      // Smoke billows and expands as it rises
+      const curScale = p.baseScale * (0.7 + p.life * 1.4) * scaleMult
+      p.sprite.scale.set(curScale, curScale, 1)
+
+      // Smoke opacity fades out smoothly
+      const alpha = Math.sin(p.life * Math.PI) * (isEscalated ? 0.45 : 0.28)
+      p.mat.opacity = Math.max(0, alpha)
+    }
+
+    // Dynamic Flickering Light
+    const flicker = Math.sin(elapsed * 21.0) * 0.5 + Math.sin(elapsed * 13.0) * 0.35 + Math.cos(elapsed * 31.0) * 0.25
+    fireLight.intensity = (isEscalated ? 9.6 : 4.6) + flicker * (isEscalated ? 2.4 : 1.2)
+    fireLight.distance = isEscalated ? 8.5 : 4.5
+    fireLight.color.set(isEscalated ? '#FF1500' : '#FF5500')
+  }
+
   propGroup.userData = {
-    flames: [flameOuter, flameLobeL, flameLobeR, flameMid, flameCore],
+    flames: [flameCore, innerFlame, ...flameParticles.map(p => p.sprite)],
+    smoke: smokeParticles.map(p => p.sprite),
     fireLight,
+    updateFire,
   }
 
   return propGroup
@@ -2141,7 +2306,10 @@ export default function Scenario() {
       }
       group.add(propGroup)
 
+      const isFireStep = isFireScenario && idx === 0
+
       // Main Interactive Target Orb (Compact 8cm radius)
+      // Positioned cleanly above props so it never obscures the physical equipment or flames
       const orbGeo = new THREE.SphereGeometry(0.08, 16, 16)
       const orbMat = new THREE.MeshStandardMaterial({
         color: step.color || '#E05A00',
@@ -2151,12 +2319,12 @@ export default function Scenario() {
         roughness: 0.2,
       })
       const orbMesh = new THREE.Mesh(orbGeo, orbMat)
-      orbMesh.position.y = 0.18
+      orbMesh.position.y = isFireStep ? 0.92 : 0.48
       orbMesh.userData = { stepIndex: idx }
       group.add(orbMesh)
 
-      // Pulsing floor target ring (Compact 14cm - 20cm)
-      const ringGeo = new THREE.RingGeometry(0.14, 0.20, 24)
+      // Pulsing floor target ring
+      const ringGeo = new THREE.RingGeometry(0.18, 0.26, 24)
       const ringMat = new THREE.MeshBasicMaterial({
         color: step.color || '#E05A00',
         side: THREE.DoubleSide,
@@ -2165,10 +2333,10 @@ export default function Scenario() {
       })
       const ringMesh = new THREE.Mesh(ringGeo, ringMat)
       ringMesh.rotation.x = -Math.PI / 2
-      ringMesh.position.y = -0.16
+      ringMesh.position.y = isFireStep ? -0.01 : -0.16
       group.add(ringMesh)
 
-      // Vertical beacon light beam (Compact 0.7m)
+      // Vertical beacon light beam (Compact 0.7m, elevated above prop)
       const beamGeo = new THREE.CylinderGeometry(0.015, 0.05, 0.7, 12)
       const beamMat = new THREE.MeshBasicMaterial({
         color: step.color || '#E05A00',
@@ -2176,12 +2344,13 @@ export default function Scenario() {
         opacity: 0.3,
       })
       const beamMesh = new THREE.Mesh(beamGeo, beamMat)
-      beamMesh.position.y = 0.45
+      beamMesh.position.y = isFireStep ? 1.35 : 0.85
       group.add(beamMesh)
 
       // Floating billboard sprite label (Proportionate: 0.72m wide x 0.14m tall)
+      // Elevated above the 3D model so equipment is 100% visible and unblocked
       const badgeSprite = createStepBadgeSprite(idx + 1, step.label, step.color || '#E05A00')
-      badgeSprite.position.set(0, 0.38, 0)
+      badgeSprite.position.set(0, isFireStep ? 1.05 : 0.68, 0)
       badgeSprite.scale.set(0.72, 0.14, 1)
       group.add(badgeSprite)
 
@@ -2275,23 +2444,9 @@ export default function Scenario() {
         }
       }
 
-      // Animate Step 0 Fire Flame Flicker & Consequence Growth
-      if (t.stepNodes[0]?.propGroup?.userData?.flames && !t.flameExtinguished) {
-        const ud = t.stepNodes[0].propGroup.userData
-        const fireMult = fireEscalatedRef.current ? 2.25 : 1.0
-        const breath = (1.0 + Math.sin(elapsed * 5.0) * 0.05 + Math.sin(elapsed * 13.0) * 0.03) * fireMult
-        const flickX = (1.0 + Math.sin(elapsed * 17.0) * 0.07) * fireMult
-        const flickZ = (1.0 + Math.cos(elapsed * 21.0) * 0.07) * fireMult
-        if (ud.flames[0]) ud.flames[0].scale.set(flickX * breath, breath * (1.0 + Math.cos(elapsed * 15.0) * 0.05), flickZ * breath)
-        if (ud.flames[1]) ud.flames[1].scale.set(flickZ * breath, breath * (1.0 + Math.sin(elapsed * 19.0) * 0.06), flickX * breath)
-        if (ud.flames[2]) ud.flames[2].scale.set(flickX * breath, breath * (1.0 + Math.cos(elapsed * 18.0) * 0.06), flickZ * breath)
-        if (ud.flames[3]) ud.flames[3].scale.set(flickZ * breath, breath, flickX * breath)
-        if (ud.flames[4]) ud.flames[4].scale.set(breath, breath, breath)
-        if (ud.fireLight) {
-          ud.fireLight.intensity = (fireEscalatedRef.current ? 9.2 : 3.5) + Math.sin(elapsed * 18.0) * (fireEscalatedRef.current ? 2.0 : 0.8)
-          ud.fireLight.distance = fireEscalatedRef.current ? 8.0 : 3.5
-          ud.fireLight.color.set(fireEscalatedRef.current ? '#FF1100' : '#FF6A00')
-        }
+      // Animate Step 0 Realistic Fire Particle Flutter, Billowing Smoke & Consequence Growth
+      if (t.stepNodes[0]?.propGroup?.userData?.updateFire && !t.flameExtinguished) {
+        t.stepNodes[0].propGroup.userData.updateFire(elapsed, fireEscalatedRef.current)
       }
 
       // Animate Step 1 Alarm Strobe LED
@@ -2528,12 +2683,12 @@ export default function Scenario() {
     // Dynamic virtual hazard reactions & realistic fire extinction
     const isExtinguished = completedSteps.includes(3)
     t.flameExtinguished = isExtinguished
-    if (t.stepNodes[0]?.propGroup?.userData?.flames) {
-      t.stepNodes[0].propGroup.userData.flames.forEach(flame => {
-        flame.visible = !isExtinguished
-      })
-      if (t.stepNodes[0].propGroup.userData.fireLight) {
-        t.stepNodes[0].propGroup.userData.fireLight.intensity = isExtinguished ? 0 : 3.5
+    if (t.stepNodes[0]?.propGroup?.userData) {
+      const ud = t.stepNodes[0].propGroup.userData
+      if (ud.flames) ud.flames.forEach(flame => { flame.visible = !isExtinguished })
+      if (ud.smoke) ud.smoke.forEach(smoke => { smoke.visible = !isExtinguished })
+      if (ud.fireLight) {
+        ud.fireLight.intensity = isExtinguished ? 0 : 4.5
       }
     }
     if (t.flameMeshes) {
