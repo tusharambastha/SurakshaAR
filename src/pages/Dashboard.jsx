@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Trophy, Clock, Star, TrendingUp, ChevronRight, AlertTriangle, Flame, Wind, Cog, Lock, PlayCircle, ShieldCheck, Zap } from 'lucide-react'
@@ -12,11 +12,11 @@ import { scoreRating } from '../lib/scoring'
 import VideoTutorialModal from '../components/ui/VideoTutorialModal'
 
 const HAZARD_ICONS = {
-  gas_leak: <Wind size={18} />,
-  fire: <Flame size={18} />,
-  machinery: <Cog size={18} />,
-  ppe: <ShieldCheck size={18} />,
-  electrical: <Zap size={18} />,
+  gas_leak: Wind,
+  fire: Flame,
+  machinery: Cog,
+  ppe: ShieldCheck,
+  electrical: Zap,
 }
 const SCENARIO_ORDER = [
   'a1b2c3d4-0001-0001-0001-000000000001', // Fire & Explosion Response
@@ -303,7 +303,7 @@ function ModuleCard({ scenario, sessions, onStart, T, lang }) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-md)', background: 'var(--color-brand-50)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-brand)', flexShrink: 0 }}>
-          {HAZARD_ICONS[scenario.hazard_type]}
+          {React.createElement(HAZARD_ICONS[scenario.hazard_type] || AlertTriangle, { size: 18 })}
         </div>
         <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 700 }}>{localTitle}</h3>
       </div>
