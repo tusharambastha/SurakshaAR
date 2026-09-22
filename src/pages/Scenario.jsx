@@ -27,7 +27,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import {
   X, Camera, Monitor, CheckCircle, WifiOff,
   Compass, ZoomIn, ZoomOut, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
-  Target, Volume2, RotateCw
+  Target, Volume2, RotateCw, AlertTriangle, RotateCcw, CheckCircle2
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
@@ -99,8 +99,10 @@ class ProceduralFireAudio {
     this.ctx = null
     this.gainNode = null
     this.noiseSource = null
+    this.filter = null
     this.isPlaying = false
     this.intervalId = null
+    this.isEscalated = false
   }
 
   start() {
@@ -117,7 +119,8 @@ class ProceduralFireAudio {
 
       this.gainNode = this.ctx.createGain()
       this.gainNode.gain.setValueAtTime(0.01, this.ctx.currentTime)
-      this.gainNode.gain.exponentialRampToValueAtTime(0.18, this.ctx.currentTime + 0.8)
+      const targetGain = this.isEscalated ? 0.38 : 0.18
+      this.gainNode.gain.exponentialRampToValueAtTime(targetGain, this.ctx.currentTime + 0.8)
       this.gainNode.connect(this.ctx.destination)
 
       // Low frequency fire roar (pink/brown noise generator buffer)
@@ -137,26 +140,29 @@ class ProceduralFireAudio {
       this.noiseSource.buffer = noiseBuffer
       this.noiseSource.loop = true
 
-      const filter = this.ctx.createBiquadFilter()
-      filter.type = 'lowpass'
-      filter.frequency.setValueAtTime(360, this.ctx.currentTime)
+      this.filter = this.ctx.createBiquadFilter()
+      this.filter.type = 'lowpass'
+      this.filter.frequency.setValueAtTime(this.isEscalated ? 520 : 360, this.ctx.currentTime)
 
-      this.noiseSource.connect(filter)
-      filter.connect(this.gainNode)
+      this.noiseSource.connect(this.filter)
+      this.filter.connect(this.gainNode)
       this.noiseSource.start()
 
       // Randomized crisp crackle / pop bursts
       this.intervalId = setInterval(() => {
         if (!this.isPlaying || !this.ctx || this.ctx.state !== 'running') return
-        if (Math.random() < 0.65) {
+        const chance = this.isEscalated ? 0.85 : 0.65
+        if (Math.random() < chance) {
           const osc = this.ctx.createOscillator()
           const popGain = this.ctx.createGain()
           const burstDur = 0.010 + Math.random() * 0.025
           osc.type = Math.random() < 0.5 ? 'triangle' : 'sawtooth'
-          osc.frequency.setValueAtTime(400 + Math.random() * 1200, this.ctx.currentTime)
+          const freq = this.isEscalated ? 500 + Math.random() * 1500 : 400 + Math.random() * 1200
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime)
           osc.frequency.exponentialRampToValueAtTime(60, this.ctx.currentTime + burstDur)
 
-          popGain.gain.setValueAtTime(0.05 + Math.random() * 0.08, this.ctx.currentTime)
+          const gainLvl = this.isEscalated ? 0.09 + Math.random() * 0.12 : 0.05 + Math.random() * 0.08
+          popGain.gain.setValueAtTime(gainLvl, this.ctx.currentTime)
           popGain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + burstDur)
 
           osc.connect(popGain)
@@ -164,12 +170,26 @@ class ProceduralFireAudio {
           osc.start()
           osc.stop(this.ctx.currentTime + burstDur)
         }
-      }, 75)
+      }, 70)
 
       this.isPlaying = true
     } catch (e) {
       console.warn('[SurakshaAR] Fire sound initialization deferred:', e)
     }
+  }
+
+  setEscalated(escalated) {
+    this.isEscalated = !!escalated
+    if (!this.gainNode || !this.ctx || this.ctx.state !== 'running') return
+    try {
+      const targetGain = this.isEscalated ? 0.40 : 0.18
+      this.gainNode.gain.cancelScheduledValues(this.ctx.currentTime)
+      this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, this.ctx.currentTime)
+      this.gainNode.gain.linearRampToValueAtTime(targetGain, this.ctx.currentTime + 0.4)
+      if (this.filter) {
+        this.filter.frequency.linearRampToValueAtTime(this.isEscalated ? 520 : 360, this.ctx.currentTime + 0.4)
+      }
+    } catch {}
   }
 
   stop() {
@@ -194,6 +214,39 @@ class ProceduralFireAudio {
     } catch {
       this.isPlaying = false
     }
+  }
+}
+
+// ─── Procedural Web Audio Subtle Countdown Ticking Synthesizer ───────────────
+class ProceduralTickAudio {
+  constructor() {
+    this.ctx = null
+  }
+
+  playTick(isCritical = false) {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      if (!this.ctx) this.ctx = new AudioCtx()
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {})
+      }
+      const osc = this.ctx.createOscillator()
+      const gain = this.ctx.createGain()
+      const dur = 0.038
+      osc.type = isCritical ? 'triangle' : 'sine'
+      osc.frequency.setValueAtTime(isCritical ? 1050 : 750, this.ctx.currentTime)
+      osc.frequency.exponentialRampToValueAtTime(isCritical ? 380 : 260, this.ctx.currentTime + dur)
+
+      // Subtle, non-annoying volume
+      gain.gain.setValueAtTime(isCritical ? 0.16 : 0.10, this.ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + dur)
+
+      osc.connect(gain)
+      gain.connect(this.ctx.destination)
+      osc.start()
+      osc.stop(this.ctx.currentTime + dur)
+    } catch {}
   }
 }
 
@@ -1234,10 +1287,26 @@ export default function Scenario() {
   const [spatialDirectionCue, setSpatialDirectionCue] = useState(null)
   const [demoMode, setDemoMode]           = useState(true) // Presentation / Demo Mode default ON
 
+  // ── Step Countdown Timer & Consequence System ─────────────────────────────
+  const getStepDuration = (idx) => (idx <= 1 ? 20 : 15)
+  const [timerSeconds, setTimerSeconds]   = useState(20)
+  const [isTimerRunning, setIsTimerRunning] = useState(true)
+  const [consequenceFailure, setConsequenceFailure] = useState(null)
+  const [positiveSuccess, setPositiveSuccess] = useState(null)
+  const [actualFireState, setActualFireState] = useState('small_safe') // 'small_safe' | 'not_safe'
+  const [fireEscalated, setFireEscalated] = useState(false)
+
+  const fireEscalatedRef = useRef(false)
+  const consequenceFailureRef = useRef(null)
+  consequenceFailureRef.current = consequenceFailure
+  const stepRetriesRef = useRef({})
+  const stepSessionLogsRef = useRef([])
+
   const canvasRef = useRef(null)
   const cameraStreamRef = useRef(null)
   const cameraVideoRef = useRef(null)
   const fireAudioRef = useRef(new ProceduralFireAudio())
+  const tickAudioRef = useRef(new ProceduralTickAudio())
 
   // Three.js persistent references
   const threeRef = useRef({
@@ -1354,9 +1423,165 @@ export default function Scenario() {
     createSession()
   }, [user, id, isOnline])
 
+  // ── Step Countdown Timer Ticking Loop ─────────────────────────────────────
+  useEffect(() => {
+    if (!isTimerRunning || consequenceFailure) return
+
+    const interval = setInterval(() => {
+      setTimerSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(interval)
+          handleStepTimeout()
+          return 0
+        }
+        const next = prev - 1
+        if (next <= 5 && next > 0) {
+          tickAudioRef.current.playTick(next <= 3)
+        }
+        return next
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isTimerRunning, currentStep, consequenceFailure])
+
+  // ── Consequence: Step Timeout Trigger ────────────────────────────────────
+  const handleStepTimeout = useCallback(() => {
+    setIsTimerRunning(false)
+    setFireEscalated(true)
+    fireEscalatedRef.current = true
+    fireAudioRef.current.setEscalated(true)
+    if (isFireScenario) {
+      fireAudioRef.current.start()
+    }
+
+    const currentRetries = (stepRetriesRef.current[currentStep] || 0) + 1
+    stepRetriesRef.current[currentStep] = currentRetries
+
+    const step = scenario?.steps?.[currentStep]
+    const stepLabel = getStepText(step, 'label') || `Step ${currentStep + 1}`
+
+    // Lightweight In-Memory Data Logging
+    const sessionEntry = {
+      stepIndex: currentStep,
+      stepName: stepLabel,
+      timeTakenMs: getStepDuration(currentStep) * 1000,
+      firstTryCorrect: false,
+      retries: currentRetries,
+      failureReason: 'timeout',
+    }
+    stepSessionLogsRef.current = [...stepSessionLogsRef.current, sessionEntry]
+    window.__surakshaStepSessionData = stepSessionLogsRef.current
+
+    const timeoutExplanations = {
+      0: {
+        title: 'Fire Spread — Response Too Slow',
+        explanation: 'Fire spread because response was too slow! In an industrial electrical fire, early containment within the first 20 seconds is critical before thermal runaway sets in and damages adjacent control racks.',
+      },
+      1: {
+        title: 'Delayed Alarm Notification',
+        explanation: 'Delayed alarm activation! Plant personnel were not notified in time, allowing dense smoke to fill the primary evacuation corridor.',
+      },
+      2: {
+        title: 'Delayed Protective PPE Donning',
+        explanation: 'Safety preparation delayed! Every second without protective gear risks severe respiratory burns from toxic hydrogen cyanide and carbon monoxide gas.',
+      },
+      3: {
+        title: 'Delayed Fire Assessment & Action',
+        explanation: 'Fire assessment and suppression took too long! The electrical fire has broken through the cabinet and ignited surrounding pallet stores.',
+      },
+      4: {
+        title: 'Delayed Facility Evacuation',
+        explanation: 'Delayed exit! Dense smoke and heat accumulate rapidly indoors, reducing oxygen levels to life-threatening limits.',
+      },
+      5: {
+        title: 'Delayed Muster Point Assembly',
+        explanation: 'Delayed muster assembly! Emergency crews cannot verify accountability or rescue trapped staff without immediate roll-call.',
+      },
+    }
+
+    const info = timeoutExplanations[currentStep] || {
+      title: 'Action Time Limit Exceeded',
+      explanation: 'Hazard worsened due to delayed response! Industrial emergency protocols require immediate action within the safety window.',
+    }
+
+    setConsequenceFailure({
+      title: info.title,
+      explanation: info.explanation,
+      reason: 'timeout',
+    })
+  }, [currentStep, scenario, isFireScenario, getStepText])
+
+  // ── Consequence / Decision: Decision-Point Choice Handler ─────────────────
+  const handleDecisionChoice = useCallback((choice) => {
+    if (consequenceFailureRef.current) return
+    const step = scenario?.steps?.[currentStep]
+    const timeTaken = Date.now() - stepStartTime
+
+    if (choice === actualFireState) {
+      // Correct assessment choice!
+      handleStepClick(currentStep)
+    } else {
+      // Wrong decision call consequence!
+      setIsTimerRunning(false)
+      setFireEscalated(true)
+      fireEscalatedRef.current = true
+      fireAudioRef.current.setEscalated(true)
+      if (isFireScenario) {
+        fireAudioRef.current.start()
+      }
+
+      const currentRetries = (stepRetriesRef.current[currentStep] || 0) + 1
+      stepRetriesRef.current[currentStep] = currentRetries
+
+      const sessionEntry = {
+        stepIndex: currentStep,
+        stepName: getStepText(step, 'label') || 'Assess Fire',
+        timeTakenMs: timeTaken,
+        firstTryCorrect: false,
+        retries: currentRetries,
+        failureReason: 'wrong_decision_call',
+        choice,
+      }
+      stepSessionLogsRef.current = [...stepSessionLogsRef.current, sessionEntry]
+      window.__surakshaStepSessionData = stepSessionLogsRef.current
+
+      let title = ''
+      let explanation = ''
+      if (choice === 'small_safe' && actualFireState === 'not_safe') {
+        title = 'Dangerous Assessment Error'
+        explanation = 'Wrong call — the fire was spreading rapidly and was NOT small enough to fight directly! Attempting to fight an oversized fire with a handheld extinguisher risks severe thermal burns and asphyxiation. The correct protocol is immediate evacuation!'
+      } else {
+        title = 'Suboptimal Fire Assessment'
+        explanation = 'Wrong call — the fire was in an early incipient stage, contained within the metal cabinet, and safely suppressible with CO₂! Unnecessary abandonment allowed an easily quenchable electrical fault to spread to adjacent industrial machinery.'
+      }
+
+      setConsequenceFailure({
+        title,
+        explanation,
+        reason: 'wrong_decision',
+      })
+    }
+  }, [currentStep, stepStartTime, actualFireState, scenario, isFireScenario, getStepText])
+
+  // ── Consequence: Retry Step Handler ──────────────────────────────────────
+  const handleRetryStep = useCallback(() => {
+    setFireEscalated(false)
+    fireEscalatedRef.current = false
+    fireAudioRef.current.setEscalated(false)
+    if (!isFireScenario || currentStep !== 0) {
+      if (currentStep !== 0) fireAudioRef.current.stop()
+    }
+    setConsequenceFailure(null)
+    setTimerSeconds(getStepDuration(currentStep))
+    setIsTimerRunning(true)
+    setStepStartTime(Date.now())
+  }, [currentStep, isFireScenario])
+
   // Complete a step handler
   const handleStepClick = useCallback(async (stepIndex) => {
     if (stepIndex !== currentStep) return
+    if (consequenceFailureRef.current) return
     const timeTaken = Date.now() - stepStartTime
     const step = scenario?.steps?.[stepIndex]
     const log = {
@@ -1370,9 +1595,28 @@ export default function Scenario() {
 
     const stepLabel = getStepText(step, 'label') || `Step ${stepIndex + 1}`
     const stepInst = getStepText(step, 'instruction') || (lang === 'sat' ? 'ᱥᱟᱹᱨᱤ! ᱫᱚᱥᱟᱨ ᱫᱷᱟᱯ ᱛᱮ ᱞᱟᱦᱟᱭ ᱢᱮ᱾' : lang === 'hi' ? 'सही! अगले चरण पर जाएं।' : 'Correct! Proceed to the next step.')
+
+    // Brief positive confirmation pulse
+    setPositiveSuccess({ label: stepLabel })
+    setTimeout(() => setPositiveSuccess(null), 950)
+
     setStepFeedback({ correct: true, label: stepLabel })
     speak(stepInst, lang)
     setTimeout(() => setStepFeedback(null), 2200)
+
+    // Data logging (in-memory analytics)
+    const retries = stepRetriesRef.current[stepIndex] || 0
+    const sessionEntry = {
+      stepIndex,
+      stepName: stepLabel,
+      timeTakenMs: timeTaken,
+      timeLimitMs: getStepDuration(stepIndex) * 1000,
+      firstTryCorrect: retries === 0,
+      retries,
+      status: 'completed',
+    }
+    stepSessionLogsRef.current = [...stepSessionLogsRef.current, sessionEntry]
+    window.__surakshaStepSessionData = stepSessionLogsRef.current
 
     const newLogs = [...stepLogs, log]
     setStepLogs(newLogs)
@@ -1386,9 +1630,15 @@ export default function Scenario() {
 
     const steps = scenario?.steps ?? []
     if (stepIndex === steps.length - 1) {
+      setIsTimerRunning(false)
       await finishSession(newLogs)
     } else {
       setCurrentStep(stepIndex + 1)
+      setTimerSeconds(getStepDuration(stepIndex + 1))
+      setIsTimerRunning(true)
+      setFireEscalated(false)
+      fireEscalatedRef.current = false
+      setConsequenceFailure(null)
       setStepStartTime(Date.now())
 
       // Auto-aim camera toward the next step
@@ -1398,7 +1648,7 @@ export default function Scenario() {
         smoothLookAt(tx, ty, tz)
       }
     }
-  }, [currentStep, stepStartTime, scenario, stepLogs, sessionId, user, isOnline, lang])
+  }, [currentStep, stepStartTime, scenario, stepLogs, sessionId, user, isOnline, lang, getStepText])
 
   // Smoothly tween OrbitControls target to look at position
   function smoothLookAt(targetX, targetY, targetZ) {
@@ -1976,6 +2226,9 @@ export default function Scenario() {
       const hits = raycaster.intersectObjects(interactableTargets, true)
 
       if (hits.length > 0) {
+        if (consequenceFailureRef.current) return
+        const activeStepObj = scenario?.steps?.[currentStepRef.current]
+        if (activeStepObj?.is_decision_step) return
         handleStepClick(currentStepRef.current)
       }
     }
@@ -2007,27 +2260,38 @@ export default function Scenario() {
       t.animId = requestAnimationFrame(renderLoop)
       const elapsed = t.clock.getElapsedTime()
 
-      // Animate hazard
+      // Animate hazard & consequence growth
       if (t.hazardGroup && !t.flameExtinguished) {
-        t.hazardGroup.scale.setScalar(1 + Math.sin(elapsed * 8) * 0.08)
+        const hMult = fireEscalatedRef.current ? 2.2 : 1.0
+        t.hazardGroup.scale.setScalar((1 + Math.sin(elapsed * 8) * 0.08) * hMult)
         if (t.flameMeshes) {
-          t.flameMeshes[0].scale.set(1 + Math.sin(elapsed * 14) * 0.12, 1 + Math.cos(elapsed * 12) * 0.15, 1 + Math.sin(elapsed * 11) * 0.12)
-          t.flameMeshes[1].scale.set(1 + Math.cos(elapsed * 16) * 0.10, 1 + Math.sin(elapsed * 15) * 0.18, 1 + Math.cos(elapsed * 13) * 0.10)
+          t.flameMeshes[0].scale.set((1 + Math.sin(elapsed * 14) * 0.12) * hMult, (1 + Math.cos(elapsed * 12) * 0.15) * hMult, (1 + Math.sin(elapsed * 11) * 0.12) * hMult)
+          t.flameMeshes[1].scale.set((1 + Math.cos(elapsed * 16) * 0.10) * hMult, (1 + Math.sin(elapsed * 15) * 0.18) * hMult, (1 + Math.cos(elapsed * 13) * 0.10) * hMult)
+        }
+        if (t.flameLight) {
+          t.flameLight.intensity = (fireEscalatedRef.current ? 9.5 : 4.0) + Math.sin(elapsed * 12) * 1.5
+          t.flameLight.distance = fireEscalatedRef.current ? 12 : 7
+          t.flameLight.color.set(fireEscalatedRef.current ? '#FF1100' : '#FF5500')
         }
       }
 
-      // Animate Step 0 Fire Flame Flicker
-      if (currentStepRef.current === 0 && t.stepNodes[0]?.propGroup?.userData?.flames && !t.flameExtinguished) {
+      // Animate Step 0 Fire Flame Flicker & Consequence Growth
+      if (t.stepNodes[0]?.propGroup?.userData?.flames && !t.flameExtinguished) {
         const ud = t.stepNodes[0].propGroup.userData
-        const breath = 1.0 + Math.sin(elapsed * 5.0) * 0.05 + Math.sin(elapsed * 13.0) * 0.03
-        const flickX = 1.0 + Math.sin(elapsed * 17.0) * 0.07
-        const flickZ = 1.0 + Math.cos(elapsed * 21.0) * 0.07
+        const fireMult = fireEscalatedRef.current ? 2.25 : 1.0
+        const breath = (1.0 + Math.sin(elapsed * 5.0) * 0.05 + Math.sin(elapsed * 13.0) * 0.03) * fireMult
+        const flickX = (1.0 + Math.sin(elapsed * 17.0) * 0.07) * fireMult
+        const flickZ = (1.0 + Math.cos(elapsed * 21.0) * 0.07) * fireMult
         if (ud.flames[0]) ud.flames[0].scale.set(flickX * breath, breath * (1.0 + Math.cos(elapsed * 15.0) * 0.05), flickZ * breath)
         if (ud.flames[1]) ud.flames[1].scale.set(flickZ * breath, breath * (1.0 + Math.sin(elapsed * 19.0) * 0.06), flickX * breath)
         if (ud.flames[2]) ud.flames[2].scale.set(flickX * breath, breath * (1.0 + Math.cos(elapsed * 18.0) * 0.06), flickZ * breath)
         if (ud.flames[3]) ud.flames[3].scale.set(flickZ * breath, breath, flickX * breath)
         if (ud.flames[4]) ud.flames[4].scale.set(breath, breath, breath)
-        if (ud.fireLight) ud.fireLight.intensity = 3.5 + Math.sin(elapsed * 18.0) * 0.8
+        if (ud.fireLight) {
+          ud.fireLight.intensity = (fireEscalatedRef.current ? 9.2 : 3.5) + Math.sin(elapsed * 18.0) * (fireEscalatedRef.current ? 2.0 : 0.8)
+          ud.fireLight.distance = fireEscalatedRef.current ? 8.0 : 3.5
+          ud.fireLight.color.set(fireEscalatedRef.current ? '#FF1100' : '#FF6A00')
+        }
       }
 
       // Animate Step 1 Alarm Strobe LED
@@ -2282,13 +2546,13 @@ export default function Scenario() {
     }
 
     // Ambient Fire Crackling Audio (Web Audio API)
-    // Plays when Step 0 is active and fire is not extinguished
-    if (isFireScenario && !isExtinguished && currentStep === 0) {
+    // Plays when Step 0 is active or when fire has escalated
+    if (isFireScenario && !isExtinguished && (currentStep === 0 || fireEscalated)) {
       fireAudioRef.current.start()
     } else {
       fireAudioRef.current.stop()
     }
-  }, [currentStep, completedSteps, arMode, isFireScenario, demoMode])
+  }, [currentStep, completedSteps, arMode, isFireScenario, demoMode, fireEscalated])
 
   if (isLoading || !cameraChecked) {
     return (
@@ -2328,6 +2592,12 @@ export default function Scenario() {
             spatialDirectionCue={spatialDirectionCue}
             demoMode={demoMode}
             onToggleDemoMode={() => setDemoMode(prev => !prev)}
+            timerSeconds={timerSeconds}
+            timerMaxSeconds={getStepDuration(currentStep)}
+            consequenceFailure={consequenceFailure}
+            onRetryStep={handleRetryStep}
+            positiveSuccess={positiveSuccess}
+            onDecisionChoice={handleDecisionChoice}
           />
         </>
       )}
@@ -2486,16 +2756,58 @@ export default function Scenario() {
             background: 'linear-gradient(to bottom, rgba(15,18,22,0.95), transparent)',
             pointerEvents: 'all',
           }}>
-            {/* Mode Badge */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: arMode ? 'rgba(224,90,0,0.25)' : 'rgba(14,124,123,0.25)',
-              border: `1.5px solid ${arMode ? 'var(--color-brand)' : '#0E7C7B'}`,
-              borderRadius: 20, padding: '6px 14px',
-              color: 'white', fontSize: 12, fontWeight: 700,
-            }}>
-              {arMode ? <Camera size={14} color="var(--color-brand)" /> : <Monitor size={14} color="#0E7C7B" />}
-              {arMode ? '📷 Camera AR Mode' : '🖥️ 3D Simulation Mode'}
+            {/* Mode Badge & Timer */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: arMode ? 'rgba(224,90,0,0.25)' : 'rgba(14,124,123,0.25)',
+                border: `1.5px solid ${arMode ? 'var(--color-brand)' : '#0E7C7B'}`,
+                borderRadius: 20, padding: '6px 14px',
+                color: 'white', fontSize: 12, fontWeight: 700,
+              }}>
+                {arMode ? <Camera size={14} color="var(--color-brand)" /> : <Monitor size={14} color="#0E7C7B" />}
+                {arMode ? '📷 Camera AR Mode' : '🖥️ 3D Simulation Mode'}
+              </div>
+
+              {/* Countdown Urgency Timer */}
+              {!allDone && (
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: 'rgba(15, 18, 24, 0.92)',
+                    backdropFilter: 'blur(8px)',
+                    border: `1.5px solid ${timerSeconds > 7 ? '#10B981' : timerSeconds > 3 ? '#F59E0B' : '#EF4444'}`,
+                    borderRadius: 20,
+                    padding: '5px 14px',
+                    boxShadow: `0 4px 16px ${timerSeconds > 7 ? 'rgba(16,185,129,0.3)' : timerSeconds > 3 ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.7)'}`,
+                    color: '#FFFFFF',
+                    fontWeight: 800,
+                    fontSize: 13,
+                    animation: timerSeconds <= 3 ? 'sarUrgentPulse 0.6s ease-in-out infinite' : 'none',
+                  }}
+                >
+                  <span>⏱</span>
+                  <span style={{ color: timerSeconds > 7 ? '#10B981' : timerSeconds > 3 ? '#F59E0B' : '#EF4444', minWidth: 26, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+                    {timerSeconds}s
+                  </span>
+                  <div style={{ width: 42, height: 5, background: 'rgba(255,255,255,0.18)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${Math.max(0, Math.min(100, (timerSeconds / getStepDuration(currentStep)) * 100))}%`,
+                        height: '100%',
+                        background: timerSeconds > 7 ? '#10B981' : timerSeconds > 3 ? '#F59E0B' : '#EF4444',
+                        borderRadius: 3,
+                        transition: 'width 0.9s linear, background-color 0.3s ease',
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: 10, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {timerSeconds <= 3 ? 'CRITICAL' : timerSeconds <= 7 ? 'EXPEDITE' : 'WINDOW'}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Right Action Controls */}
@@ -2595,53 +2907,128 @@ export default function Scenario() {
                   {getStepText(activeStep, 'instruction')}
                 </p>
 
-                {/* Direct Action Completion Button (Guarantees 100% usability!) */}
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button
-                    onClick={() => handleStepClick(currentStep)}
-                    style={{
-                      flex: 1,
-                      background: 'var(--color-brand)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 12,
-                      padding: '14px 20px',
-                      fontWeight: 700,
-                      fontSize: 15,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      boxShadow: '0 4px 14px rgba(224,90,0,0.4)',
-                    }}
-                  >
-                    <CheckCircle size={20} />
-                    Complete Action: {activeStep.label}
-                  </button>
+                {/* Direct Action Completion / Decision Buttons */}
+                {activeStep?.is_decision_step ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--color-brand)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      ⚡ Decision Point: Evaluate Fire Hazard Severity
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        onClick={() => handleDecisionChoice('small_safe')}
+                        style={{
+                          flex: 1,
+                          background: 'linear-gradient(135deg, #10B981, #059669)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 12,
+                          padding: '14px 16px',
+                          fontWeight: 700,
+                          fontSize: 14,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          boxShadow: '0 4px 14px rgba(16,185,129,0.35)',
+                        }}
+                      >
+                        🔥 Small &amp; Safe (Extinguish)
+                      </button>
 
-                  <button
-                    onClick={handleFocusTarget}
-                    title="Center view on this target"
-                    style={{
-                      background: 'rgba(255,255,255,0.12)',
-                      color: 'white',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      borderRadius: 12,
-                      padding: '0 16px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      fontSize: 13,
-                      fontWeight: 600,
-                    }}
-                  >
-                    <Target size={18} />
-                    Locate
-                  </button>
-                </div>
+                      <button
+                        onClick={() => handleDecisionChoice('not_safe')}
+                        style={{
+                          flex: 1,
+                          background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: 12,
+                          padding: '14px 16px',
+                          fontWeight: 700,
+                          fontSize: 14,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 8,
+                          boxShadow: '0 4px 14px rgba(239,68,68,0.35)',
+                        }}
+                      >
+                        ⚠️ Not Safe / Spreading (Evacuate)
+                      </button>
+
+                      <button
+                        onClick={handleFocusTarget}
+                        title="Center view on this target"
+                        style={{
+                          background: 'rgba(255,255,255,0.12)',
+                          color: 'white',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: 12,
+                          padding: '0 16px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          fontSize: 13,
+                          fontWeight: 600,
+                        }}
+                      >
+                        <Target size={18} />
+                        Locate
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => handleStepClick(currentStep)}
+                      style={{
+                        flex: 1,
+                        background: 'var(--color-brand)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 12,
+                        padding: '14px 20px',
+                        fontWeight: 700,
+                        fontSize: 15,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        boxShadow: '0 4px 14px rgba(224,90,0,0.4)',
+                      }}
+                    >
+                      <CheckCircle size={20} />
+                      Complete Action: {activeStep.label}
+                    </button>
+
+                    <button
+                      onClick={handleFocusTarget}
+                      title="Center view on this target"
+                      style={{
+                        background: 'rgba(255,255,255,0.12)',
+                        color: 'white',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: 12,
+                        padding: '0 16px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <Target size={18} />
+                      Locate
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2684,6 +3071,132 @@ export default function Scenario() {
           <p style={{ fontSize: 13, opacity: 0.9 }}>{stepFeedback.correct ? 'Correct Action Performed! ✓' : 'Out of Sequence — Follow step order'}</p>
         </div>
       )}
+
+      {/* Positive Action Confirmation Badge Pulse */}
+      {positiveSuccess && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '24%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 9998,
+            background: 'rgba(16, 185, 129, 0.96)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 20,
+            padding: '12px 24px',
+            color: '#FFFFFF',
+            boxShadow: '0 12px 32px rgba(16, 185, 129, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            animation: 'sarScaleUp 0.25s ease-out',
+            pointerEvents: 'none',
+          }}
+        >
+          <CheckCircle2 size={24} />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Correct Protocol Action! ✓</div>
+            <div style={{ fontSize: '0.74rem', opacity: 0.9 }}>Executed within safety response window</div>
+          </div>
+        </div>
+      )}
+
+      {/* Consequence Overlay Modal on Failure or Timeout */}
+      {consequenceFailure && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 18, 24, 0.88)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 500,
+              width: '100%',
+              background: '#181D26',
+              border: '2px solid #EF4444',
+              borderRadius: 22,
+              padding: '28px 24px',
+              boxShadow: '0 20px 50px rgba(239, 68, 68, 0.4), 0 8px 24px rgba(0,0,0,0.7)',
+              textAlign: 'center',
+              color: '#FFFFFF',
+              animation: 'sarScaleUp 0.25s ease-out',
+            }}
+          >
+            <div style={{
+              width: 60, height: 60, borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)',
+              border: '2px solid #EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 14px', color: '#EF4444'
+            }}>
+              <AlertTriangle size={34} />
+            </div>
+
+            <div style={{
+              fontSize: '0.74rem', fontWeight: 800, color: '#EF4444',
+              textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6
+            }}>
+              Critical Safety Consequence
+            </div>
+
+            <h2 style={{ fontSize: '1.3rem', fontWeight: 800, margin: '0 0 12px', color: '#FFFFFF' }}>
+              {consequenceFailure.title}
+            </h2>
+
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: 14, padding: '14px 16px', marginBottom: 22, textAlign: 'left'
+            }}>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: '#FCA5A5', lineHeight: 1.6 }}>
+                {consequenceFailure.explanation}
+              </p>
+            </div>
+
+            <button
+              onClick={handleRetryStep}
+              style={{
+                background: '#E05A00',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: 12,
+                padding: '14px 22px',
+                fontSize: '0.98rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                boxShadow: '0 4px 18px rgba(224, 90, 0, 0.45)',
+              }}
+            >
+              <RotateCcw size={19} />
+              <span>Retry This Step</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Global Injected Keyframes for Timer & Modal */}
+      <style>{`
+        @keyframes sarUrgentPulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.06); box-shadow: 0 0 20px rgba(239, 68, 68, 0.85); }
+          100% { transform: scale(1); }
+        }
+        @keyframes sarScaleUp {
+          0% { transform: scale(0.92); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 }

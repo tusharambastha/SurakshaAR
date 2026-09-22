@@ -42,6 +42,12 @@ export default function VirtualARHUD({
   spatialDirectionCue,
   demoMode = true,
   onToggleDemoMode,
+  timerSeconds,
+  timerMaxSeconds,
+  consequenceFailure,
+  onRetryStep,
+  positiveSuccess,
+  onDecisionChoice,
 }) {
   const [trackerExpanded, setTrackerExpanded] = useState(true)
 
@@ -272,6 +278,52 @@ export default function VirtualARHUD({
             )}
           </div>
         </div>
+
+        {/* Dynamic Step Urgency Countdown Timer */}
+        {!allDone && timerSeconds !== undefined && (
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '1px 0' }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'rgba(15, 18, 24, 0.94)',
+                backdropFilter: 'blur(10px)',
+                border: `1.5px solid ${timerSeconds > 7 ? '#10B981' : timerSeconds > 3 ? '#F59E0B' : '#EF4444'}`,
+                borderRadius: '24px',
+                padding: '4px 13px',
+                boxShadow: `0 4px 16px ${timerSeconds > 7 ? 'rgba(16,185,129,0.3)' : timerSeconds > 3 ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.7)'}`,
+                animation: timerSeconds <= 3 ? 'sarUrgentPulse 0.6s ease-in-out infinite' : 'none',
+              }}
+            >
+              <span style={{ fontSize: '0.85rem' }}>⏱</span>
+              <span style={{
+                color: timerSeconds > 7 ? '#10B981' : timerSeconds > 3 ? '#F59E0B' : '#EF4444',
+                fontSize: '0.82rem',
+                fontWeight: 800,
+                fontVariantNumeric: 'tabular-nums',
+                minWidth: 24,
+                textAlign: 'center'
+              }}>
+                {timerSeconds}s
+              </span>
+              <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.18)', borderRadius: 2, overflow: 'hidden' }}>
+                <div
+                  style={{
+                    width: `${Math.max(0, Math.min(100, (timerSeconds / (timerMaxSeconds || 20)) * 100))}%`,
+                    height: '100%',
+                    background: timerSeconds > 7 ? '#10B981' : timerSeconds > 3 ? '#F59E0B' : '#EF4444',
+                    borderRadius: 2,
+                    transition: 'width 0.9s linear, background-color 0.3s ease',
+                  }}
+                />
+              </div>
+              <span style={{ fontSize: '0.64rem', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                {timerSeconds <= 3 ? 'CRITICAL' : timerSeconds <= 7 ? 'EXPEDITE' : 'WINDOW'}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* ── 2D Top Mini-Map / Spatial Step Tracker ── */}
         <div
@@ -655,33 +707,88 @@ export default function VirtualARHUD({
               </p>
             </div>
 
-            {/* Primary Action Button (Works on both 3D object tap & screen button) */}
-            <button
-              type="button"
-              onClick={() => onStepClick(currentStep)}
-              style={{
-                background: 'var(--color-brand)',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: '12px',
-                padding: '12px 18px',
-                fontSize: '0.88rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                boxShadow: '0 4px 16px rgba(224, 90, 0, 0.45)',
-                transition: 'transform 0.1s ease, filter 0.15s ease',
-              }}
-              onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.98)')}
-              onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
-            >
-              <CheckCircle2 size={18} />
-              <span>Perform Action: {stepLabel}</span>
-              <ArrowRight size={16} />
-            </button>
+            {/* Primary Action / Decision Buttons */}
+            {activeStep?.is_decision_step ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                <div style={{ fontSize: '0.70rem', fontWeight: 800, color: 'var(--color-brand)', textAlign: 'center', letterSpacing: '0.04em' }}>
+                  SAFETY DECISION POINT · EVALUATE HAZARD SEVERITY
+                </div>
+                <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                  <button
+                    type="button"
+                    onClick={() => onDecisionChoice && onDecisionChoice('small_safe')}
+                    style={{
+                      flex: 1,
+                      background: 'linear-gradient(135deg, #10B981, #059669)',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '11px 10px',
+                      fontSize: '0.80rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                    }}
+                  >
+                    <span>🔥 Small &amp; Safe</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onDecisionChoice && onDecisionChoice('not_safe')}
+                    style={{
+                      flex: 1,
+                      background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '11px 10px',
+                      fontSize: '0.80rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
+                    }}
+                  >
+                    <span>⚠️ Not Safe / Spreading</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onStepClick(currentStep)}
+                style={{
+                  background: 'var(--color-brand)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px 18px',
+                  fontSize: '0.88rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 16px rgba(224, 90, 0, 0.45)',
+                  transition: 'transform 0.1s ease, filter 0.15s ease',
+                }}
+                onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.98)')}
+                onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+              >
+                <CheckCircle2 size={18} />
+                <span>Perform Action: {stepLabel}</span>
+                <ArrowRight size={16} />
+              </button>
+            )}
           </>
         )}
 
@@ -745,6 +852,134 @@ export default function VirtualARHUD({
           </div>
         </div>
       )}
+
+      {/* Positive Action Confirmation Badge Pulse */}
+      {positiveSuccess && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '24%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 9998,
+            background: 'rgba(16, 185, 129, 0.96)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 20,
+            padding: '12px 22px',
+            color: '#FFFFFF',
+            boxShadow: '0 12px 32px rgba(16, 185, 129, 0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            animation: 'sarScaleUp 0.25s ease-out',
+            pointerEvents: 'none',
+          }}
+        >
+          <CheckCircle2 size={24} />
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '0.92rem' }}>Correct Protocol Action! ✓</div>
+            <div style={{ fontSize: '0.72rem', opacity: 0.9 }}>Executed within safety response window</div>
+          </div>
+        </div>
+      )}
+
+      {/* Consequence Overlay Modal on Failure or Timeout */}
+      {consequenceFailure && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(15, 18, 24, 0.90)',
+            backdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 20,
+            pointerEvents: 'all',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 480,
+              width: '100%',
+              background: '#181D26',
+              border: '2px solid #EF4444',
+              borderRadius: 22,
+              padding: '26px 22px',
+              boxShadow: '0 20px 50px rgba(239, 68, 68, 0.45), 0 8px 24px rgba(0,0,0,0.8)',
+              textAlign: 'center',
+              color: '#FFFFFF',
+              animation: 'sarScaleUp 0.25s ease-out',
+            }}
+          >
+            <div style={{
+              width: 56, height: 56, borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)',
+              border: '2px solid #EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 12px', color: '#EF4444'
+            }}>
+              <AlertTriangle size={32} />
+            </div>
+
+            <div style={{
+              fontSize: '0.72rem', fontWeight: 800, color: '#EF4444',
+              textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6
+            }}>
+              Critical Safety Consequence
+            </div>
+
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 10px', color: '#FFFFFF' }}>
+              {consequenceFailure.title}
+            </h2>
+
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: 14, padding: '12px 14px', marginBottom: 20, textAlign: 'left'
+            }}>
+              <p style={{ margin: 0, fontSize: '0.88rem', color: '#FCA5A5', lineHeight: 1.55 }}>
+                {consequenceFailure.explanation}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onRetryStep}
+              style={{
+                background: '#E05A00',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '13px 20px',
+                fontSize: '0.94rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                boxShadow: '0 4px 18px rgba(224, 90, 0, 0.45)',
+              }}
+            >
+              <RotateCcw size={18} />
+              <span>Retry This Step</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Global Injected Keyframes */}
+      <style>{`
+        @keyframes sarUrgentPulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.06); box-shadow: 0 0 20px rgba(239, 68, 68, 0.85); }
+          100% { transform: scale(1); }
+        }
+        @keyframes sarScaleUp {
+          0% { transform: scale(0.92); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   )
 }
