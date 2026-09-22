@@ -1485,6 +1485,8 @@ export default function Scenario() {
     fireVisual: null,
     clock: new THREE.Clock(),
     deviceRot: { alpha: 0, beta: 90, gamma: 0 },
+    hasRealOrientation: false,
+    initTimestamp: 0,
     anchoredStep: -1,
     anchoredMode: null,
   })
@@ -2369,6 +2371,12 @@ export default function Scenario() {
       })
     })
     t.stepNodes = stepNodes
+    t.initTimestamp = performance.now()
+    if (arModeRef.current && stepNodes[0]) {
+      stepNodes[0].group.visible = true
+      stepNodes[0].group.position.set(0, 1.18, -1.7)
+      stepNodes[0].group.lookAt(0, 1.18, 0)
+    }
 
     // 8. Raycasting Click & Touch Listener
     const raycaster = new THREE.Raycaster()
@@ -2416,10 +2424,17 @@ export default function Scenario() {
 
     // 10. Device Orientation Handler for Camera AR
     function onDeviceRot(e) {
-      t.deviceRot = {
-        alpha: e.alpha ?? 0,
-        beta: e.beta ?? 90,
-        gamma: e.gamma ?? 0,
+      if (e.alpha !== null && e.beta !== null) {
+        t.deviceRot = {
+          alpha: e.alpha,
+          beta: e.beta,
+          gamma: e.gamma ?? 0,
+        }
+        if (!t.hasRealOrientation) {
+          t.hasRealOrientation = true
+          t.anchoredStep = -1
+          t.initTimestamp = performance.now()
+        }
       }
     }
     window.addEventListener('deviceorientation', onDeviceRot)
@@ -2511,7 +2526,8 @@ export default function Scenario() {
 
         // ── Presentation Demo Mode Anchoring ──
         if (demoModeRef.current) {
-          if (t.anchoredStep !== activeIdx || t.anchoredMode !== true) {
+          const isStabilizing = (performance.now() - t.initTimestamp < 1500)
+          if (t.anchoredStep !== activeIdx || t.anchoredMode !== true || isStabilizing) {
             const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
             const forwardH = new THREE.Vector3(camForward.x, 0, camForward.z).normalize()
             if (forwardH.lengthSq() < 0.001) forwardH.set(0, 0, -1)
@@ -2527,8 +2543,10 @@ export default function Scenario() {
               activeNode.group.lookAt(camera.position.x, anchorPos.y, camera.position.z)
               activeNode.group.visible = true
             }
-            t.anchoredStep = activeIdx
-            t.anchoredMode = true
+            if (!isStabilizing) {
+              t.anchoredStep = activeIdx
+              t.anchoredMode = true
+            }
           }
         } else {
           // Realistic Multi-Location Mode: restore fixed room coordinates
@@ -2637,6 +2655,7 @@ export default function Scenario() {
 
     // Signal renderLoop to re-anchor active object to live camera orientation
     t.anchoredStep = -1
+    t.initTimestamp = performance.now()
 
     t.stepNodes.forEach(node => {
       const isCompleted = completedSteps.includes(node.stepIndex)

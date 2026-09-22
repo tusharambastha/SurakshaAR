@@ -1055,8 +1055,20 @@ export function mockGetScenarios() {
 }
 
 export function mockGetScenario(id) {
-  const scenario = DEMO_SCENARIOS.find(s => s.id === id) || null
-  return { data: scenario, error: scenario ? null : { message: 'Scenario not found.' } }
+  if (!id) return { data: DEMO_SCENARIOS[0], error: null }
+  const lower = String(id).toLowerCase()
+  const scenario = DEMO_SCENARIOS.find(s => s.id === id) ||
+    DEMO_SCENARIOS.find(s => {
+      const sId = (s.id || '').toLowerCase()
+      const sType = (s.hazard_type || '').toLowerCase()
+      const sTitle = (s.title || '').toLowerCase()
+      return sId.includes(lower) ||
+        (lower.includes('fire') && (sType === 'fire' || sTitle.includes('fire'))) ||
+        (lower.includes('ppe') && (sType === 'ppe' || sTitle.includes('ppe'))) ||
+        (lower.includes('machinery') && (sType === 'machinery' || sTitle.includes('machinery'))) ||
+        (lower.includes('gas') && (sType.includes('gas') || sTitle.includes('gas')))
+    }) || DEMO_SCENARIOS[0]
+  return { data: scenario, error: null }
 }
 
 // ─── Training Sessions ───────────────────────────────────────
@@ -1203,8 +1215,16 @@ export function mockGetFeedbackLogs(sessionId) {
 
 // ─── Assessment Questions ─────────────────────────────────────
 export function mockGetQuestions(scenarioId) {
-  const matching = DEMO_QUESTIONS.filter(q => q.scenario_id === scenarioId)
-  if (!matching.length) return { data: [], error: null }
+  const resolvedScenario = DEMO_SCENARIOS.find(s => s.id === scenarioId) ||
+    DEMO_SCENARIOS.find(s => {
+      const lower = String(scenarioId || '').toLowerCase()
+      const sId = (s.id || '').toLowerCase()
+      const sType = (s.hazard_type || '').toLowerCase()
+      return sId.includes(lower) || lower.includes(sType)
+    })
+  const actualId = resolvedScenario ? resolvedScenario.id : scenarioId
+  let matching = DEMO_QUESTIONS.filter(q => q.scenario_id === actualId)
+  if (!matching.length) matching = DEMO_QUESTIONS.slice(0, 5)
 
   // 1. Shuffle all questions for this scenario
   const shuffled = [...matching]
