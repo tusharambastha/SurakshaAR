@@ -82,6 +82,31 @@ export default function Login() {
               </div>
             )}
 
+            {/* 1-Click Demo Login for Hackathon & Quick Evaluation */}
+            <button
+              type="button"
+              className="btn btn-secondary btn-full"
+              style={{
+                marginBottom: 18,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                borderColor: 'var(--color-brand)',
+                color: 'var(--color-brand)',
+                fontWeight: 700,
+                background: 'rgba(224, 90, 0, 0.08)',
+              }}
+              onClick={async () => {
+                setLoading(true)
+                await mockSignIn({ email: 'trainee@suraksha.demo', password: 'demo' })
+                await refreshProfile()
+                navigate('/dashboard', { replace: true })
+              }}
+            >
+              ⚡ 1-Click Quick Demo Sign In
+            </button>
+
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div className="form-group">
                 <label className="form-label" htmlFor="email">{T('email')}</label>

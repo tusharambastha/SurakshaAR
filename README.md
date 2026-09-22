@@ -17,11 +17,34 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License" /></a>
 </p>
 
+<p align="center">
+  <a href="https://tusharambastha.github.io/SurakshaAR/"><img src="https://img.shields.io/badge/🚀_Live_Demo-Open_Platform-E05A00?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live Demo" /></a>
+  <a href="https://tusharambastha.github.io/SurakshaAR/#/scenario/a1b2c3d4-0001-0001-0001-000000000001"><img src="https://img.shields.io/badge/🔥_AR_Fire_Simulator-Launch_Module-EF4444?style=for-the-badge" alt="AR Fire Simulator" /></a>
+  <a href="https://tusharambastha.github.io/SurakshaAR/#/dashboard"><img src="https://img.shields.io/badge/🎯_Trainee_Dashboard-Explore-10B981?style=for-the-badge" alt="Dashboard" /></a>
+  <a href="https://tusharambastha.github.io/SurakshaAR/#/admin-login"><img src="https://img.shields.io/badge/🛡️_Admin_Portal-Login-6366F1?style=for-the-badge" alt="Admin Portal" /></a>
+</p>
+
 <br />
 
 <p align="center">
   <img src="./public/images/surakshaar-hero-preview-v2.png" alt="SurakshaAR Platform Interface" width="100%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;" />
 </p>
+
+---
+
+## 🌐 Live Deployment & Direct Links
+
+| Module | URL | Direct Action |
+|---|---|---|
+| **Platform Homepage** | [https://tusharambastha.github.io/SurakshaAR/](https://tusharambastha.github.io/SurakshaAR/) | Landing page, feature overview, trilingual UI |
+| **AR Fire Safety Simulator** | [Launch AR Fire Module](https://tusharambastha.github.io/SurakshaAR/#/scenario/a1b2c3d4-0001-0001-0001-000000000001) | Live camera AR fire hazard detection & response |
+| **Trainee Dashboard** | [Open Trainee Dashboard](https://tusharambastha.github.io/SurakshaAR/#/dashboard) | 4 industry modules, progress KPIs, certificates |
+| **Admin & Compliance Portal** | [Open Admin Portal](https://tusharambastha.github.io/SurakshaAR/#/admin-login) | Safety officer analytics, pass rates, audit logs |
+
+#### 🔑 Zero-Setup Demo Credentials:
+- **Trainee**: Automatic 1-Click login or `trainee@suraksha.demo`
+- **Admin**: `admin@suraksha.demo` / `Admin@1234`
+
 
 ---
 

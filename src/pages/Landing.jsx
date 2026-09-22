@@ -153,7 +153,7 @@ export default function Landing() {
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
             <button
               className="btn btn-primary btn-lg"
-              onClick={() => navigate(user ? '/dashboard' : '/signup')}
+              onClick={() => navigate('/dashboard')}
               style={{ fontSize: '1.05rem', padding: '14px 32px' }}
             >
               <Camera size={20} />
@@ -769,10 +769,10 @@ export default function Landing() {
           </p>
           <button
             className="btn btn-primary btn-lg"
-            onClick={() => navigate(user ? '/dashboard' : '/signup')}
+            onClick={() => navigate('/dashboard')}
             style={{ fontSize: '1.05rem', padding: '16px 40px' }}
           >
-            {user ? 'Go to Dashboard' : 'Create Free Account'}
+            Launch AR Training Dashboard
             <ArrowRight size={18} />
           </button>
           {!user && (
