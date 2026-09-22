@@ -829,7 +829,11 @@ function createLOTOTagTexture() {
   // Red DANGER banner
   ctx.fillStyle = '#DC2626'
   ctx.beginPath()
-  ctx.roundRect(12, 14, 232, 68, 8)
+  if (ctx.roundRect) {
+    ctx.roundRect(12, 14, 232, 68, 8)
+  } else {
+    ctx.rect(12, 14, 232, 68)
+  }
   ctx.fill()
 
   ctx.fillStyle = '#FFFFFF'
@@ -893,7 +897,11 @@ function createZeroEnergyGaugeTexture() {
   // Safe badge
   ctx.fillStyle = '#064E3B'
   ctx.beginPath()
-  ctx.roundRect(238, 58, 128, 46, 6)
+  if (ctx.roundRect) {
+    ctx.roundRect(238, 58, 128, 46, 6)
+  } else {
+    ctx.rect(238, 58, 128, 46)
+  }
   ctx.fill()
   ctx.fillStyle = '#6EE7B7'
   ctx.font = '800 18px -apple-system, sans-serif'
