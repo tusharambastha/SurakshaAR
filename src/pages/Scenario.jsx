@@ -362,184 +362,135 @@ function createMusterSignTexture() {
   return tex
 }
 
-// ─── Realistic 3D Fire Object Generator (Warm Glow, Volumetric Cones, Embers) ─
-function createRealisticFireGroup() {
-  const fireGroup = new THREE.Group()
+// ─── Realistic 3D Fire Object Generator (Step 0 Station Prop) ────────────────
+function createFireSourceProp() {
+  const propGroup = new THREE.Group()
 
-  // 1. Scorched Ground Mark (circular burnt soot decal)
-  const scorchCanvas = document.createElement('canvas')
-  scorchCanvas.width = 256; scorchCanvas.height = 256
-  const sctx = scorchCanvas.getContext('2d')
-  const sGrad = sctx.createRadialGradient(128, 128, 15, 128, 128, 120)
-  sGrad.addColorStop(0, 'rgba(12, 12, 14, 0.98)')
-  sGrad.addColorStop(0.45, 'rgba(35, 20, 10, 0.88)')
-  sGrad.addColorStop(0.85, 'rgba(130, 35, 5, 0.40)')
-  sGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
-  sctx.fillStyle = sGrad
-  sctx.beginPath()
-  sctx.arc(128, 128, 120, 0, Math.PI * 2)
-  sctx.fill()
-
-  // Burnt ember specks
-  for (let i = 0; i < 45; i++) {
-    const angle = Math.random() * Math.PI * 2
-    const dist = Math.random() * 95
-    sctx.fillStyle = Math.random() < 0.6 ? '#FF4400' : '#FFB700'
-    sctx.beginPath()
-    sctx.arc(128 + Math.cos(angle) * dist, 128 + Math.sin(angle) * dist, 1.2 + Math.random() * 2, 0, Math.PI * 2)
-    sctx.fill()
-  }
-
-  const scorchTex = new THREE.CanvasTexture(scorchCanvas)
-  const scorchMesh = new THREE.Mesh(
-    new THREE.CircleGeometry(0.38, 32),
-    new THREE.MeshBasicMaterial({ map: scorchTex, transparent: true, opacity: 0.92, depthWrite: false, side: THREE.DoubleSide })
-  )
-  scorchMesh.rotation.x = -Math.PI / 2
-  scorchMesh.position.y = -0.01
-  fireGroup.add(scorchMesh)
-
-  // 2. Heavy charred industrial equipment base ring
-  const pad = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.24, 0.27, 0.035, 24),
+  // 1. Heavy industrial charred steel hazard base
+  const baseRing = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.24, 0.27, 0.04, 24),
     new THREE.MeshStandardMaterial({ color: '#1E293B', metalness: 0.8, roughness: 0.4 })
   )
-  pad.position.y = 0.015
-  fireGroup.add(pad)
+  baseRing.position.y = 0.02
+  propGroup.add(baseRing)
 
-  // 3. Volumetric Animated Flame Cones (Realistic ~0.62m waist-height)
-  // (a) Outer flame body (Crimson / Deep Orange) ~0.60m tall
+  // 2. Charred coal rocks & glowing embers surrounding base
+  const coalMat = new THREE.MeshStandardMaterial({ color: '#18181B', roughness: 0.9 })
+  const glowMat = new THREE.MeshStandardMaterial({ color: '#FF3B00', emissive: '#FF2200', emissiveIntensity: 3.2 })
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2
+    const dist = 0.18 + (i % 3) * 0.025
+    const coal = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.035 + (i % 2) * 0.015),
+      coalMat
+    )
+    coal.position.set(Math.cos(angle) * dist, 0.03, Math.sin(angle) * dist)
+    coal.rotation.set(i, i * 1.5, i * 0.7)
+    propGroup.add(coal)
+
+    const ember = new THREE.Mesh(
+      new THREE.SphereGeometry(0.016, 8, 8),
+      glowMat
+    )
+    ember.position.set(Math.cos(angle + 0.3) * (dist * 0.85), 0.035, Math.sin(angle + 0.3) * (dist * 0.85))
+    propGroup.add(ember)
+  }
+
+  // 3. Volumetric Vibrant Flame Geometries (Opaque & High Emissive for Solid AR Visibility)
+  // (a) Main Central Flame Cone (~0.46m tall)
   const flameOuter = new THREE.Mesh(
-    new THREE.ConeGeometry(0.24, 0.62, 16),
+    new THREE.ConeGeometry(0.20, 0.46, 16),
     new THREE.MeshStandardMaterial({
       color: '#FF3B00',
       emissive: '#FF2200',
       emissiveIntensity: 2.8,
       roughness: 0.2,
-      transparent: true,
-      opacity: 0.90,
+      side: THREE.DoubleSide,
     })
   )
-  flameOuter.position.y = 0.32
-  fireGroup.add(flameOuter)
+  flameOuter.position.y = 0.23
+  propGroup.add(flameOuter)
 
-  // (b) Mid flame body (Golden Yellow) ~0.50m tall
+  // (b) Secondary Left Flame Lobe (~0.36m tall, angled)
+  const flameLobeL = new THREE.Mesh(
+    new THREE.ConeGeometry(0.12, 0.36, 14),
+    new THREE.MeshStandardMaterial({
+      color: '#FF5500',
+      emissive: '#FF3300',
+      emissiveIntensity: 3.0,
+      roughness: 0.2,
+      side: THREE.DoubleSide,
+    })
+  )
+  flameLobeL.position.set(-0.08, 0.18, 0.03)
+  flameLobeL.rotation.z = 0.18
+  propGroup.add(flameLobeL)
+
+  // (c) Secondary Right Flame Lobe (~0.38m tall, angled)
+  const flameLobeR = new THREE.Mesh(
+    new THREE.ConeGeometry(0.13, 0.38, 14),
+    new THREE.MeshStandardMaterial({
+      color: '#FF5500',
+      emissive: '#FF3300',
+      emissiveIntensity: 3.0,
+      roughness: 0.2,
+      side: THREE.DoubleSide,
+    })
+  )
+  flameLobeR.position.set(0.08, 0.19, -0.02)
+  flameLobeR.rotation.z = -0.16
+  propGroup.add(flameLobeR)
+
+  // (d) Mid Flame Body (Golden Yellow ~0.34m tall)
   const flameMid = new THREE.Mesh(
-    new THREE.ConeGeometry(0.17, 0.50, 14),
+    new THREE.ConeGeometry(0.14, 0.34, 14),
     new THREE.MeshStandardMaterial({
       color: '#FFB800',
       emissive: '#FF9500',
       emissiveIntensity: 3.4,
       roughness: 0.1,
-      transparent: true,
-      opacity: 0.95,
+      side: THREE.DoubleSide,
     })
   )
-  flameMid.position.y = 0.26
-  fireGroup.add(flameMid)
+  flameMid.position.y = 0.19
+  propGroup.add(flameMid)
 
-  // (c) Core flame (White-Hot Center) ~0.35m tall
+  // (e) White-Hot Core (~0.24m tall)
   const flameCore = new THREE.Mesh(
-    new THREE.ConeGeometry(0.095, 0.35, 12),
+    new THREE.ConeGeometry(0.08, 0.24, 12),
     new THREE.MeshStandardMaterial({
       color: '#FFFDF5',
       emissive: '#FFFFFF',
-      emissiveIntensity: 4.2,
+      emissiveIntensity: 4.5,
       roughness: 0.1,
+      side: THREE.DoubleSide,
     })
   )
-  flameCore.position.y = 0.19
-  fireGroup.add(flameCore)
+  flameCore.position.y = 0.14
+  propGroup.add(flameCore)
 
-  // 4. Procedural texture for flame particle embers
-  const ptCanvas = document.createElement('canvas')
-  ptCanvas.width = 64; ptCanvas.height = 64
-  const ptctx = ptCanvas.getContext('2d')
-  const ptGrad = ptctx.createRadialGradient(32, 40, 2, 32, 32, 28)
-  ptGrad.addColorStop(0, 'rgba(255, 255, 240, 1)')
-  ptGrad.addColorStop(0.35, 'rgba(255, 180, 0, 0.9)')
-  ptGrad.addColorStop(0.7, 'rgba(255, 50, 0, 0.5)')
-  ptGrad.addColorStop(1, 'rgba(200, 0, 0, 0)')
-  ptctx.fillStyle = ptGrad
-  ptctx.fillRect(0, 0, 64, 64)
-  const emberTex = new THREE.CanvasTexture(ptCanvas)
+  // 4. Warm Dynamic Fire PointLight
+  const fireLight = new THREE.PointLight('#FF6A00', 3.5, 3.5)
+  fireLight.position.set(0, 0.26, 0)
+  propGroup.add(fireLight)
 
-  // 5. Rising Ember Particles
-  const embers = []
-  const emberMat = new THREE.MeshBasicMaterial({
-    map: emberTex,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  })
-  for (let i = 0; i < 28; i++) {
-    const size = 0.042 + Math.random() * 0.045
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 1.4), emberMat.clone())
-    mesh.position.set(
-      (Math.random() - 0.5) * 0.22,
-      0.08 + Math.random() * 0.50,
-      (Math.random() - 0.5) * 0.22
-    )
-    mesh.userData = {
-      vx: (Math.random() - 0.5) * 0.003,
-      vy: 0.008 + Math.random() * 0.009,
-      vz: (Math.random() - 0.5) * 0.003,
-      life: Math.random(),
-      speed: 0.008 + Math.random() * 0.010,
-      baseOpacity: 0.88,
-      swayPhase: Math.random() * Math.PI * 2,
-    }
-    fireGroup.add(mesh)
-    embers.push(mesh)
-  }
-
-  // 6. Soft Smoke Puffs
-  const smokeParticles = []
-  const smokeMat = new THREE.MeshBasicMaterial({
-    color: '#222226',
-    transparent: true,
-    opacity: 0.22,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  })
-  for (let i = 0; i < 8; i++) {
-    const size = 0.08 + Math.random() * 0.07
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), smokeMat.clone())
-    mesh.position.set(
-      (Math.random() - 0.5) * 0.16,
-      0.45 + Math.random() * 0.35,
-      (Math.random() - 0.5) * 0.16
-    )
-    mesh.userData = {
-      vy: 0.004 + Math.random() * 0.004,
-      life: Math.random(),
-      speed: 0.005 + Math.random() * 0.005,
-      baseOpacity: 0.24,
-    }
-    fireGroup.add(mesh)
-    smokeParticles.push(mesh)
-  }
-
-  // 7. Dynamic PointLights with Warm Fire Glow
-  const fireLight = new THREE.PointLight('#FF6A00', 4.5, 4.0)
-  fireLight.position.set(0, 0.40, 0)
-  fireGroup.add(fireLight)
-
-  const fireGlow = new THREE.PointLight('#FF2E00', 2.0, 5.0)
-  fireGlow.position.set(0, 0.65, 0)
-  fireGroup.add(fireGlow)
-
-  return {
-    group: fireGroup,
-    flameOuter,
-    flameMid,
-    flameCore,
-    embers,
-    smokeParticles,
+  propGroup.userData = {
+    flames: [flameOuter, flameLobeL, flameLobeR, flameMid, flameCore],
     fireLight,
-    fireGlow,
   }
+
+  return propGroup
+}
+
+function createHazardPadProp() {
+  const propGroup = new THREE.Group()
+  const pad = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.24, 0.27, 0.04, 24),
+    new THREE.MeshStandardMaterial({ color: '#EAB308', metalness: 0.2, roughness: 0.4 })
+  )
+  pad.position.y = 0.02
+  propGroup.add(pad)
+  return propGroup
 }
 
 // ─── 3D Props for Training Station Steps ───────────────────────────────────────
@@ -883,7 +834,7 @@ export default function Scenario() {
     },
   })
 
-  const isFireScenario = scenario?.hazard_type === 'fire'
+  const isFireScenario = scenario?.hazard_type === 'fire' || scenario?.id?.includes('0001') || (scenario?.title && /fire/i.test(scenario.title))
   const isGasScenario  = scenario?.hazard_type === 'gas_leak'
 
   const getStepText = useCallback((s, field) => {
@@ -1454,19 +1405,7 @@ export default function Scenario() {
       // ── Human-Scaled 3D Interactive Prop ──────────────────────────────────
       let propGroup = new THREE.Group()
       if (idx === 0) {
-        if (isFireScenario) {
-          const fireVis = createRealisticFireGroup()
-          propGroup.add(fireVis.group)
-          t.fireVisual = fireVis
-        } else {
-          // Hazard base / caution floor pad for non-fire
-          const pad = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.24, 0.27, 0.04, 24),
-            new THREE.MeshStandardMaterial({ color: '#EAB308', metalness: 0.2, roughness: 0.4 })
-          )
-          pad.position.y = -0.06
-          propGroup.add(pad)
-        }
+        propGroup = isFireScenario ? createFireSourceProp() : createHazardPadProp()
       } else if (idx === 1) {
         propGroup = createAlarmBoxProp()
       } else if (idx === 2) {
@@ -1605,70 +1544,18 @@ export default function Scenario() {
         }
       }
 
-      // Animate Realistic Fire Visual (Volumetric Cones, Embers, Smoke, Dynamic Lighting)
-      if (t.fireVisual && !t.flameExtinguished) {
-        const f = t.fireVisual
-        const breath = 1.0 + Math.sin(elapsed * 4.0) * 0.05 + Math.sin(elapsed * 12.0) * 0.04
-        const flickerX = 1.0 + Math.sin(elapsed * 16.0) * 0.08
-        const flickerZ = 1.0 + Math.cos(elapsed * 19.0) * 0.08
-
-        if (f.flameOuter) f.flameOuter.scale.set(flickerX * breath, breath * (1.0 + Math.cos(elapsed * 14.0) * 0.06), flickerZ * breath)
-        if (f.flameMid) f.flameMid.scale.set(flickerZ * breath, breath * (1.0 + Math.sin(elapsed * 18.0) * 0.08), flickerX * breath)
-        if (f.flameCore) f.flameCore.scale.set(breath, breath * (1.0 + Math.sin(elapsed * 22.0) * 0.05), breath)
-
-        // Floating glowing embers
-        if (f.embers) {
-          const camWorldPos = new THREE.Vector3()
-          camera.getWorldPosition(camWorldPos)
-          const camLocal = f.group.worldToLocal(camWorldPos.clone())
-
-          f.embers.forEach(p => {
-            const d = p.userData
-            d.life += d.speed
-            if (d.life >= 1.0) {
-              d.life = 0
-              p.position.x = (Math.random() - 0.5) * 0.22
-              p.position.y = 0.08 + Math.random() * 0.12
-              p.position.z = (Math.random() - 0.5) * 0.22
-              p.material.opacity = d.baseOpacity
-            }
-            p.position.y += d.vy
-            p.position.x += d.vx + Math.sin(elapsed * 5.0 + d.swayPhase) * 0.002
-            p.position.z += d.vz
-
-            if (d.life > 0.5) {
-              p.material.opacity = d.baseOpacity * (1 - (d.life - 0.5) / 0.5)
-            }
-            p.lookAt(camLocal)
-          })
-        }
-
-        // Rising subtle smoke puffs
-        if (f.smokeParticles) {
-          f.smokeParticles.forEach(s => {
-            const d = s.userData
-            d.life += d.speed
-            if (d.life >= 1.0) {
-              d.life = 0
-              s.position.x = (Math.random() - 0.5) * 0.18
-              s.position.y = 0.45 + Math.random() * 0.10
-              s.position.z = (Math.random() - 0.5) * 0.18
-              s.scale.setScalar(1.0)
-              s.material.opacity = d.baseOpacity
-            }
-            s.position.y += d.vy
-            s.scale.multiplyScalar(1.008)
-            s.material.opacity = d.baseOpacity * Math.max(1.0 - d.life, 0)
-          })
-        }
-
-        // Multi-frequency warm fire light flicker
-        if (f.fireLight) {
-          f.fireLight.intensity = 4.2 + Math.sin(elapsed * 18.0) * 0.9 + Math.cos(elapsed * 27.0) * 0.6
-        }
-        if (f.fireGlow) {
-          f.fireGlow.intensity = 2.0 + Math.sin(elapsed * 9.0) * 0.5
-        }
+      // Animate Step 0 Fire Flame Flicker
+      if (currentStepRef.current === 0 && t.stepNodes[0]?.propGroup?.userData?.flames && !t.flameExtinguished) {
+        const ud = t.stepNodes[0].propGroup.userData
+        const breath = 1.0 + Math.sin(elapsed * 5.0) * 0.05 + Math.sin(elapsed * 13.0) * 0.03
+        const flickX = 1.0 + Math.sin(elapsed * 17.0) * 0.07
+        const flickZ = 1.0 + Math.cos(elapsed * 21.0) * 0.07
+        if (ud.flames[0]) ud.flames[0].scale.set(flickX * breath, breath * (1.0 + Math.cos(elapsed * 15.0) * 0.05), flickZ * breath)
+        if (ud.flames[1]) ud.flames[1].scale.set(flickZ * breath, breath * (1.0 + Math.sin(elapsed * 19.0) * 0.06), flickX * breath)
+        if (ud.flames[2]) ud.flames[2].scale.set(flickX * breath, breath * (1.0 + Math.cos(elapsed * 18.0) * 0.06), flickZ * breath)
+        if (ud.flames[3]) ud.flames[3].scale.set(flickZ * breath, breath, flickX * breath)
+        if (ud.flames[4]) ud.flames[4].scale.set(breath, breath, breath)
+        if (ud.fireLight) ud.fireLight.intensity = 3.5 + Math.sin(elapsed * 18.0) * 0.8
       }
 
       // Animate Step 1 Alarm Strobe LED
@@ -1730,7 +1617,7 @@ export default function Scenario() {
               const anchorPos = new THREE.Vector3()
                 .copy(camera.position)
                 .addScaledVector(forwardH, anchorDist)
-              anchorPos.y = activeIdx === 0 ? camera.position.y - 0.40 : camera.position.y - 0.25
+              anchorPos.y = camera.position.y - 0.22
 
               activeNode.group.position.copy(anchorPos)
               activeNode.group.lookAt(camera.position.x, anchorPos.y, camera.position.z)
@@ -1892,14 +1779,13 @@ export default function Scenario() {
     // Dynamic virtual hazard reactions & realistic fire extinction
     const isExtinguished = completedSteps.includes(3)
     t.flameExtinguished = isExtinguished
-    if (t.fireVisual) {
-      t.fireVisual.flameOuter.visible = !isExtinguished
-      t.fireVisual.flameMid.visible = !isExtinguished
-      t.fireVisual.flameCore.visible = !isExtinguished
-      t.fireVisual.embers.forEach(e => { e.visible = !isExtinguished })
-      t.fireVisual.smokeParticles.forEach(s => { s.visible = !isExtinguished })
-      if (t.fireVisual.fireLight) t.fireVisual.fireLight.intensity = isExtinguished ? 0 : 4.5
-      if (t.fireVisual.fireGlow) t.fireVisual.fireGlow.intensity = isExtinguished ? 0 : 2.0
+    if (t.stepNodes[0]?.propGroup?.userData?.flames) {
+      t.stepNodes[0].propGroup.userData.flames.forEach(flame => {
+        flame.visible = !isExtinguished
+      })
+      if (t.stepNodes[0].propGroup.userData.fireLight) {
+        t.stepNodes[0].propGroup.userData.fireLight.intensity = isExtinguished ? 0 : 3.5
+      }
     }
     if (t.flameMeshes) {
       t.flameMeshes.forEach(mesh => {
