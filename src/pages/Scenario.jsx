@@ -2422,9 +2422,10 @@ export default function Scenario() {
     }
     window.addEventListener('resize', onResize)
 
-    // 10. Device Orientation Handler for Camera AR
+    // 10. Device Orientation Handler for Camera AR (Handheld mobile devices only)
+    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)
     function onDeviceRot(e) {
-      if (e.alpha !== null && e.beta !== null) {
+      if (isTouchDevice && e.alpha !== null && e.beta !== null) {
         t.deviceRot = {
           alpha: e.alpha,
           beta: e.beta,
@@ -2638,7 +2639,7 @@ export default function Scenario() {
       renderer.dispose()
       scene.clear()
     }
-  }, [scenario, handleStepClick]) // ONLY run once when scenario loads!
+  }, [scenario, handleStepClick, cameraChecked])
 
   // Keep refs up to date for the persistent animation loop
   const currentStepRef = useRef(currentStep)
@@ -2726,18 +2727,7 @@ export default function Scenario() {
     } else {
       fireAudioRef.current.stop()
     }
-  }, [currentStep, completedSteps, arMode, isFireScenario, demoMode, fireEscalated])
-
-  if (isLoading || !cameraChecked) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#1A1A1A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center', color: 'white' }}>
-          <div className="spinner" style={{ borderTopColor: 'var(--color-brand)', margin: '0 auto 16px' }} />
-          <p style={{ fontWeight: 600 }}>Loading 3D Training Simulator…</p>
-        </div>
-      </div>
-    )
-  }
+  }, [currentStep, completedSteps, arMode, isFireScenario, demoMode, fireEscalated, cameraChecked])
 
   const steps = scenario?.steps ?? []
   const allDone = completedSteps.length === steps.length && steps.length > 0
@@ -2745,6 +2735,24 @@ export default function Scenario() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#1F242D', position: 'relative', overflow: 'hidden' }}>
+
+      {/* Loading Overlay — Keeps Canvas permanently mounted so WebGL never suffers race conditions */}
+      {(isLoading || !cameraChecked) && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 100,
+          background: '#1A1A1A',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <div style={{ textAlign: 'center', color: 'white' }}>
+            <div className="spinner" style={{ borderTopColor: 'var(--color-brand)', margin: '0 auto 16px' }} />
+            <p style={{ fontWeight: 600 }}>Loading 3D Training Simulator…</p>
+          </div>
+        </div>
+      )}
 
       {/* Camera Live Feed & Virtual AR HUD (AR Mode) */}
       {arMode && cameraAvail && (
