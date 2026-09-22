@@ -2370,39 +2370,6 @@ export default function Scenario() {
     })
     t.stepNodes = stepNodes
 
-    // Immediate visual state synchronization on initial creation (avoids first-load blank issue)
-    const initialIsAr = arModeRef.current
-    if (initialIsAr) {
-      scene.background = null
-      if (floor) floor.visible = false
-      if (warehousePropsGroup) warehousePropsGroup.visible = false
-      camera.position.set(0, 0, 0)
-    } else {
-      scene.background = new THREE.Color('#1F242D')
-      if (floor) floor.visible = true
-      if (warehousePropsGroup) warehousePropsGroup.visible = true
-      camera.position.set(0, 3.5, 9.5)
-      controls.target.set(0, 1.2, 0)
-      controls.update()
-    }
-
-    t.anchoredStep = -1
-    t.anchoredMode = null
-
-    // Immediately anchor active step right in front of camera if in Demo Mode
-    if (demoModeRef.current) {
-      const activeNode = stepNodes[currentStepRef.current]
-      if (activeNode) {
-        if (initialIsAr) {
-          activeNode.group.position.set(0, -0.22, -1.7)
-          activeNode.group.lookAt(0, -0.22, 0)
-          activeNode.group.visible = true
-          t.anchoredStep = currentStepRef.current
-          t.anchoredMode = true
-        }
-      }
-    }
-
     // 8. Raycasting Click & Touch Listener
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
@@ -2545,18 +2512,11 @@ export default function Scenario() {
         // ── Presentation Demo Mode Anchoring ──
         if (demoModeRef.current) {
           if (t.anchoredStep !== activeIdx || t.anchoredMode !== true) {
+            const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+            const forwardH = new THREE.Vector3(camForward.x, 0, camForward.z).normalize()
+            if (forwardH.lengthSq() < 0.001) forwardH.set(0, 0, -1)
+
             if (activeNode) {
-              // Ensure camera is at origin in AR mode
-              if (camera.position.lengthSq() > 0.001) {
-                camera.position.set(0, 0, 0)
-              }
-
-              const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
-              let forwardH = new THREE.Vector3(camForward.x, 0, camForward.z).normalize()
-              if (forwardH.lengthSq() < 0.001 || isNaN(forwardH.x) || isNaN(forwardH.z)) {
-                forwardH.set(0, 0, -1)
-              }
-
               const anchorDist = 1.7
               const anchorPos = new THREE.Vector3()
                 .copy(camera.position)
@@ -2566,10 +2526,9 @@ export default function Scenario() {
               activeNode.group.position.copy(anchorPos)
               activeNode.group.lookAt(camera.position.x, anchorPos.y, camera.position.z)
               activeNode.group.visible = true
-
-              t.anchoredStep = activeIdx
-              t.anchoredMode = true
             }
+            t.anchoredStep = activeIdx
+            t.anchoredMode = true
           }
         } else {
           // Realistic Multi-Location Mode: restore fixed room coordinates
@@ -2710,26 +2669,14 @@ export default function Scenario() {
       t.warehousePropsGroup.visible = !arMode
     }
 
-    // Update scene background, floor and camera visibility for AR vs 3D mode
+    // Update scene background and floor visibility for AR vs 3D mode
     if (t.scene) {
       if (arMode) {
         t.scene.background = null // Transparent for camera view
         if (t.floor) t.floor.visible = false // Trainee's camera shows real-world floor!
-        if (t.camera) t.camera.position.set(0, 0, 0)
-        t.anchoredStep = -1
-        t.anchoredMode = null
       } else {
         t.scene.background = new THREE.Color('#1F242D') // Crisp slate studio room
         if (t.floor) t.floor.visible = true
-        if (t.camera && t.camera.position.lengthSq() < 1) {
-          t.camera.position.set(0, 3.5, 9.5)
-          if (t.controls) {
-            t.controls.target.set(0, 1.2, 0)
-            t.controls.update()
-          }
-        }
-        t.anchoredStep = -1
-        t.anchoredMode = null
       }
     }
 
@@ -2760,7 +2707,7 @@ export default function Scenario() {
     } else {
       fireAudioRef.current.stop()
     }
-  }, [scenario, currentStep, completedSteps, arMode, isFireScenario, demoMode, fireEscalated])
+  }, [currentStep, completedSteps, arMode, isFireScenario, demoMode, fireEscalated])
 
   if (isLoading || !cameraChecked) {
     return (
