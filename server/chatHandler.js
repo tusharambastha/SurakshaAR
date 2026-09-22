@@ -4,53 +4,51 @@ import { RateLimiter } from '../worker/rateLimiter.js'
 import {
   checkCriticalHazardGuardrails,
   queryKnowledgeBase,
+  findFaqMatch,
   MODULES
 } from '../src/lib/safetyKnowledge.js'
 
-export const SURAKSHA_MITRA_SYSTEM_PROMPT = `You are 'Suraksha Mitra', the advanced, friendly, and highly knowledgeable AI Safety Copilot for SurakshaAR — an AR industrial safety training platform for workers and trainees in India.
+export const SURAKSHA_MITRA_SYSTEM_PROMPT = `You are 'Suraksha Mitra', the advanced, friendly, and highly knowledgeable AI Safety Copilot for SurakshaAR — an AR industrial safety training platform for workers and trainees in India (specifically Jharkhand mining and manufacturing).
 
-HOW TO COMMUNICATE (BEHAVE LIKE CHATGPT / GEMINI):
-1. Conversational & Human-like: Talk naturally, warmly, and clearly like an expert safety mentor and helpful colleague. NEVER speak like a rigid checklist, generic robotic script, or cold bullet-point dump.
-2. Answer Directly First: Always answer the user's specific question directly and conversationally before giving details or examples. If asked 'what is PPE' or 'what is X', first explain what it is, why it exists, and its real-world importance in simple, relatable words.
+HOW TO COMMUNICATE:
+1. Conversational & Human-like: Talk naturally, warmly, and clearly like an expert safety mentor and helpful colleague. NEVER speak like a cold bullet-point dump or rigid robot.
+2. Answer Directly First: Always answer the user's specific question directly and conversationally before giving details or examples.
 3. Language Adherence:
-   - CRITICAL: You MUST write your response ENTIRELY in the user's selected language specified in the prompt/turn instructions.
-   - If English is selected, write 100% in English even if the user asks in Hindi/Hinglish.
+   - If English is selected, write 100% in English.
    - If Hindi is selected, write in Devanagari Hindi (हिंदी).
    - If Hinglish is selected, write in conversational Hinglish (Roman Hindi).
-   - If Santali is selected, write in Santali.
+   - If Santali is selected, write in Santali (Ol Chiki script).
 4. Formatting:
    - Use well-structured, engaging paragraphs for explanations.
    - Bold **key points** to make them easy to read on mobile and desktop.
-   - Use bullet points only when helpful to list components or steps, and explain briefly why each one is used.
-   - End with a friendly, conversational question asking if they'd like practical tips or specific training guidance.
+   - End with a friendly question asking if they'd like practical tips or specific training guidance.
 5. Industrial Safety Standards:
-   - Ground all safety practices in authentic standards (IS 2925, IS 15298, OSHA, DGMS), but explain them in simple layman terms without overwhelming jargon.`
+   - Ground all safety practices in authentic standards (IS 2925, IS 15298, OSHA, DGMS), explained in simple terms.`
 
 export function getLanguagePrompt(lang = 'en') {
   if (lang === 'en') {
     return `### CRITICAL LANGUAGE MANDATE:
-The user has strictly chosen ENGLISH as their interface language.
-- You MUST write 100% of your response in ENGLISH.
+The user has chosen ENGLISH as their interface language.
+- Write 100% of your response in ENGLISH.
 - Greet with 'Hello' or 'Hi', NOT 'Namaste' or 'Johar'.
-- Do NOT use any Hindi words, Hinglish, or Devanagari script under ANY circumstances.
-- Even if previous messages in the chat history were in Hindi, you MUST immediately reply in pure English.`
+- Do NOT use Hindi words or Devanagari script.`
   }
   if (lang === 'hi') {
     return `### CRITICAL LANGUAGE MANDATE:
-The user has strictly chosen HINDI (हिंदी) as their interface language.
-- You MUST write 100% of your response in pure, fluent Devanagari Hindi (हिंदी).
+The user has chosen HINDI (हिंदी) as their interface language.
+- Write 100% of your response in fluent Devanagari Hindi (हिंदी).
 - Greet with 'नमस्ते' or 'जोहार'.`
   }
   if (lang === 'hinglish') {
     return `### CRITICAL LANGUAGE MANDATE:
-The user has strictly chosen HINGLISH as their interface language.
-- You MUST write 100% of your response in conversational Hinglish (Hindi written in Roman / English alphabet, e.g. 'Namaste! Main hoon Suraksha Mitra...').
+The user has chosen HINGLISH as their interface language.
+- Write in conversational Hinglish (Hindi in Roman alphabet, e.g. 'Namaste! Main hoon Suraksha Mitra...').
 - Greet with 'Johar!' or 'Namaste!'.`
   }
   if (lang === 'sat') {
     return `### CRITICAL LANGUAGE MANDATE:
-The user has strictly chosen SANTALI (ᱥᱟᱱᱛᱟᱲᱤ) as their interface language.
-- You MUST write your response in Santali (Ol Chiki script) with clear, simple terms.`
+The user has chosen SANTALI (ᱥᱟᱱᱛᱟᱲᱤ) as their interface language.
+- Write in Santali (Ol Chiki script) with clear, simple terms.`
   }
   return ''
 }
@@ -58,31 +56,24 @@ The user has strictly chosen SANTALI (ᱥᱟᱱᱛᱟᱲᱤ) as their interface 
 // Local rate limiter instance
 export const localLimiter = new RateLimiter({
   windowMs: 60 * 1000,
-  maxRequests: 30,
+  maxRequests: 45,
 })
 
 /**
- * Retrieve Gemini API key strictly on the server side.
+ * Retrieve Groq API key strictly on the server side.
  * Checks process.env, .env, .env.local, .env.production.
  */
-export function getGeminiApiKey() {
-  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 10) {
-    return process.env.GEMINI_API_KEY.trim()
+export function getGroqApiKey() {
+  if (process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim().length > 10) {
+    return process.env.GROQ_API_KEY.trim()
   }
-  if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim().length > 10) {
-    return process.env.GOOGLE_API_KEY.trim()
-  }
-  if (process.env.VITE_GEMINI_API_KEY && process.env.VITE_GEMINI_API_KEY.trim().length > 10) {
-    return process.env.VITE_GEMINI_API_KEY.trim()
-  }
-  // Try reading .env or .env.local in project root
   const candidateFiles = ['.env.local', '.env', '.env.production']
   for (const f of candidateFiles) {
     try {
       const fullPath = path.resolve(process.cwd(), f)
       if (fs.existsSync(fullPath)) {
         const text = fs.readFileSync(fullPath, 'utf8')
-        const match = text.match(/^(?:GEMINI_API_KEY|GOOGLE_API_KEY|VITE_GEMINI_API_KEY)\s*=\s*["']?([^"'\r\n]+)["']?/m)
+        const match = text.match(/^GROQ_API_KEY\s*=\s*["']?([^"'\r\n]+)["']?/m)
         if (match && match[1] && match[1].trim().length > 10) {
           return match[1].trim()
         }
@@ -93,18 +84,45 @@ export function getGeminiApiKey() {
 }
 
 /**
- * Server-side Chat API for Suraksha Mitra
- * Supports:
- * 1. New conversational agent: { messages: [...], sessionId, stream }
- * 2. Legacy signature: { query, lang, module, history }
+ * Retrieve Sarvam API key strictly on the server side.
  */
-export async function handleChatApi(payload = {}) {
+export function getSarvamApiKey() {
+  if (process.env.SARVAM_API_KEY && process.env.SARVAM_API_KEY.trim().length > 10) {
+    return process.env.SARVAM_API_KEY.trim()
+  }
+  const candidateFiles = ['.env.local', '.env', '.env.production']
+  for (const f of candidateFiles) {
+    try {
+      const fullPath = path.resolve(process.cwd(), f)
+      if (fs.existsSync(fullPath)) {
+        const text = fs.readFileSync(fullPath, 'utf8')
+        const match = text.match(/^SARVAM_API_KEY\s*=\s*["']?([^"'\r\n]+)["']?/m)
+        if (match && match[1] && match[1].trim().length > 10) {
+          return match[1].trim()
+        }
+      }
+    } catch (_) {}
+  }
+  return null
+}
+
+/**
+ * Server-side Chat API for Suraksha Mitra powered by Groq (llama-3.3-70b-versatile)
+ */
+export async function handleChatApi(payload = {}, resStream = null) {
   const sessionId = payload.sessionId || 'local-session'
   const rateCheck = localLimiter.check(sessionId)
   if (!rateCheck.allowed) {
+    const rateMsg = '⚠️ Rate limit exceeded. Please wait a moment before sending more messages.'
+    if (resStream) {
+      resStream.write(`data: ${JSON.stringify({ chunk: rateMsg })}\n\n`)
+      resStream.write('data: [DONE]\n\n')
+      resStream.end()
+      return
+    }
     return {
       error: 'Rate limit exceeded. Please wait a moment before asking another question.',
-      reply: '⚠️ Rate limit exceeded. Please wait a moment before sending more messages.',
+      reply: rateMsg,
       retryAfter: rateCheck.retryAfter,
     }
   }
@@ -121,9 +139,16 @@ export async function handleChatApi(payload = {}) {
   }
 
   if (!query || query.trim().length === 0) {
+    const emptyMsg = 'Please ask an industrial safety or training question.'
+    if (resStream) {
+      resStream.write(`data: ${JSON.stringify({ chunk: emptyMsg })}\n\n`)
+      resStream.write('data: [DONE]\n\n')
+      resStream.end()
+      return
+    }
     return {
-      reply: 'Please ask an industrial safety or training question.',
-      answer: 'Please ask an industrial safety or training question.',
+      reply: emptyMsg,
+      answer: emptyMsg,
       source: 'Suraksha Mitra',
       confidence: 0,
       sources: []
@@ -133,13 +158,19 @@ export async function handleChatApi(payload = {}) {
   const lang = payload.lang || 'en'
   const module = payload.module || MODULES.GLOBAL
 
-  // 1. Critical Hazard Guardrail Check FIRST (checks query + recent conversation context)
+  // 1. Critical Hazard Guardrail Check FIRST
   const fullContextQuery = [
     query,
     ...(Array.isArray(messages) ? messages.slice(-4).map(m => m.content || m.text || '') : [])
   ].join(' ')
   const critical = checkCriticalHazardGuardrails(fullContextQuery, lang)
   if (critical) {
+    if (resStream) {
+      resStream.write(`data: ${JSON.stringify({ chunk: critical.answer })}\n\n`)
+      resStream.write('data: [DONE]\n\n')
+      resStream.end()
+      return
+    }
     return {
       reply: critical.answer,
       answer: critical.answer,
@@ -150,21 +181,46 @@ export async function handleChatApi(payload = {}) {
     }
   }
 
-  // 2. Query verified local safety knowledge
+  // 2. Verified FAQ Knowledge Base Check
+  const faqMatch = findFaqMatch(query, lang)
+  if (faqMatch) {
+    if (resStream) {
+      resStream.write(`data: ${JSON.stringify({ chunk: faqMatch.answer })}\n\n`)
+      resStream.write('data: [DONE]\n\n')
+      resStream.end()
+      return
+    }
+    return {
+      reply: faqMatch.answer,
+      answer: faqMatch.answer,
+      source: faqMatch.source,
+      confidence: faqMatch.confidence || 0.98,
+      sources: []
+    }
+  }
+
+  // 3. Local Safety Knowledge match
   const localMatch = queryKnowledgeBase(query, lang, module, messages)
 
-  // 3. Check for Gemini API key
-  const apiKey = getGeminiApiKey()
+  // 4. Check for Groq API key
+  const groqKey = getGroqApiKey()
 
-  if (!apiKey || apiKey === 'your-gemini-api-key-here') {
-    console.info('[SurakshaMitra] No active GEMINI_API_KEY configured — serving verified safety response.')
+  if (!groqKey) {
     const safeReply = localMatch?.answer || (
       lang === 'hi'
         ? 'मैं सुरक्षा मित्र हूँ। औद्योगिक और खनन सुरक्षा (PPE, गैस रिसाव, बिजली, मशीन सुरक्षा) पर आप मुझसे कोई भी सवाल पूछ सकते हैं।'
         : lang === 'hinglish'
           ? 'Main hoon Suraksha Mitra. Industrial aur mining safety (PPE, fire, gas leak, electrical, machinery) par aap mujhse koi bhi practical sawal pooch sakte hain.'
-          : 'I am Suraksha Mitra. You can ask me any practical questions regarding industrial safety, PPE, mining hazards, fire response, or AR training.'
+          : lang === 'sat'
+            ? '👷 ᱡᱚᱦᱟᱨ! ᱤᱧ ᱫᱚ ᱥᱩᱨᱠᱷᱟ ᱢᱤᱛᱨᱚ ᱠᱟᱹᱱᱟᱹᱧ᱾ ᱠᱷᱟᱫᱟᱱ ᱟᱨ ᱠᱟᱹᱨᱜᱟᱲ ᱨᱮᱱᱟᱜ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱵᱟᱵᱚᱛ ᱠᱩᱞᱤᱭ ᱢᱮ᱾'
+            : 'I am Suraksha Mitra. You can ask me any practical questions regarding industrial safety, PPE, mining hazards, fire response, or AR training.'
     )
+    if (resStream) {
+      resStream.write(`data: ${JSON.stringify({ chunk: safeReply })}\n\n`)
+      resStream.write('data: [DONE]\n\n')
+      resStream.end()
+      return
+    }
     return {
       reply: safeReply,
       answer: safeReply,
@@ -174,103 +230,103 @@ export async function handleChatApi(payload = {}) {
     }
   }
 
-  // 4. Live Gemini API Call
+  // 5. Groq OpenAI-Compatible Chat Completions Call
   try {
-    const contents = []
-    const recentMessages = messages.slice(-10)
-
-    for (const m of recentMessages) {
-      const role = m.role === 'assistant' ? 'model' : 'user'
-      const text = typeof m.content === 'string' ? m.content : (m.text || '')
-      if (!text.trim()) continue
-
-      if (contents.length > 0 && contents[contents.length - 1].role === role) {
-        contents[contents.length - 1].parts[0].text += '\n' + text
-      } else {
-        contents.push({ role, parts: [{ text }] })
-      }
-    }
-
-    if (contents.length === 0) {
-      contents.push({ role: 'user', parts: [{ text: query }] })
-    }
-
-    // Explicit active directive on latest turn (prepended to front)
-    if (contents.length > 0) {
-      const last = contents[contents.length - 1]
-      if (last.role === 'user') {
-        const tag = lang === 'en'
-          ? '[LANGUAGE: ENGLISH. Output 100% in English. Do NOT use Hindi/Devanagari.]\n\n'
-          : lang === 'hi'
-            ? '[LANGUAGE: HINDI. Output in Devanagari Hindi (हिंदी).]\n\n'
-            : lang === 'hinglish'
-              ? '[LANGUAGE: HINGLISH. Output in conversational Hinglish (Roman Hindi).]\n\n'
-              : lang === 'sat'
-                ? '[LANGUAGE: SANTALI. Output in Santali.]\n\n'
-                : ''
-        last.parts[0].text = tag + last.parts[0].text
-      }
-    }
-
     let trustedContextPrompt = ''
     if (localMatch && !localMatch.isFallback) {
-      trustedContextPrompt = `\n\n[Background Safety Knowledge (IS/OSHA Reference): ${localMatch.answer}\nUse these verified technical facts for accuracy, but formulate your response in a warm, helpful, conversational AI style matching the user's question.]`
+      trustedContextPrompt = `\n\n[Verified Safety Facts (IS/OSHA): ${localMatch.answer}\nIncorporate these verified safety facts for accuracy.]`
     }
-
     const fullSystemInstruction = `${getLanguagePrompt(lang)}\n\n${SURAKSHA_MITRA_SYSTEM_PROMPT}${trustedContextPrompt}`
 
-    const models = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest']
-    let candidate = null
-    let lastError = null
+    const groqMessages = [
+      { role: 'system', content: fullSystemInstruction },
+      ...messages.slice(-8).map(m => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: typeof m.content === 'string' ? m.content : (m.text || '')
+      }))
+    ]
 
-    for (const modelName of models) {
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`
-      const requestPayload = {
-        contents,
-        systemInstruction: {
-          parts: [{ text: fullSystemInstruction }]
-        },
-        generationConfig: {
-          temperature: 0.5,
-          maxOutputTokens: 2048,
-        }
-      }
-
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestPayload)
+    const isStreaming = Boolean(payload.stream && resStream)
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${groqKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: groqMessages,
+        temperature: 0.4,
+        max_tokens: 1024,
+        stream: isStreaming
       })
+    })
 
-      if (res.ok) {
-        const json = await res.json()
-        if (json.candidates && json.candidates[0]) {
-          candidate = json.candidates[0]
-          break
-        }
-      } else {
-        const errText = await res.text()
-        lastError = `Gemini API [${modelName}] failed (${res.status}): ${errText}`
-        console.warn('[SurakshaMitra]', lastError)
-      }
+    if (!groqRes.ok) {
+      const errText = await groqRes.text()
+      console.warn('[SurakshaMitra Groq] API error:', groqRes.status, errText)
+      throw new Error(`Groq API returned ${groqRes.status}`)
     }
 
-    if (candidate && candidate.content?.parts) {
-      const rawText = candidate.content.parts.map(p => p.text).filter(Boolean).join('\n')
+    // Stream SSE back to client
+    if (isStreaming && groqRes.body) {
+      const reader = groqRes.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data:')) continue
+          const dataStr = trimmed.slice(5).trim()
+          if (dataStr === '[DONE]') {
+            resStream.write('data: [DONE]\n\n')
+            continue
+          }
+          try {
+            const parsed = JSON.parse(dataStr)
+            const chunk = parsed.choices?.[0]?.delta?.content
+            if (chunk) {
+              resStream.write(`data: ${JSON.stringify({ chunk })}\n\n`)
+            }
+          } catch (_) {}
+        }
+      }
+      resStream.end()
+      return
+    }
+
+    const data = await groqRes.json()
+    const replyText = data.choices?.[0]?.message?.content
+    if (replyText) {
       return {
-        reply: rawText,
-        answer: rawText,
-        source: 'Suraksha Mitra AI (Gemini)',
+        reply: replyText,
+        answer: replyText,
+        source: 'Suraksha Mitra AI (Groq Llama 3.3)',
+        provider: 'Groq',
         confidence: 0.98,
         sources: []
       }
     }
   } catch (err) {
-    console.error('[handleChatApi] Error calling Gemini:', err)
+    console.error('[handleChatApi] Groq error:', err)
   }
 
   // Graceful fallback on API error
   const fallbackAnswer = localMatch?.answer || "I am your safety assistant. Please consult your certified safety officer or check site SOPs."
+  if (resStream) {
+    resStream.write(`data: ${JSON.stringify({ chunk: fallbackAnswer })}\n\n`)
+    resStream.write('data: [DONE]\n\n')
+    resStream.end()
+    return
+  }
   return {
     reply: fallbackAnswer,
     answer: fallbackAnswer,

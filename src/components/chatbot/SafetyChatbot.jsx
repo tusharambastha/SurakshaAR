@@ -29,9 +29,8 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { useLang } from '../../contexts/LanguageContext'
-import { querySafetyAssistant, getSuggestedQuestions, MODULES } from '../../lib/safetyKnowledge'
+import { querySafetyAssistant, getSuggestedQuestions, findFaqMatch, MODULES } from '../../lib/safetyKnowledge'
 import { speak, stopSpeech, startListening, isTTSSupported, isVoiceSupported } from '../../lib/voice'
-import { streamClientGeminiResponse } from '../../lib/geminiClient'
 
 export const CHAT_LANGUAGES = [
   { code: 'en', name: 'English', native: 'English', flag: '🇬🇧', voice: true, voiceBadge: 'Voice 🎙️' },
@@ -133,11 +132,24 @@ export default function SafetyChatbot() {
   const [speakingMsgId, setSpeakingMsgId] = useState(null)
   const [voiceNotice, setVoiceNotice] = useState(null)
   const [activeEndpoint, setActiveEndpoint] = useState(null)
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true))
 
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
   const recognitionRef = useRef(null)
   const abortControllerRef = useRef(null)
+
+  // Network online/offline monitor
+  useEffect(() => {
+    function handleOnline() { setIsOnline(true) }
+    function handleOffline() { setIsOnline(false) }
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   // Save messages to localStorage whenever they update
   useEffect(() => {
@@ -266,10 +278,56 @@ export default function SafetyChatbot() {
     let streamedSuccess = false
     const botMsgId = 'a-' + Date.now()
 
+    // 1. Instant Verified FAQ Check (EN, HI, SAT) — fastest, offline-safe
+    const instantFaq = findFaqMatch(query, chatLang)
+    if (instantFaq) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: botMsgId,
+          role: 'assistant',
+          content: instantFaq.answer,
+          source: instantFaq.source || 'Suraksha Mitra Safety Knowledge (Verified)',
+          sources: []
+        }
+      ])
+      setIsGenerating(false)
+      scrollBottom()
+      return
+    }
+
+    // 2. If browser is offline, answer immediately from verified safety knowledge base
+    if (!isOnline) {
+      const localResult = await querySafetyAssistant(query, chatLang, activeModule, contextualMessages)
+      const text = typeof localResult === 'string'
+        ? localResult
+        : (localResult?.answer || localResult?.reply || "I am your safety assistant. Please consult your site safety officer.")
+      setMessages(prev => [
+        ...prev,
+        {
+          id: botMsgId,
+          role: 'assistant',
+          content: text,
+          source: 'Suraksha Mitra Safety Knowledge (Offline ⚡)',
+          sources: localResult?.sources || []
+        }
+      ])
+      setIsGenerating(false)
+      scrollBottom()
+      return
+    }
+
+    // 3. Try backend endpoints (Groq server / proxy) with timeout
     for (const endpoint of endpointsToTry) {
       if (abortController.signal.aborted) break
       try {
         setActiveEndpoint(endpoint)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 4000)
+
+        const abortHandler = () => controller.abort()
+        abortController.signal.addEventListener('abort', abortHandler)
+
         const response = await fetch(endpoint, {
           method: 'POST',
           headers: {
@@ -285,7 +343,10 @@ export default function SafetyChatbot() {
             lang: chatLang,
             module: activeModule
           }),
-          signal: abortController.signal
+          signal: controller.signal
+        }).finally(() => {
+          clearTimeout(timeoutId)
+          abortController.signal.removeEventListener('abort', abortHandler)
         })
 
         // Check for rate limit
@@ -306,15 +367,13 @@ export default function SafetyChatbot() {
         }
 
         if (!response.ok) {
-          console.warn(`[SafetyChatbot] Endpoint ${endpoint} returned ${response.status}`)
           continue
         }
 
         const contentType = response.headers.get('content-type') || ''
 
-        // 1. Streaming SSE response
+        // Streaming SSE response
         if (contentType.includes('text/event-stream') && response.body) {
-          // Add placeholder bot message
           setMessages(prev => [
             ...prev,
             {
@@ -362,17 +421,18 @@ export default function SafetyChatbot() {
             }
           }
 
-          // Mark streaming complete
-          setMessages(prev =>
-            prev.map(m =>
-              m.id === botMsgId ? { ...m, streaming: false } : m
+          if (accumulatedText.trim().length > 0) {
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === botMsgId ? { ...m, streaming: false } : m
+              )
             )
-          )
-          streamedSuccess = true
-          break
+            streamedSuccess = true
+            break
+          }
         }
 
-        // 2. Non-streaming JSON response
+        // Non-streaming JSON response
         if (contentType.includes('application/json')) {
           const json = await response.json()
           const replyText = json.reply || json.answer
@@ -392,66 +452,17 @@ export default function SafetyChatbot() {
           }
         }
       } catch (err) {
-        if (err.name === 'AbortError') return
-        console.warn(`[SafetyChatbot] Failed with endpoint ${endpoint}:`, err)
+        if (err.name === 'AbortError' && abortController.signal.aborted) return
       }
     }
 
-    // 3. Direct Gemini Streaming (client-side AI for static hosting like GitHub Pages)
-    if (!streamedSuccess && !abortController.signal.aborted) {
-      try {
-        console.info('[SafetyChatbot] Activating client-side Gemini AI streaming...')
-        let accumulated = ''
-        
-        // Add placeholder message for streaming
-        setMessages(prev => [
-          ...prev,
-          {
-            id: botMsgId,
-            role: 'assistant',
-            content: '',
-            streaming: true,
-            source: 'Suraksha Mitra AI (Gemini)'
-          }
-        ])
-
-        await streamClientGeminiResponse({
-          messages: contextualMessages,
-          query,
-          lang: chatLang,
-          signal: abortController.signal,
-          onChunk: (chunk, total) => {
-            accumulated = total
-            setMessages(prev =>
-              prev.map(m =>
-                m.id === botMsgId ? { ...m, content: total } : m
-              )
-            )
-            scrollBottom()
-          }
-        })
-
-        if (accumulated.trim().length > 0) {
-          setMessages(prev =>
-            prev.map(m =>
-              m.id === botMsgId ? { ...m, streaming: false } : m
-            )
-          )
-          streamedSuccess = true
-        }
-      } catch (geminiErr) {
-        if (geminiErr.name === 'AbortError') return
-        console.warn('[SafetyChatbot] Client Gemini stream failed, falling back:', geminiErr)
-      }
-    }
-
-    // 4. Graceful Fallback if both backend proxy and live Gemini were unavailable (e.g. offline)
+    // 4. Graceful Fallback if backend was unreachable (e.g. GitHub Pages static hosting or offline)
     if (!streamedSuccess && !abortController.signal.aborted) {
       console.info('[SafetyChatbot] Using local safety knowledge fallback.')
       const localResult = await querySafetyAssistant(query, chatLang, activeModule, contextualMessages)
       const text = typeof localResult === 'string'
         ? localResult
-        : (localResult?.answer || localResult?.reply || "I'm your Suraksha Mitra safety assistant. Please consult your site safety officer.")
+        : (localResult?.answer || localResult?.reply || "I am your Suraksha Mitra safety assistant. Please consult your site safety officer.")
       const source = typeof localResult === 'object' && localResult?.source
         ? localResult.source
         : 'Suraksha Mitra Safety Knowledge'
@@ -726,13 +737,17 @@ export default function SafetyChatbot() {
                   </p>
                   <span style={{
                     fontSize: '0.62rem',
-                    background: 'rgba(255,255,255,0.25)',
+                    background: !isOnline ? 'rgba(239, 68, 68, 0.45)' : 'rgba(255,255,255,0.25)',
                     color: 'white',
-                    padding: '1px 6px',
+                    padding: '2px 7px',
                     borderRadius: '10px',
                     fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    boxShadow: !isOnline ? '0 1px 3px rgba(0,0,0,0.2)' : 'none'
                   }}>
-                    AI
+                    {!isOnline ? '⚡ Offline' : 'AI Copilot'}
                   </span>
                 </div>
                 <p style={{

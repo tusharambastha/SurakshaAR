@@ -21,7 +21,75 @@
  * 6. Optional External AI / Gemini Integration with graceful local fallback
  */
 
-import { generateClientGeminiResponse } from './geminiClient.js'
+import safetyFaq from '../data/safetyFaq.js'
+
+/**
+ * Fast verified FAQ matching across English, Hindi, and Santali (Ol Chiki)
+ */
+export function findFaqMatch(query, lang = 'en') {
+  if (!query || typeof query !== 'string') return null
+  const qClean = query.trim().toLowerCase()
+  if (!qClean) return null
+
+  // 1. Direct keyword match (prioritize longer/more specific keywords)
+  let bestMatch = null
+  let bestScore = 0
+
+  for (const item of safetyFaq) {
+    if (item.keywords && Array.isArray(item.keywords)) {
+      for (const kw of item.keywords) {
+        if (!kw) continue
+        const kwLower = kw.toLowerCase()
+        if (qClean.includes(kwLower)) {
+          const score = kwLower.length
+          if (score > bestScore) {
+            bestScore = score
+            const lData = item[lang] || item.en
+            bestMatch = {
+              answer: lData.answer,
+              question: lData.question,
+              source: 'Suraksha Mitra Safety Knowledge (Verified)',
+              confidence: 0.98,
+              isFaq: true,
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (bestMatch) return bestMatch
+
+  // 2. Ol Chiki script matching (\u1C50-\u1C7F)
+  const isOlChiki = /[\u1c50-\u1c7f]/.test(query)
+  if (isOlChiki) {
+    for (const item of safetyFaq) {
+      if (item.sat) {
+        const words = query.split(/\s+/).filter(w => w.length > 2)
+        for (const w of words) {
+          if (item.sat.question.includes(w) || (item.keywords && item.keywords.some(k => k.includes(w)))) {
+            return {
+              answer: item.sat.answer,
+              question: item.sat.question,
+              source: 'ᱥᱩᱨᱠᱷᱟ ᱢᱤᱛᱨᱚ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱵᱟᱰᱟᱭ',
+              confidence: 0.95,
+              isFaq: true,
+            }
+          }
+        }
+      }
+    }
+    // Default Santali verified safety response
+    return {
+      answer: "👷 ᱡᱚᱦᱟᱨ! ᱤᱧ ᱫᱚ ᱥᱩᱨᱠᱷᱟ ᱢᱤᱛᱨᱚ ᱠᱟᱹᱱᱟᱹᱧ᱾ ᱠᱷᱟᱫᱟᱱ ᱟᱨ ᱠᱟᱹᱨᱜᱟᱲ ᱨᱮ ᱠᱟᱹᱢᱤ ᱡᱚᱠᱷᱚᱱ ᱡᱟᱣᱜᱮ PPE ᱥᱟᱢᱟᱱ (ᱦᱮᱞᱢᱮᱴ, ᱪᱚᱥᱢᱟ, ᱡᱩᱛᱟᱹ) ᱦᱚᱨᱚᱜ ᱢᱮ, ᱥᱮᱸᱜᱮᱞ ᱡᱩᱞ ᱞᱮᱱᱠᱷᱟᱱ CO₂ ᱤᱬᱤᱡᱤᱡ ᱵᱮᱵᱷᱟᱨ ᱢᱮ ᱟᱨ ᱜᱮᱥ ᱞᱤᱠ ᱡᱚᱠᱷᱚᱱ ᱢᱟᱥᱴᱟᱨ ᱯᱚᱭᱮᱱᱴ ᱛᱮ ᱧᱤᱨ ᱢᱮ᱾",
+      source: 'ᱥᱩᱨᱠᱷᱟ ᱢᱤᱛᱨᱚ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱵᱟᱰᱟᱭ',
+      confidence: 0.90,
+      isFaq: true,
+    }
+  }
+
+  return null
+}
 
 export const MODULES = {
   FIRE_EXPLOSION: 'FIRE_EXPLOSION',
@@ -717,18 +785,23 @@ export async function querySafetyAssistant(input, lang = 'en', currentModule = M
   const critical = checkCriticalHazardGuardrails(input, lang);
   if (critical) return critical;
 
-  // Try calling the secure server-side chat endpoint (Cloudflare Worker or Vite proxy)
+  // Check verified tri-lingual FAQ knowledge base first (instant, accurate in EN, HI, SAT)
+  const faqMatch = findFaqMatch(input, lang);
+  if (faqMatch) return faqMatch;
+
+  // Try calling the secure server-side chat endpoint (Groq backend or proxy)
   if (typeof window !== 'undefined') {
     const customEndpoint = import.meta.env.VITE_CHAT_API_URL
     const endpoints = [
       ...(customEndpoint ? [customEndpoint] : []),
-      '/SurakshaAR/api/chat',
       '/api/chat',
+      '/SurakshaAR/api/chat',
       '/.netlify/functions/chat'
     ]
     for (const endpoint of endpoints) {
       try {
-        console.log(`[SurakshaMitra] Sending query to backend endpoint (${endpoint}):`, input)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3500)
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -747,16 +820,14 @@ export async function querySafetyAssistant(input, lang = 'en', currentModule = M
             lang,
             module: currentModule,
             sessionId: (typeof localStorage !== 'undefined' && localStorage.getItem('suraksha_mitra_session_id')) || 'default-session',
-          })
+          }),
+          signal: controller.signal
         })
+        clearTimeout(timeoutId)
         if (res.ok) {
           const data = await res.json()
           const text = data?.reply || data?.answer
           if (text) {
-            console.log('[SurakshaMitra] Successfully received response from backend:', {
-              source: data.source || data.provider,
-              answerPreview: text.slice(0, 60) + '...'
-            })
             return {
               answer: text,
               reply: text,
@@ -768,34 +839,13 @@ export async function querySafetyAssistant(input, lang = 'en', currentModule = M
             }
           }
         }
-      } catch (err) {
-        console.warn(`[SurakshaMitra] Endpoint ${endpoint} connection issue:`, err)
+      } catch (_) {
+        // Continue to next endpoint or fallback
       }
     }
   }
 
-  // Try client-side Gemini call if running on static host (e.g. GitHub Pages)
-  try {
-    const geminiRes = await generateClientGeminiResponse({
-      query: input,
-      lang,
-      messages: Array.isArray(history)
-        ? history.map(m => ({
-            role: m.role === 'assistant' || m.role === 'bot' ? 'assistant' : 'user',
-            content: m.text || m.content || ''
-          }))
-        : []
-    })
-    if (geminiRes?.answer) {
-      console.log('[SurakshaMitra] Successfully generated response from client Gemini AI')
-      return geminiRes
-    }
-  } catch (err) {
-    console.warn('[SurakshaSaathi] Client Gemini fallback error:', err)
-  }
-
   // Graceful local knowledge base fallback (100% offline resilient)
-  console.warn('[SurakshaSaathi] Backend endpoints and Gemini unavailable, using local safety knowledge fallback.');
   return queryKnowledgeBase(input, lang, currentModule, history);
 }
 
