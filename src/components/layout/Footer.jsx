@@ -1,8 +1,73 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { Shield, Mail, Instagram, ExternalLink, ArrowUpRight } from 'lucide-react'
+import { useLang } from '../../contexts/LanguageContext'
+import { Shield, Mail, Instagram, ArrowUpRight, Globe } from 'lucide-react'
 
 export function Footer() {
+  const { lang, setLang, SUPPORTED_LANGUAGES } = useLang()
+
+  const footerTexts = {
+    en: {
+      tagline: 'Immersive, interactive, and practical Augmented Reality safety training for high-risk industrial environments.',
+      sihBadge: 'Smart India Hackathon 2026 · SIH26041',
+      platform: 'Platform',
+      connect: 'Connect',
+      language: 'Language',
+      about: 'Know About SurakshaAR',
+      contact: 'Contact Us',
+      privacy: 'Privacy Policy',
+      terms: 'Terms & Conditions',
+      copyright: 'Copyright Policy',
+      safetyTips: 'Safety Tips',
+      instagram: 'Instagram: @surakshaaar',
+      rights: '© 2026 SurakshaAR. All Rights Reserved.',
+      privacyShort: 'Privacy',
+      termsShort: 'Terms',
+      copyrightShort: 'Copyright',
+      contactShort: 'Contact',
+    },
+    hi: {
+      tagline: 'उच्च जोखिम वाले औद्योगिक वातावरण के लिए गहन, संवादात्मक और व्यावहारिक ऑगमेंटेड रियलिटी सुरक्षा प्रशिक्षण।',
+      sihBadge: 'स्मार्ट इंडिया हैकाथॉन 2026 · SIH26041',
+      platform: 'प्लेटफ़ॉर्म',
+      connect: 'संपर्क सूत्र',
+      language: 'भाषा',
+      about: 'SurakshaAR के बारे में जानें',
+      contact: 'संपर्क करें',
+      privacy: 'गोपनीयता नीति',
+      terms: 'नियम एवं शर्तें',
+      copyright: 'कॉपीराइट नीति',
+      safetyTips: 'सुरक्षा टिप्स',
+      instagram: 'इंस्टाग्राम: @surakshaaar',
+      rights: '© 2026 SurakshaAR. सर्वाधिकार सुरक्षित।',
+      privacyShort: 'गोपनीयता',
+      termsShort: 'शर्तें',
+      copyrightShort: 'कॉपीराइट',
+      contactShort: 'संपर्क',
+    },
+    sat: {
+      tagline: 'ᱟᱹᱰᱤ ᱵᱚᱛᱚᱨᱟᱱ ᱠᱟᱹᱨᱜᱟᱲ ᱴᱷᱟᱶ ᱞᱟᱹᱜᱤᱫ ᱜᱟᱹᱦᱤᱨ ᱟᱨ ᱠᱟᱹᱢᱤᱭᱟᱱ ᱚᱜᱽᱢᱮᱱᱴᱮᱰ ᱨᱤᱭᱟᱞᱤᱴᱤ (AR) ᱥᱩᱨᱠᱷᱟ ᱥᱤᱠᱷᱟᱣ᱾',
+      sihBadge: 'ᱥᱢᱟᱨᱴ ᱤᱱᱰᱤᱭᱟ ᱦᱮᱠᱟᱛᱷᱚᱱ ᱒᱐᱒᱖ · SIH26041',
+      platform: 'ᱯᱞᱮᱴᱯᱷᱳᱨᱢ',
+      connect: 'ᱡᱚᱯᱲᱟᱣ',
+      language: 'ᱯᱟᱹᱨᱥᱤ',
+      about: 'SurakshaAR ᱵᱟᱵᱚᱛ ᱵᱟᱰᱟᱭ ᱢᱮ',
+      contact: 'ᱡᱚᱯᱲᱟᱣ ᱢᱮ',
+      privacy: 'ᱫᱟᱱᱟᱝ ᱱᱤᱭᱟᱹᱢ (Privacy)',
+      terms: 'ᱱᱤᱭᱟᱹᱢ ᱟᱨ ᱥᱚᱨᱛ (Terms)',
+      copyright: 'ᱠᱚᱯᱤᱨᱟᱭᱤᱴ ᱱᱤᱭᱟᱹᱢ',
+      safetyTips: 'ᱥᱩᱨᱠᱷᱟ ᱴᱤᱯᱥ',
+      instagram: 'ᱤᱱᱥᱴᱟᱜᱨᱟᱢ: @surakshaaar',
+      rights: '© ᱒᱐᱒᱖ SurakshaAR. ᱡᱚᱛᱚ ᱟᱹᱭᱫᱟᱹᱨᱤ ᱫᱚᱦᱚ ᱮᱱᱟ᱾',
+      privacyShort: 'ᱫᱟᱱᱟᱝ',
+      termsShort: 'ᱥᱚᱨᱛ',
+      copyrightShort: 'ᱠᱚᱯᱤᱨᱟᱭᱤᱴ',
+      contactShort: 'ᱡᱚᱯᱲᱟᱣ',
+    },
+  }
+
+  const t = footerTexts[lang] ?? footerTexts.en
+
   return (
     <footer
       style={{
@@ -55,7 +120,7 @@ export function Footer() {
                 margin: 0,
               }}
             >
-              Immersive, interactive, and practical Augmented Reality safety training for high-risk industrial environments.
+              {t.tagline}
             </p>
             <div
               style={{
@@ -73,7 +138,7 @@ export function Footer() {
               }}
             >
               <Shield size={12} color="var(--color-brand)" />
-              <span>Smart India Hackathon 2026 · SIH26041</span>
+              <span>{t.sihBadge}</span>
             </div>
           </div>
 
@@ -89,7 +154,7 @@ export function Footer() {
                 marginBottom: 14,
               }}
             >
-              Platform
+              {t.platform}
             </h4>
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <li>
@@ -104,7 +169,22 @@ export function Footer() {
                   onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-brand)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
                 >
-                  Know About SurakshaAR
+                  {t.about}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/safety-tips"
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    textDecoration: 'none',
+                    fontSize: '0.88rem',
+                    transition: 'color var(--transition-fast)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-brand)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
+                >
+                  {t.safetyTips}
                 </Link>
               </li>
               <li>
@@ -119,7 +199,7 @@ export function Footer() {
                   onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-brand)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
                 >
-                  Contact Us
+                  {t.contact}
                 </Link>
               </li>
               <li>
@@ -134,7 +214,7 @@ export function Footer() {
                   onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-brand)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
                 >
-                  Privacy Policy
+                  {t.privacy}
                 </Link>
               </li>
               <li>
@@ -149,7 +229,7 @@ export function Footer() {
                   onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-brand)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
                 >
-                  Terms &amp; Conditions
+                  {t.terms}
                 </Link>
               </li>
               <li>
@@ -164,13 +244,13 @@ export function Footer() {
                   onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-brand)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
                 >
-                  Copyright Policy
+                  {t.copyright}
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Connect & Social Links */}
+          {/* Connect & Language Selector */}
           <div style={{ minWidth: 200, flex: '1 1 200px' }}>
             <h4
               style={{
@@ -182,9 +262,9 @@ export function Footer() {
                 marginBottom: 14,
               }}
             >
-              Connect
+              {t.connect}
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
               {/* Instagram link */}
               <a
                 href="https://www.instagram.com/surakshaaar/"
@@ -203,7 +283,7 @@ export function Footer() {
                 onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
               >
                 <Instagram size={16} color="var(--color-brand)" />
-                <span>Instagram: @surakshaaar</span>
+                <span>{t.instagram}</span>
                 <ArrowUpRight size={13} style={{ opacity: 0.6 }} />
               </a>
 
@@ -226,6 +306,45 @@ export function Footer() {
                 <span>surakshaar.in@gmail.com</span>
               </a>
             </div>
+
+            {/* Quick Language Switcher */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
+                <Globe size={13} />
+                <span>{t.language}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {SUPPORTED_LANGUAGES.map((l) => {
+                  const isActive = lang === l.code
+                  return (
+                    <button
+                      key={l.code}
+                      type="button"
+                      onClick={() => setLang(l.code)}
+                      style={{
+                        padding: '4px 8px',
+                        background: isActive ? 'var(--color-brand)' : 'var(--color-surface-alt)',
+                        color: isActive ? '#FFFFFF' : 'var(--color-text-secondary)',
+                        border: '1px solid',
+                        borderColor: isActive ? 'var(--color-brand)' : 'var(--color-border)',
+                        borderRadius: 'var(--radius-sm, 6px)',
+                        fontSize: '0.74rem',
+                        fontWeight: isActive ? 700 : 500,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <span>{l.flag}</span>
+                      <span>{l.nativeLabel}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -250,24 +369,28 @@ export function Footer() {
               onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-brand)' }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)' }}
             >
-              © 2026 SurakshaAR. All Rights Reserved.
+              {t.rights}
             </Link>
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
             <Link to="/privacy" style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}>
-              Privacy
+              {t.privacyShort}
             </Link>
             <span>·</span>
             <Link to="/terms" style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}>
-              Terms
+              {t.termsShort}
             </Link>
             <span>·</span>
             <Link to="/copyright" style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}>
-              Copyright
+              {t.copyrightShort}
+            </Link>
+            <span>·</span>
+            <Link to="/safety-tips" style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}>
+              {t.safetyTips}
             </Link>
             <span>·</span>
             <Link to="/contact" style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}>
-              Contact
+              {t.contactShort}
             </Link>
           </div>
         </div>

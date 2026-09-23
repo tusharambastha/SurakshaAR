@@ -30,6 +30,7 @@ import Terms       from './pages/Terms'
 import Privacy     from './pages/Privacy'
 import Contact     from './pages/Contact'
 import Copyright   from './pages/Copyright'
+import SafetyTips  from './pages/SafetyTips'
 import CookieConsentBanner from './components/ui/CookieConsentBanner'
 import Admin       from './pages/admin/Admin'
 import AdminTrainees from './pages/admin/AdminTrainees'
@@ -130,6 +131,7 @@ export default function App() {
                     <Route path="/privacy"            element={<Privacy />} />
                     <Route path="/contact"            element={<Contact />} />
                     <Route path="/copyright"          element={<Copyright />} />
+                    <Route path="/safety-tips"        element={<SafetyTips />} />
 
                     {/* ── Trainee (protected) ── */}
                     <Route path="/dashboard"             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
