@@ -152,6 +152,21 @@ export function Footer() {
                   Terms &amp; Conditions
                 </Link>
               </li>
+              <li>
+                <Link
+                  to="/copyright"
+                  style={{
+                    color: 'var(--color-text-secondary)',
+                    textDecoration: 'none',
+                    fontSize: '0.88rem',
+                    transition: 'color var(--transition-fast)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-brand)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
+                >
+                  Copyright Policy
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -229,7 +244,14 @@ export function Footer() {
           }}
         >
           <div>
-            © 2026 SurakshaAR. All Rights Reserved.
+            <Link
+              to="/copyright"
+              style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-brand)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-muted)' }}
+            >
+              © 2026 SurakshaAR. All Rights Reserved.
+            </Link>
           </div>
           <div style={{ display: 'flex', gap: 16 }}>
             <Link to="/privacy" style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}>
@@ -238,6 +260,10 @@ export function Footer() {
             <span>·</span>
             <Link to="/terms" style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}>
               Terms
+            </Link>
+            <span>·</span>
+            <Link to="/copyright" style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}>
+              Copyright
             </Link>
             <span>·</span>
             <Link to="/contact" style={{ color: 'var(--color-text-muted)', textDecoration: 'none' }}>
