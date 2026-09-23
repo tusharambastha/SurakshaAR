@@ -77,8 +77,10 @@ export const t = {
     createAccount: 'Create Account',
     signIn: 'Sign In',
     alreadyHaveAccount: 'Already have an account?',
-    dontHaveAccount: "Don't have an account?",
     orLoginWith: 'or sign in with',
+    continueWithGoogle: 'Continue with Google / Gmail',
+    signInWithGoogle: 'Sign in with Google / Gmail',
+    orRegisterWith: 'or register with email & password',
 
     // Dashboard
     goodMorning: 'Good morning',
@@ -268,8 +270,10 @@ export const t = {
     createAccount: 'खाता बनाएं',
     signIn: 'साइन इन',
     alreadyHaveAccount: 'पहले से खाता है?',
-    dontHaveAccount: 'खाता नहीं है?',
     orLoginWith: 'या लॉग इन करें',
+    continueWithGoogle: 'Google / Gmail से जारी रखें',
+    signInWithGoogle: 'Google / Gmail से साइन इन करें',
+    orRegisterWith: 'या ईमेल और पासवर्ड से रजिस्टर करें',
 
     // Dashboard
     goodMorning: 'सुप्रभात',
@@ -459,8 +463,10 @@ export const t = {
     createAccount: 'ᱮᱠᱟᱣᱩᱱᱴ ᱵᱮᱱᱟᱣ ᱢᱮ',
     signIn: 'ᱥᱟᱭᱤᱱ ᱤᱱ',
     alreadyHaveAccount: 'ᱯᱟᱹᱦᱤᱞ ᱠᱷᱚᱱ ᱮᱠᱟᱣᱩᱱᱴ ᱢᱮᱱᱟᱜᱼᱟ?',
-    dontHaveAccount: 'ᱮᱠᱟᱣᱩᱱᱴ ᱵᱟᱹᱱᱩᱜᱼᱟ?',
     orLoginWith: 'ᱥᱮ ᱱᱚᱶᱟ ᱛᱮ ᱞᱚᱜᱽ ᱤᱱ ᱢᱮ',
+    continueWithGoogle: 'Google / Gmail ᱛᱮ ᱞᱟᱦᱟᱭ ᱢᱮ',
+    signInWithGoogle: 'Google / Gmail ᱛᱮ ᱥᱟᱭᱤᱱ ᱤᱱ ᱢᱮ',
+    orRegisterWith: 'ᱥᱮ ᱤᱢᱮᱞ ᱟᱨ ᱯᱟᱥᱣᱟᱨᱰ ᱛᱮ ᱨᱮᱡᱤᱥᱴᱟᱨ ᱢᱮ',
 
     // Dashboard
     goodMorning: 'ᱥᱟᱹᱜᱩᱱ ᱥᱮᱛᱟᱜ',

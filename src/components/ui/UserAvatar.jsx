@@ -1,20 +1,29 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 
 export function getUserAvatarUrl(user, profile) {
   if (profile?.avatar_url) return profile.avatar_url
   if (user?.user_metadata?.avatar_url) return user.user_metadata.avatar_url
   if (user?.user_metadata?.picture) return user.user_metadata.picture
   const email = (user?.email || profile?.email || '').trim().toLowerCase()
-  if (email) {
-    // unavatar.io pulls profile picture associated with Gmail/Google account or Gravatar
-    return `https://unavatar.io/${encodeURIComponent(email)}`
+  if (email && email.includes('@')) {
+    // If user registered with Gmail, automatically pull their Google account profile photo
+    if (email.endsWith('@gmail.com') || email.endsWith('@googlemail.com')) {
+      return `https://unavatar.io/google/${encodeURIComponent(email)}?fallback=false`
+    }
+    return `https://unavatar.io/${encodeURIComponent(email)}?fallback=false`
   }
   return null
 }
 
 export function UserAvatar({ user, profile, size = 38, style = {}, className = '' }) {
-  const [imgError, setImgError] = useState(false)
   const avatarUrl = getUserAvatarUrl(user, profile)
+  const [imgError, setImgError] = useState(false)
+
+  // Reset error state whenever the avatar URL or user changes
+  useEffect(() => {
+    setImgError(false)
+  }, [avatarUrl])
+
   const name = profile?.full_name || user?.email || 'Trainee'
   const initial = name.trim()[0]?.toUpperCase() || 'T'
 

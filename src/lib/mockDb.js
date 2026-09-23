@@ -912,30 +912,36 @@ const DEMO_QUESTIONS = [
 const SESSION_KEY = 'mock_session'
 const PROFILES_KEY = 'mock_profiles'
 
-export async function mockSignUp({ email, password, fullName, employeeId, department, language }) {
+export async function mockSignUp({ email, password, fullName, employeeId, department, language, avatarUrl }) {
   await delay(400)
   const profiles = load(PROFILES_KEY, {})
-  if (Object.values(profiles).find(p => p.email === email)) {
+  const cleanEmail = (email || '').trim().toLowerCase()
+  if (Object.values(profiles).find(p => (p.email || '').toLowerCase() === cleanEmail)) {
     return { data: null, error: { message: 'Email already registered.' } }
   }
   const userId = uuid()
+  const isGmail = cleanEmail.endsWith('@gmail.com') || cleanEmail.endsWith('@googlemail.com')
+  const defaultGmailAvatar = isGmail
+    ? `https://unavatar.io/google/${encodeURIComponent(cleanEmail)}?fallback=false`
+    : `https://unavatar.io/${encodeURIComponent(cleanEmail)}?fallback=false`
+
   const profile = {
     id: userId,
-    email,
+    email: cleanEmail,
     full_name: fullName || '',
     employee_id: employeeId || '',
     department: department || '',
     preferred_language: language || 'en',
     role: 'trainee',
-    avatar_url: null,
+    avatar_url: avatarUrl || defaultGmailAvatar,
     created_at: new Date().toISOString(),
     _password: password,
   }
   profiles[userId] = profile
   save(PROFILES_KEY, profiles)
-  const session = { userId, email, role: 'trainee' }
+  const session = { userId, email: cleanEmail, role: 'trainee' }
   save(SESSION_KEY, session)
-  return { data: { user: { id: userId, email }, session }, error: null }
+  return { data: { user: { id: userId, email: cleanEmail }, session }, error: null }
 }
 
 export async function mockSignIn({ email, password }) {
@@ -996,6 +1002,10 @@ export async function mockSignIn({ email, password }) {
       const newId = uuid()
       const namePart = cleanEmail.split('@')[0].replace(/[._]/g, ' ')
       const capName = namePart.charAt(0).toUpperCase() + namePart.slice(1)
+      const isGmail = cleanEmail.endsWith('@gmail.com') || cleanEmail.endsWith('@googlemail.com')
+      const defaultGmailAvatar = isGmail
+        ? `https://unavatar.io/google/${encodeURIComponent(cleanEmail)}?fallback=false`
+        : `https://unavatar.io/${encodeURIComponent(cleanEmail)}?fallback=false`
       const newProfile = {
         id: newId,
         email: cleanEmail,
@@ -1004,6 +1014,7 @@ export async function mockSignIn({ email, password }) {
         department: 'Industrial Safety',
         role: 'trainee',
         preferred_language: 'en',
+        avatar_url: defaultGmailAvatar,
         created_at: new Date().toISOString(),
         _password: password,
       }
