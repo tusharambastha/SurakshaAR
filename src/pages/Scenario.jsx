@@ -1454,7 +1454,18 @@ export default function Scenario() {
   const [placedSteps, setPlacedSteps]     = useState({})
   const placedStepsRef                    = useRef({})
   placedStepsRef.current                  = placedSteps
-  const [xrTrackingType, setXrTrackingType] = useState('orientation') // 'webxr' | 'orientation'
+  const [xrTrackingType, setXrTrackingType] = useState('orientation') // 'webxr' | 'orientation' | 'webxr_supported_gyro'
+  const [webXrSupported, setWebXrSupported] = useState(false)
+  const [sensorDebug, setSensorDebug]     = useState({
+    activeMethod: 'Detecting sensors...',
+    eventCount: 0,
+    alpha: 0,
+    beta: 90,
+    gamma: 0,
+    camFwd: { x: 0, y: 0, z: -1 },
+    placedCoords: null,
+    isWebXrSupported: false,
+  })
 
   // ── Step Countdown Timer & Consequence System ─────────────────────────────
   const getStepDuration = (idx) => (idx <= 1 ? 20 : 15)
@@ -1489,7 +1500,11 @@ export default function Scenario() {
     fireVisual: null,
     clock: new THREE.Clock(),
     deviceRot: { alpha: 0, beta: 90, gamma: 0 },
+    sensorQuaternion: null,
     hasRealOrientation: false,
+    sensorEventCount: 0,
+    activeMethod: 'Initializing...',
+    lastDebugUpdate: 0,
     dragYaw: 0,
     dragPitch: 0,
     initTimestamp: 0,
@@ -1499,25 +1514,57 @@ export default function Scenario() {
     placedRotations: {},
   })
 
-  // Auto-detect WebXR Hit-Test capability
+  // Sensor Permission Handler for Android & iOS
+  const requestSensorPermissions = useCallback(async () => {
+    // 1. Android Chrome: Check Generic Sensor API & Permissions API for accelerometer / gyroscope
+    if (typeof navigator !== 'undefined' && navigator.permissions?.query) {
+      try {
+        const accel = await navigator.permissions.query({ name: 'accelerometer' }).catch(() => null)
+        const gyro = await navigator.permissions.query({ name: 'gyroscope' }).catch(() => null)
+        if (accel || gyro) {
+          console.log('[SurakshaAR] Sensor permissions state:', { accel: accel?.state, gyro: gyro?.state })
+        }
+      } catch {
+        // Permissions query not supported or not required for sensors on this platform
+      }
+    }
+
+    // 2. iOS Safari: Explicit requestPermission prompt
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const res = await DeviceOrientationEvent.requestPermission()
+        console.log('[SurakshaAR] iOS DeviceOrientation permission granted:', res)
+      } catch (err) {
+        console.warn('[SurakshaAR] iOS DeviceOrientation permission error:', err)
+      }
+    }
+  }, [])
+
+  // Auto-detect WebXR Hit-Test capability & provide explicit fallback logging
   useEffect(() => {
     if (typeof navigator !== 'undefined' && 'xr' in navigator && navigator.xr?.isSessionSupported) {
       navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-        setXrTrackingType(supported ? 'webxr' : 'orientation')
-      }).catch(() => {
+        console.log(`[SurakshaAR] WebXR 'immersive-ar' support query: ${supported}. Running WebRTC Camera AR with high-precision Gyro/Sensor tracking fallback.`)
+        setWebXrSupported(supported)
+        setXrTrackingType(supported ? 'webxr_supported_gyro' : 'orientation')
+        setSensorDebug(prev => ({ ...prev, isWebXrSupported: supported }))
+      }).catch((err) => {
+        console.log('[SurakshaAR] WebXR query error:', err)
+        setWebXrSupported(false)
         setXrTrackingType('orientation')
+        setSensorDebug(prev => ({ ...prev, isWebXrSupported: false }))
       })
     } else {
+      console.log('[SurakshaAR] WebXR not available on this browser/platform. Graceful fallback: Sensor/Gyro World-Locked AR.')
+      setWebXrSupported(false)
       setXrTrackingType('orientation')
+      setSensorDebug(prev => ({ ...prev, isWebXrSupported: false }))
     }
   }, [])
 
   // ── Tap-to-Place AR Placement Mechanics ────────────────────────────────────
   const handlePlaceCurrentStep = useCallback(() => {
-    // Request gyro permission on user gesture (iOS Safari requirement)
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      DeviceOrientationEvent.requestPermission().catch(() => {})
-    }
+    requestSensorPermissions()
 
     const t = threeRef.current
     const activeIdx = currentStepRef.current
@@ -1542,6 +1589,17 @@ export default function Scenario() {
       activeNode.group.position.copy(placedPos)
       activeNode.group.lookAt(camera.position.x, placedPos.y, camera.position.z)
       t.placedRotations[activeIdx] = activeNode.group.quaternion.clone()
+
+      // 4. Update live debug state with placed coordinates
+      setSensorDebug(prev => ({
+        ...prev,
+        placedCoords: {
+          x: placedPos.x.toFixed(2),
+          y: placedPos.y.toFixed(2),
+          z: placedPos.z.toFixed(2),
+        },
+      }))
+      console.log(`[SurakshaAR] Tap-to-Place Step ${activeIdx}: placed at [${placedPos.x.toFixed(2)}, ${placedPos.y.toFixed(2)}, ${placedPos.z.toFixed(2)}] along live camForward [${camForward.x.toFixed(2)}, ${camForward.y.toFixed(2)}, ${camForward.z.toFixed(2)}]`)
     }
 
     setPlacedSteps(prev => ({ ...prev, [activeIdx]: true }))
@@ -1551,7 +1609,7 @@ export default function Scenario() {
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try { navigator.vibrate(60) } catch {}
     }
-  }, [])
+  }, [requestSensorPermissions])
 
   const handleResetPlacement = useCallback(() => {
     const t = threeRef.current
@@ -2546,15 +2604,58 @@ export default function Scenario() {
     }
     window.addEventListener('resize', onResize)
 
-    // 10. Device Orientation Handler for Camera AR (All mobile & tablet devices)
+    // 10. Device Orientation & Sensor Handlers (Android 10+, Chrome & iOS)
+    const _zee = new THREE.Vector3(0, 0, 1)
+    const _euler = new THREE.Euler()
+    const _q0 = new THREE.Quaternion()
+    const _q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)) // -PI/2 around X axis
+
+    let relativeSensor = null
+    if (typeof window !== 'undefined' && 'RelativeOrientationSensor' in window) {
+      try {
+        relativeSensor = new window.RelativeOrientationSensor({ frequency: 60 })
+        relativeSensor.addEventListener('reading', () => {
+          if (relativeSensor.quaternion) {
+            t.sensorQuaternion = relativeSensor.quaternion
+            t.hasRealOrientation = true
+            t.sensorEventCount = (t.sensorEventCount || 0) + 1
+            t.activeMethod = 'RelativeOrientationSensor (60Hz)'
+          }
+        })
+        relativeSensor.addEventListener('error', (event) => {
+          console.log('[SurakshaAR] RelativeOrientationSensor:', event.error?.name)
+        })
+        relativeSensor.start()
+      } catch (err) {
+        console.log('[SurakshaAR] RelativeOrientationSensor init:', err?.message)
+      }
+    }
+
     function onDeviceRot(e) {
-      if (e.alpha !== null && e.beta !== null) {
+      // Don't overwrite if RelativeOrientationSensor is providing 60Hz precision
+      if (t.activeMethod?.includes('RelativeOrientationSensor') && t.sensorQuaternion) {
+        return
+      }
+
+      // Android / iOS device orientation handler
+      // CRITICAL FIX: Do NOT check e.alpha !== null && e.beta !== null!
+      // On many Android devices, alpha is null if compass is uncalibrated,
+      // but beta & gamma are valid accelerometer readings.
+      const hasAlpha = e.alpha !== null && e.alpha !== undefined
+      const hasBeta = e.beta !== null && e.beta !== undefined
+      const hasGamma = e.gamma !== null && e.gamma !== undefined
+
+      if (hasAlpha || hasBeta || hasGamma) {
         t.deviceRot = {
-          alpha: e.alpha,
-          beta: e.beta,
-          gamma: e.gamma ?? 0,
+          alpha: hasAlpha ? e.alpha : (t.deviceRot?.alpha ?? 0),
+          beta: hasBeta ? e.beta : (t.deviceRot?.beta ?? 90),
+          gamma: hasGamma ? e.gamma : (t.deviceRot?.gamma ?? 0),
         }
         t.hasRealOrientation = true
+        t.sensorEventCount = (t.sensorEventCount || 0) + 1
+        t.activeMethod = e.type === 'deviceorientationabsolute'
+          ? 'DeviceOrientationAbsolute (Sensors Active)'
+          : 'DeviceOrientation (Sensors Active)'
       }
     }
     window.addEventListener('deviceorientation', onDeviceRot, { passive: true })
@@ -2636,18 +2737,49 @@ export default function Scenario() {
         camera.position.set(0, 1.4, 0)
 
         if (t.hasRealOrientation) {
-          const { alpha, beta, gamma } = t.deviceRot
-          const euler = new THREE.Euler(
-            THREE.MathUtils.degToRad(beta - 90) + t.dragPitch,
-            THREE.MathUtils.degToRad(alpha) + t.dragYaw,
-            THREE.MathUtils.degToRad(-gamma),
-            'YXZ'
-          )
-          camera.quaternion.setFromEuler(euler)
+          if (t.sensorQuaternion) {
+            camera.quaternion.set(
+              t.sensorQuaternion[0],
+              t.sensorQuaternion[1],
+              t.sensorQuaternion[2],
+              t.sensorQuaternion[3]
+            )
+            camera.quaternion.multiply(_q1)
+            const screenAngle = (window.screen?.orientation?.angle || window.orientation || 0)
+            camera.quaternion.multiply(_q0.setFromAxisAngle(_zee, -THREE.MathUtils.degToRad(screenAngle)))
+          } else {
+            const { alpha, beta, gamma } = t.deviceRot
+            const screenAngle = (window.screen?.orientation?.angle || window.orientation || 0)
+            const alphaRad = THREE.MathUtils.degToRad(alpha) + t.dragYaw
+            const betaRad = THREE.MathUtils.degToRad(beta) + t.dragPitch
+            const gammaRad = THREE.MathUtils.degToRad(gamma)
+            const orientRad = THREE.MathUtils.degToRad(screenAngle)
+
+            _euler.set(betaRad, alphaRad, -gammaRad, 'YXZ')
+            camera.quaternion.setFromEuler(_euler)
+            camera.quaternion.multiply(_q1)
+            camera.quaternion.multiply(_q0.setFromAxisAngle(_zee, -orientRad))
+          }
         } else {
           // Dynamic camera orientation from drag aim (desktop webcam / laptop / gyro-less)
-          const euler = new THREE.Euler(t.dragPitch, t.dragYaw, 0, 'YXZ')
-          camera.quaternion.setFromEuler(euler)
+          _euler.set(t.dragPitch, t.dragYaw, 0, 'YXZ')
+          camera.quaternion.setFromEuler(_euler)
+        }
+
+        // Live Sensor Debug HUD throttled state update (~6 updates/sec)
+        const now = performance.now()
+        if (!t.lastDebugUpdate || now - t.lastDebugUpdate > 160) {
+          t.lastDebugUpdate = now
+          const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+          setSensorDebug(prev => ({
+            ...prev,
+            activeMethod: t.activeMethod || (t.hasRealOrientation ? 'Sensors Active' : 'Touch/Mouse Aim Fallback'),
+            eventCount: t.sensorEventCount || 0,
+            alpha: t.deviceRot?.alpha ?? 0,
+            beta: t.deviceRot?.beta ?? 90,
+            gamma: t.deviceRot?.gamma ?? 0,
+            camFwd: { x: camFwd.x, y: camFwd.y, z: camFwd.z },
+          }))
         }
 
         const activeIdx = currentStepRef.current
@@ -2756,6 +2888,9 @@ export default function Scenario() {
       window.removeEventListener('deviceorientation', onDeviceRot)
       if ('ondeviceorientationabsolute' in window) {
         window.removeEventListener('deviceorientationabsolute', onDeviceRot)
+      }
+      if (relativeSensor) {
+        try { relativeSensor.stop() } catch {}
       }
       fireAudioRef.current.stop()
       controls.dispose()
@@ -2907,6 +3042,7 @@ export default function Scenario() {
             onPlaceObject={handlePlaceCurrentStep}
             onResetPlacement={handleResetPlacement}
             xrTrackingType={xrTrackingType}
+            sensorDebug={sensorDebug}
           />
         </>
       )}

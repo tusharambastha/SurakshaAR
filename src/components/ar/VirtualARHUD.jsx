@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   Volume2, CheckCircle2, AlertTriangle, Flame, Wind, Zap, Shield, Target,
   ArrowRight, Monitor, X, Printer, Compass, ChevronLeft, ChevronRight,
-  RotateCcw, MapPin, Bell, DoorOpen, Navigation, Cog, Lock
+  RotateCcw, MapPin, Bell, DoorOpen, Navigation, Cog, Lock, Activity
 } from 'lucide-react'
 import { speak } from '../../lib/voice'
 
@@ -104,8 +104,10 @@ export default function VirtualARHUD({
   onPlaceObject,
   onResetPlacement,
   xrTrackingType = 'orientation',
+  sensorDebug = null,
 }) {
   const [trackerExpanded, setTrackerExpanded] = useState(true)
+  const [showDebugHUD, setShowDebugHUD] = useState(true)
 
   const activeStep = steps[currentStep]
   const objectName = getStepObjectName(currentStep, scenario?.hazard_type, lang)
@@ -263,7 +265,13 @@ export default function VirtualARHUD({
 
             {/* Tap-to-Place / Tracking Mode Status Chip */}
             <div
-              title={xrTrackingType === 'webxr' ? 'WebXR surface hit-testing active' : 'Orientation gyro world-locked tracking active'}
+              title={
+                xrTrackingType === 'webxr'
+                  ? 'WebXR surface hit-testing active'
+                  : xrTrackingType === 'webxr_supported_gyro'
+                  ? 'WebXR supported by browser — running WebRTC Sensor/Gyro tracking'
+                  : 'Orientation gyro world-locked tracking active'
+              }
               style={{
                 background: 'rgba(28, 32, 40, 0.90)',
                 border: '1.5px solid rgba(255, 255, 255, 0.25)',
@@ -278,8 +286,37 @@ export default function VirtualARHUD({
               }}
             >
               <Target size={12} color="#F97316" />
-              <span>{xrTrackingType === 'webxr' ? '⚡ XR Hit-Test' : '📍 Tap-to-Place'}</span>
+              <span>
+                {xrTrackingType === 'webxr'
+                  ? '⚡ XR Hit-Test'
+                  : xrTrackingType === 'webxr_supported_gyro'
+                  ? '📱 Gyro AR (XR)'
+                  : '📱 Gyro AR'}
+              </span>
             </div>
+
+            {/* Sensor Debug HUD Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowDebugHUD(prev => !prev)}
+              title="Toggle Live AR Sensor Debug HUD Readout"
+              style={{
+                background: showDebugHUD ? 'rgba(234, 88, 12, 0.90)' : 'rgba(28, 32, 40, 0.90)',
+                border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                color: '#FFFFFF',
+                borderRadius: '20px',
+                padding: '5px 9px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <Activity size={12} color="#FFFFFF" />
+              <span>{showDebugHUD ? 'HUD: ON' : 'HUD: OFF'}</span>
+            </button>
 
             {onToggleMode && (
               <button
@@ -541,6 +578,96 @@ export default function VirtualARHUD({
           </div>
         )}
       </div>
+
+      {/* ── LIVE SENSOR DEBUG HUD (Android 10+ Sensor Verification) ── */}
+      {sensorDebug && showDebugHUD && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 76,
+            left: 12,
+            zIndex: 35,
+            background: 'rgba(10, 15, 26, 0.94)',
+            border: '1.5px solid rgba(249, 115, 22, 0.70)',
+            borderRadius: '12px',
+            padding: '9px 13px',
+            fontSize: '0.68rem',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            color: '#F3F4F6',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.65)',
+            pointerEvents: 'all',
+            maxWidth: 320,
+            lineHeight: 1.45,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5, borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#F97316', fontWeight: 800 }}>
+              <Activity size={13} color="#F97316" />
+              <span>SENSOR DEBUG HUD</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDebugHUD(false)}
+              style={{
+                background: 'rgba(255,255,255,0.12)',
+                border: 'none',
+                color: '#D1D5DB',
+                borderRadius: '4px',
+                padding: '1px 6px',
+                cursor: 'pointer',
+                fontSize: '0.62rem',
+                fontWeight: 700,
+              }}
+            >
+              ✕ Hide
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div>
+              <span style={{ color: '#9CA3AF' }}>Sensor: </span>
+              <span style={{ color: '#38BDF8', fontWeight: 700 }}>{sensorDebug.activeMethod}</span>
+            </div>
+            <div>
+              <span style={{ color: '#9CA3AF' }}>XR Engine: </span>
+              <span style={{ color: sensorDebug.isWebXrSupported ? '#34D399' : '#FBBF24', fontWeight: 600 }}>
+                {sensorDebug.isWebXrSupported ? 'WebXR Available (Gyro Active)' : 'Sensor World-Locked'}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#9CA3AF' }}>Sensor Events: </span>
+              <span style={{ color: sensorDebug.eventCount > 0 ? '#34D399' : '#EF4444', fontWeight: 800 }}>
+                {sensorDebug.eventCount} {sensorDebug.eventCount > 0 ? '✓ LIVE' : '⚠ WAITING'}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#9CA3AF' }}>Live Angles: </span>
+              <span style={{ color: '#FFFFFF', fontWeight: 600 }}>
+                α: {Number(sensorDebug.alpha ?? 0).toFixed(1)}° | β: {Number(sensorDebug.beta ?? 90).toFixed(1)}° | γ: {Number(sensorDebug.gamma ?? 0).toFixed(1)}°
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#9CA3AF' }}>Cam Forward: </span>
+              <span style={{ color: '#FDE047', fontWeight: 700 }}>
+                [{Number(sensorDebug.camFwd?.x ?? 0).toFixed(2)}, {Number(sensorDebug.camFwd?.y ?? 0).toFixed(2)}, {Number(sensorDebug.camFwd?.z ?? -1).toFixed(2)}]
+              </span>
+            </div>
+            {sensorDebug.placedCoords ? (
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 3, marginTop: 2 }}>
+                <span style={{ color: '#9CA3AF' }}>Placed 3D Coord: </span>
+                <span style={{ color: '#10B981', fontWeight: 800 }}>
+                  [{sensorDebug.placedCoords.x}, {sensorDebug.placedCoords.y}, {sensorDebug.placedCoords.z}]
+                </span>
+              </div>
+            ) : (
+              <div style={{ color: '#9CA3AF', fontStyle: 'italic', fontSize: '0.62rem', marginTop: 2 }}>
+                Aim camera &amp; tap &quot;Place Object Here&quot;
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Off-Screen Perimeter Directional Indicators (Only when placed & not in view) ── */}
       {!allDone && isPlaced && !inView && (
