@@ -779,7 +779,7 @@ export default function VirtualARHUD({
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '11px',
-                          padding: '10px 8px',
+                          padding: '11px 8px',
                           fontSize: '0.78rem',
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -792,7 +792,7 @@ export default function VirtualARHUD({
                           pointerEvents: 'auto',
                         }}
                       >
-                        <span>🔥 Small &amp; Safe</span>
+                        <span>🧯 Small &amp; Safe (Extinguish)</span>
                       </button>
 
                       <button
@@ -809,7 +809,7 @@ export default function VirtualARHUD({
                           color: '#FFFFFF',
                           border: 'none',
                           borderRadius: '11px',
-                          padding: '10px 8px',
+                          padding: '11px 8px',
                           fontSize: '0.78rem',
                           fontWeight: 700,
                           cursor: 'pointer',
@@ -822,7 +822,7 @@ export default function VirtualARHUD({
                           pointerEvents: 'auto',
                         }}
                       >
-                        <span>⚠️ Not Safe / Spreading</span>
+                        <span>🏃 Not Safe / Spreading (Evacuate)</span>
                       </button>
                     </div>
                   </div>

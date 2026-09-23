@@ -192,6 +192,81 @@ class ProceduralFireAudio {
     } catch {}
   }
 
+  playCO2Discharge() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      if (!this.ctx) this.ctx = new AudioCtx()
+      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {})
+
+      const now = this.ctx.currentTime
+      const dur = 1.6
+
+      // White noise buffer for pressurized gas discharge
+      const bufSize = Math.floor(this.ctx.sampleRate * dur)
+      const buffer = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate)
+      const data = buffer.getChannelData(0)
+      for (let i = 0; i < bufSize; i++) {
+        data[i] = (Math.random() * 2 - 1)
+      }
+
+      const noise = this.ctx.createBufferSource()
+      noise.buffer = buffer
+
+      // High-pressure gas hiss filter (Bandpass around 1800 Hz)
+      const filter = this.ctx.createBiquadFilter()
+      filter.type = 'bandpass'
+      filter.frequency.setValueAtTime(1800, now)
+      filter.Q.setValueAtTime(1.6, now)
+
+      const gain = this.ctx.createGain()
+      gain.gain.setValueAtTime(0.01, now)
+      gain.gain.linearRampToValueAtTime(0.42, now + 0.06) // Sudden pressurized blast
+      gain.gain.exponentialRampToValueAtTime(0.32, now + 0.8)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + dur) // Decaying hiss
+
+      noise.connect(filter)
+      filter.connect(gain)
+      gain.connect(this.ctx.destination)
+
+      noise.start(now)
+      noise.stop(now + dur)
+    } catch (e) {
+      console.warn('[SurakshaAR] CO2 audio discharge failed:', e)
+    }
+  }
+
+  playEvacuationAlarm() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      if (!this.ctx) this.ctx = new AudioCtx()
+      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {})
+
+      const now = this.ctx.currentTime
+      // 3 urgent industrial two-tone siren pulses
+      for (let p = 0; p < 3; p++) {
+        const tStart = now + p * 0.42
+        const osc = this.ctx.createOscillator()
+        const g = this.ctx.createGain()
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(880, tStart)
+        osc.frequency.setValueAtTime(660, tStart + 0.16)
+
+        g.gain.setValueAtTime(0.24, tStart)
+        g.gain.linearRampToValueAtTime(0.24, tStart + 0.32)
+        g.gain.exponentialRampToValueAtTime(0.0001, tStart + 0.38)
+
+        osc.connect(g)
+        g.connect(this.ctx.destination)
+        osc.start(tStart)
+        osc.stop(tStart + 0.38)
+      }
+    } catch (e) {
+      console.warn('[SurakshaAR] Evacuation alarm audio failed:', e)
+    }
+  }
+
   stop() {
     if (!this.isPlaying) return
     try {
@@ -293,41 +368,127 @@ function createAlarmFaceTexture() {
 
 function createExtinguisherLabelTexture() {
   const canvas = document.createElement('canvas')
-  canvas.width = 512; canvas.height = 256
+  canvas.width = 1024
+  canvas.height = 512
   const ctx = canvas.getContext('2d')
-  ctx.fillStyle = '#0F172A'
-  ctx.fillRect(0, 0, 512, 256)
 
-  // Red header
+  // Dark industrial vinyl backing
+  ctx.fillStyle = '#11141A'
+  ctx.fillRect(0, 0, 1024, 512)
+
+  // Outer safety border line
+  ctx.strokeStyle = '#334155'
+  ctx.lineWidth = 6
+  ctx.strokeRect(8, 8, 1008, 496)
+
+  // 1. Top Header: Bold High-Contrast Industrial Crimson
   ctx.fillStyle = '#DC2626'
-  ctx.fillRect(8, 8, 496, 58)
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = '900 32px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillText('CO₂ FIRE EXTINGUISHER', 256, 50)
+  ctx.fillRect(16, 16, 992, 100)
 
-  // Step instructions
-  ctx.fillStyle = '#F8FAFC'
-  ctx.font = 'bold 20px sans-serif'
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = '900 46px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('CARBON DIOXIDE (CO₂)', 512, 70)
+
+  ctx.fillStyle = '#FEE2E2'
+  ctx.font = '700 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  ctx.fillText('5 KG STORED PRESSURE · IS:15683 COMPLIANT · CLASS B & C', 512, 102)
+
+  // 2. PASS Operating Instructions (4 column blocks)
+  const passSteps = [
+    { num: '1', title: 'PULL', desc: 'Pull Safety Pin\nBreak seal tag' },
+    { num: '2', title: 'AIM', desc: 'Aim Horn Nozzle\nAt base of fire' },
+    { num: '3', title: 'SQUEEZE', desc: 'Squeeze Lever\nDischarge gas' },
+    { num: '4', title: 'SWEEP', desc: 'Sweep Horn\nSide to side' },
+  ]
+
+  const boxW = 232
+  const gap = 16
+  const startX = 24
+  const startY = 130
+
+  passSteps.forEach((st, i) => {
+    const x = startX + i * (boxW + gap)
+    ctx.fillStyle = '#1E2430'
+    ctx.fillRect(x, startY, boxW, 150)
+    ctx.strokeStyle = '#475569'
+    ctx.lineWidth = 3
+    ctx.strokeRect(x, startY, boxW, 150)
+
+    // Number circle badge
+    ctx.fillStyle = '#DC2626'
+    ctx.beginPath()
+    ctx.arc(x + 36, startY + 36, 22, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.fillStyle = '#FFFFFF'
+    ctx.font = '900 24px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText(st.num, x + 36, startY + 44)
+
+    // Action Header
+    ctx.fillStyle = '#38BDF8'
+    ctx.font = '900 24px sans-serif'
+    ctx.textAlign = 'left'
+    ctx.fillText(st.title, x + 72, startY + 44)
+
+    // Description text
+    ctx.fillStyle = '#E2E8F0'
+    ctx.font = '600 17px sans-serif'
+    const lines = st.desc.split('\n')
+    lines.forEach((line, li) => {
+      ctx.fillText(line, x + 16, startY + 90 + li * 26)
+    })
+  })
+
+  // 3. Fire Hazard Class Badges
+  // Class B (Flammable Liquids)
+  ctx.fillStyle = '#1D4ED8'
+  ctx.fillRect(24, 296, 480, 72)
+  ctx.strokeStyle = '#60A5FA'
+  ctx.lineWidth = 3
+  ctx.strokeRect(24, 296, 480, 72)
+
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = '900 26px sans-serif'
   ctx.textAlign = 'left'
-  ctx.fillText('1. PULL SAFETY PIN', 25, 105)
-  ctx.fillText('2. AIM NOZZLE AT BASE OF FIRE', 25, 140)
-  ctx.fillText('3. SQUEEZE LEVER & SWEEP', 25, 175)
+  ctx.fillText('CLASS B : FLAMMABLE LIQUIDS', 46, 342)
 
-  // Rating badges
-  ctx.fillStyle = '#3B82F6'
-  ctx.fillRect(25, 202, 135, 36)
+  // Class C (Energized Electrical Equipment)
+  ctx.fillStyle = '#B45309'
+  ctx.fillRect(520, 296, 480, 72)
+  ctx.strokeStyle = '#FBBF24'
+  ctx.lineWidth = 3
+  ctx.strokeRect(520, 296, 480, 72)
+
   ctx.fillStyle = '#FFFFFF'
-  ctx.font = 'bold 17px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.fillText('CLASS B (FLUID)', 92, 226)
+  ctx.font = '900 26px sans-serif'
+  ctx.fillText('CLASS C : ENERGIZED ELECTRICAL', 542, 342)
 
+  // 4. Yellow Safety Caution Warning Banner (Frostbite Hazard)
   ctx.fillStyle = '#EAB308'
-  ctx.fillRect(175, 202, 145, 36)
+  ctx.fillRect(24, 384, 976, 56)
+
+  // Warning text
   ctx.fillStyle = '#000000'
-  ctx.fillText('CLASS C (ELEC)', 247, 226)
+  ctx.font = '900 21px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('⚠️ CAUTION: CO₂ DISCHARGE EXPANDS AT -78.5°C — HOLD FROST-FREE INSULATED GRIP ONLY', 512, 420)
+
+  // 5. Maintenance / Hydrostatic stamp info
+  ctx.fillStyle = '#64748B'
+  ctx.font = '600 16px monospace'
+  ctx.textAlign = 'left'
+  ctx.fillText('HYDROSTATIC TEST: 250 BAR · CAPACITY: 5.0 KG · FACTORY TESTED 2026', 30, 475)
+
+  ctx.fillStyle = '#22C55E'
+  ctx.font = 'bold 16px sans-serif'
+  ctx.textAlign = 'right'
+  ctx.fillText('✔ SURAKSHA INSPECTION VERIFIED', 990, 475)
 
   const tex = new THREE.CanvasTexture(canvas)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.generateMipmaps = true
   return tex
 }
 
@@ -828,73 +989,220 @@ function createPPEStationProp() {
 function createExtinguisherProp() {
   const propGroup = new THREE.Group()
 
-  // Red cylinder body
-  const cyl = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.07, 0.07, 0.42, 24),
-    new THREE.MeshStandardMaterial({ color: '#DC2626', metalness: 0.35, roughness: 0.25 })
+  // 1. Heavy-duty black molded rubber impact boot / base ring
+  const baseBoot = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.082, 0.084, 0.055, 32),
+    new THREE.MeshStandardMaterial({
+      color: '#18181B',
+      roughness: 0.88,
+      metalness: 0.08,
+    })
   )
-  cyl.position.y = 0.03
+  baseBoot.position.y = -0.19
+  propGroup.add(baseBoot)
+
+  // 2. High-pressure forged steel cylinder body (Satin powder-coated Safety Red)
+  const cyl = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.078, 0.078, 0.44, 32),
+    new THREE.MeshStandardMaterial({
+      color: '#B91C1C',
+      roughness: 0.38,
+      metalness: 0.32,
+    })
+  )
+  cyl.position.y = 0.05
   propGroup.add(cyl)
 
-  // Dome top
-  const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(0.07, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.5),
-    new THREE.MeshStandardMaterial({ color: '#DC2626', metalness: 0.35, roughness: 0.25 })
+  // 3. Smooth domed cylinder shoulder
+  const shoulder = new THREE.Mesh(
+    new THREE.SphereGeometry(0.078, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.46),
+    new THREE.MeshStandardMaterial({
+      color: '#B91C1C',
+      roughness: 0.38,
+      metalness: 0.32,
+    })
   )
-  dome.position.y = 0.24
-  propGroup.add(dome)
+  shoulder.position.y = 0.27
+  propGroup.add(shoulder)
 
-  // Rounded base foot ring
-  const baseRing = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.074, 0.074, 0.03, 24),
-    new THREE.MeshStandardMaterial({ color: '#1E293B', roughness: 0.6 })
+  // 4. Machined brass neck collar ring
+  const neckRing = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.034, 0.040, 0.032, 24),
+    new THREE.MeshStandardMaterial({
+      color: '#C29B38',
+      metalness: 0.85,
+      roughness: 0.22,
+    })
   )
-  baseRing.position.y = -0.18
-  propGroup.add(baseRing)
+  neckRing.position.y = 0.325
+  propGroup.add(neckRing)
 
-  // Printed instructional label band
+  // 5. Screen-printed Vinyl PASS & Hazard Classification Label (wrapped around cylinder)
   const labelTex = createExtinguisherLabelTexture()
   const labelMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.071, 0.071, 0.22, 24, 1, true, 0, Math.PI),
-    new THREE.MeshStandardMaterial({ map: labelTex, roughness: 0.4 })
+    new THREE.CylinderGeometry(0.079, 0.079, 0.26, 32, 1, true, 0, Math.PI * 1.15),
+    new THREE.MeshStandardMaterial({
+      map: labelTex,
+      roughness: 0.42,
+      metalness: 0.1,
+    })
   )
-  labelMesh.position.set(0, 0.03, 0)
-  labelMesh.rotation.y = Math.PI * 0.5
+  labelMesh.position.set(0, 0.04, 0)
+  labelMesh.rotation.y = Math.PI * 0.425
   propGroup.add(labelMesh)
 
-  // Valve body & squeeze handle
+  // 6. Forged Brass Valve Manifold Assembly
   const valve = new THREE.Mesh(
-    new THREE.BoxGeometry(0.045, 0.06, 0.045),
-    new THREE.MeshStandardMaterial({ color: '#334155', metalness: 0.85 })
+    new THREE.BoxGeometry(0.045, 0.055, 0.044),
+    new THREE.MeshStandardMaterial({
+      color: '#D97706',
+      metalness: 0.88,
+      roughness: 0.24,
+    })
   )
-  valve.position.set(0, 0.28, 0)
+  valve.position.set(0, 0.36, 0)
   propGroup.add(valve)
 
-  const handle = new THREE.Mesh(
-    new THREE.BoxGeometry(0.10, 0.015, 0.03),
-    new THREE.MeshStandardMaterial({ color: '#DC2626', metalness: 0.3 })
+  // 7. Brushed Stainless Steel Carry Handle (Lower fixed grip)
+  const carryHandle = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.016, 0.026),
+    new THREE.MeshStandardMaterial({
+      color: '#94A3B8',
+      metalness: 0.90,
+      roughness: 0.18,
+    })
   )
-  handle.position.set(-0.04, 0.32, 0)
-  handle.rotation.z = -0.25
-  propGroup.add(handle)
+  carryHandle.position.set(-0.055, 0.365, 0)
+  propGroup.add(carryHandle)
 
-  // Pressure gauge
-  const gauge = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.018, 0.018, 0.012, 16),
-    new THREE.MeshStandardMaterial({ color: '#E2E8F0', emissive: '#22C55E', emissiveIntensity: 0.4 })
+  // 8. Stainless Steel Operating Squeeze Lever (Upper hinged trigger)
+  const squeezeLever = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.014, 0.024),
+    new THREE.MeshStandardMaterial({
+      color: '#CBD5E1',
+      metalness: 0.92,
+      roughness: 0.14,
+    })
   )
-  gauge.position.set(0.04, 0.28, 0.02)
-  gauge.rotation.x = Math.PI / 2
-  propGroup.add(gauge)
+  squeezeLever.position.set(-0.05, 0.395, 0)
+  squeezeLever.rotation.z = -0.16
+  propGroup.add(squeezeLever)
 
-  // Black discharge horn & hose
-  const horn = new THREE.Mesh(
-    new THREE.ConeGeometry(0.032, 0.18, 16),
-    new THREE.MeshStandardMaterial({ color: '#0F172A', roughness: 0.6 })
+  // 9. Chrome Hinge Pivot Rivet
+  const pivotPin = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.007, 0.007, 0.032, 12),
+    new THREE.MeshStandardMaterial({ color: '#F1F5F9', metalness: 0.95, roughness: 0.1 })
   )
-  horn.position.set(0.09, 0.15, 0.03)
-  horn.rotation.z = -0.55
-  propGroup.add(horn)
+  pivotPin.position.set(0.01, 0.38, 0)
+  pivotPin.rotation.x = Math.PI / 2
+  propGroup.add(pivotPin)
+
+  // 10. Polished Chrome Safety Pull Pin with Split Wire Ring
+  const ringGeo = new THREE.TorusGeometry(0.018, 0.0035, 12, 24)
+  const ringMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', metalness: 0.98, roughness: 0.08 })
+  const pullRing = new THREE.Mesh(ringGeo, ringMat)
+  pullRing.position.set(-0.01, 0.375, 0.028)
+  pullRing.rotation.y = 0.35
+  propGroup.add(pullRing)
+
+  // 11. Bright Yellow Tamper Indicator Seal Tag
+  const seal = new THREE.Mesh(
+    new THREE.BoxGeometry(0.010, 0.022, 0.008),
+    new THREE.MeshStandardMaterial({ color: '#FACC15', roughness: 0.45 })
+  )
+  seal.position.set(-0.01, 0.362, 0.025)
+  propGroup.add(seal)
+
+  // 12. Flexible Reinforced High-Pressure Rubber Discharge Hose
+  const hosePoints = [
+    new THREE.Vector3(0.024, 0.36, 0),
+    new THREE.Vector3(0.075, 0.32, 0.03),
+    new THREE.Vector3(0.095, 0.22, 0.06),
+    new THREE.Vector3(0.090, 0.14, 0.06),
+  ]
+  const hoseCurve = new THREE.CatmullRomCurve3(hosePoints)
+  const hose = new THREE.Mesh(
+    new THREE.TubeGeometry(hoseCurve, 16, 0.009, 10, false),
+    new THREE.MeshStandardMaterial({ color: '#1E293B', roughness: 0.78, metalness: 0.1 })
+  )
+  propGroup.add(hose)
+
+  // Brass Hose Coupler
+  const coupler = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.011, 0.011, 0.022, 12),
+    new THREE.MeshStandardMaterial({ color: '#C29B38', metalness: 0.85, roughness: 0.25 })
+  )
+  coupler.position.set(0.025, 0.36, 0)
+  coupler.rotation.z = Math.PI / 2
+  propGroup.add(coupler)
+
+  // 13. Flared CO2 Trumpet Discharge Horn Nozzle
+  const hornGroup = new THREE.Group()
+  // Insulated Frost-Free Ribbed Handle Grip
+  const grip = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.019, 0.019, 0.075, 16),
+    new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.92 })
+  )
+  grip.position.set(0, 0.09, 0)
+  hornGroup.add(grip)
+
+  // Conical Discharge Horn
+  const hornCone = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.046, 0.018, 0.20, 24, 1, true),
+    new THREE.MeshStandardMaterial({ color: '#0F172A', roughness: 0.68, metalness: 0.12, side: THREE.DoubleSide })
+  )
+  hornCone.position.set(0, -0.04, 0)
+  hornGroup.add(hornCone)
+
+  // Horn Lip Ring
+  const hornLip = new THREE.Mesh(
+    new THREE.TorusGeometry(0.046, 0.0035, 10, 24),
+    new THREE.MeshStandardMaterial({ color: '#1E293B', roughness: 0.7 })
+  )
+  hornLip.position.set(0, 0.06, 0)
+  hornLip.rotation.x = Math.PI / 2
+  hornGroup.add(hornLip)
+
+  hornGroup.position.set(0.095, 0.06, 0.06)
+  hornGroup.rotation.z = -0.32
+  hornGroup.rotation.x = 0.18
+  propGroup.add(hornGroup)
+
+  // 14. Soft Contact Shadow Disc on Floor
+  const shadowCanvas = document.createElement('canvas')
+  shadowCanvas.width = 128
+  shadowCanvas.height = 128
+  const sCtx = shadowCanvas.getContext('2d')
+  const sGrad = sCtx.createRadialGradient(64, 64, 8, 64, 64, 62)
+  sGrad.addColorStop(0, 'rgba(0, 0, 0, 0.65)')
+  sGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0.35)')
+  sGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+  sCtx.fillStyle = sGrad
+  sCtx.beginPath()
+  sCtx.arc(64, 64, 62, 0, Math.PI * 2)
+  sCtx.fill()
+  const shadowTex = new THREE.CanvasTexture(shadowCanvas)
+
+  const shadowDisc = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.38, 0.38),
+    new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0.85, depthWrite: false })
+  )
+  shadowDisc.rotation.x = -Math.PI / 2
+  shadowDisc.position.y = -0.215
+  propGroup.add(shadowDisc)
+
+  // 15. Generous mobile touch hitbox (invisible)
+  const hitBox = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.22, 0.80, 12),
+    new THREE.MeshBasicMaterial({ visible: false })
+  )
+  hitBox.position.y = 0.15
+  propGroup.add(hitBox)
+
+  propGroup.userData = {
+    isExtinguisher: true,
+    hornGroup,
+  }
 
   return propGroup
 }
@@ -1917,72 +2225,93 @@ export default function Scenario() {
       title: info.title,
       explanation: info.explanation,
       reason: 'timeout',
+      isDecisionTimeout: currentStep === 3 || !!scenario?.steps?.[currentStep]?.is_decision_step,
     })
   }, [currentStep, scenario, isFireScenario, getStepText, stopTimer])
 
   // ── Consequence / Decision: Decision-Point Choice Handler ─────────────────
   const handleDecisionChoice = useCallback((choice) => {
-    console.log('[SurakshaAR] handleDecisionChoice tapped:', { choice, actualFireState, currentStep })
+    console.log('[SurakshaAR] handleDecisionChoice tapped:', { choice, currentStep })
 
     // 1. Immediately cancel the timer interval so timeout consequence cannot fire
     stopTimer()
 
-    // 2. Ignore click if a consequence modal is already being displayed
-    if (consequenceFailureRef.current) return
+    // 2. Clear any active consequence failure modal
+    setConsequenceFailure(null)
+    consequenceFailureRef.current = null
 
     const step = scenario?.steps?.[currentStep]
     const timeTaken = Date.now() - stepStartTime
 
-    if (choice === actualFireState) {
-      console.log('[SurakshaAR] Decision is CORRECT! Advancing step...')
-      // Correct assessment choice!
+    if (choice === 'small_safe') {
+      console.log('[SurakshaAR] Decision: Small & Safe — Direct Fire Suppression')
+      // Play CO2 pressurized gas discharge audio
+      if (fireAudioRef.current) {
+        fireAudioRef.current.playCO2Discharge()
+      }
+      // Trigger 3D CO2 vapor discharge plume animation
+      if (threeRef.current?.triggerCO2Spray) {
+        threeRef.current.triggerCO2Spray()
+      }
+
+      // Extinguish fire in 3D scene immediately
+      if (threeRef.current?.stepNodes?.[0]?.propGroup?.userData) {
+        const ud = threeRef.current.stepNodes[0].propGroup.userData
+        if (ud.flames) ud.flames.forEach(f => { f.visible = false })
+        if (ud.smoke) ud.smoke.forEach(s => { s.visible = false })
+      }
+      if (threeRef.current?.flameLight) {
+        threeRef.current.flameLight.intensity = 0
+      }
+      threeRef.current.flameExtinguished = true
+
+      setPositiveSuccess({
+        label: lang === 'hi' ? '🧯 CO₂ से आग बुझा दी गई!' : '🧯 Fire Extinguished with CO₂!',
+      })
+      setStepFeedback({
+        correct: true,
+        label: lang === 'hi' ? 'आग नियंत्रित (CO₂)' : 'Fire Suppressed (CO₂)',
+      })
+
+      // Advance step
       if (handleStepClickRef.current) {
         handleStepClickRef.current(currentStep)
       } else {
         handleStepClick(currentStep)
       }
     } else {
-      console.log('[SurakshaAR] Decision is INCORRECT! Triggering choice consequence...')
-      // Wrong decision call consequence!
+      console.log('[SurakshaAR] Decision: Not Safe / Spreading — Immediate Evacuation Protocol')
+      // Workable safety path: evacuating when fire is spreading saves lives!
+      if (fireAudioRef.current) {
+        fireAudioRef.current.playEvacuationAlarm()
+      }
+
+      // Escalate fire urgency so trainee moves fast
       setFireEscalated(true)
       fireEscalatedRef.current = true
-      fireAudioRef.current.setEscalated(true)
-      if (isFireScenario) {
-        fireAudioRef.current.start()
-      }
 
-      const currentRetries = (stepRetriesRef.current[currentStep] || 0) + 1
-      stepRetriesRef.current[currentStep] = currentRetries
-
-      const sessionEntry = {
-        stepIndex: currentStep,
-        stepName: getStepText(step, 'label') || 'Assess Fire',
-        timeTakenMs: timeTaken,
-        firstTryCorrect: false,
-        retries: currentRetries,
-        failureReason: 'wrong_decision_call',
-        choice,
-      }
-      stepSessionLogsRef.current = [...stepSessionLogsRef.current, sessionEntry]
-      window.__surakshaStepSessionData = stepSessionLogsRef.current
-
-      let title = ''
-      let explanation = ''
-      if (choice === 'small_safe' && actualFireState === 'not_safe') {
-        title = 'Dangerous Assessment Error'
-        explanation = 'Wrong call — the fire was spreading rapidly and was NOT small enough to fight directly! Attempting to fight an oversized fire with a handheld extinguisher risks severe thermal burns and asphyxiation. The correct protocol is immediate evacuation!'
-      } else {
-        title = 'Suboptimal Fire Assessment'
-        explanation = 'Wrong call — the fire was in an early incipient stage, contained within the metal cabinet, and safely suppressible with CO₂! Unnecessary abandonment allowed an easily quenchable electrical fault to spread to adjacent industrial machinery.'
-      }
-
-      setConsequenceFailure({
-        title,
-        explanation,
-        reason: 'wrong_decision',
+      setPositiveSuccess({
+        label: lang === 'hi' ? '🚨 आपातकालीन निकासी: तुरंत निकास की ओर जाएं!' : '🚨 Evacuation Activated: Proceed to Fire Exit!',
       })
+      setStepFeedback({
+        correct: true,
+        label: lang === 'hi' ? 'आपातकालीन निकासी' : 'Emergency Evacuation',
+      })
+      speak(
+        lang === 'hi'
+          ? 'आग फैल रही है। तुरंत आपातकालीन निकास की ओर बढ़ें।'
+          : 'Hazardous fire condition assessed. Proceed immediately to the emergency fire exit.',
+        lang
+      )
+
+      // Advance step directly to next step (Step 4: Use Fire Exit)
+      if (handleStepClickRef.current) {
+        handleStepClickRef.current(currentStep)
+      } else {
+        handleStepClick(currentStep)
+      }
     }
-  }, [currentStep, stepStartTime, actualFireState, scenario, isFireScenario, getStepText, stopTimer, handleStepClick])
+  }, [currentStep, stepStartTime, scenario, lang, stopTimer, handleStepClick])
 
   // Expose decision handler globally for test scripts
   useEffect(() => {
@@ -2268,7 +2597,8 @@ export default function Scenario() {
     renderer.setSize(width, height)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.2
+    renderer.toneMappingExposure = 1.0 // Calibrated exposure eliminates blown-out plastic specular
+    renderer.outputColorSpace = THREE.SRGBColorSpace
     t.renderer = renderer
 
     // 2. Scene
@@ -2302,16 +2632,16 @@ export default function Scenario() {
     t.deviceQuat = new THREE.Quaternion()
     t.initialAlpha = null
 
-    // 5. Lighting — Bright, high-contrast, industrial visibility
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334455, 1.4)
+    // 5. Lighting — Balanced industrial key, fill, and floor bounce
+    const hemiLight = new THREE.HemisphereLight(0xF8FAFC, 0x1E293B, 0.75)
     scene.add(hemiLight)
 
-    const dirLight = new THREE.DirectionalLight(0xfff3e0, 1.5)
-    dirLight.position.set(12, 20, 10)
+    const dirLight = new THREE.DirectionalLight(0xFFFBF0, 1.05)
+    dirLight.position.set(10, 18, 10)
     scene.add(dirLight)
 
-    const fillLight = new THREE.DirectionalLight(0xcceeff, 0.8)
-    fillLight.position.set(-12, 10, -10)
+    const fillLight = new THREE.DirectionalLight(0x93C5FD, 0.40)
+    fillLight.position.set(-10, 8, -8)
     scene.add(fillLight)
 
     // 6. Environment Props
@@ -2592,6 +2922,10 @@ export default function Scenario() {
       const orbMesh = new THREE.Mesh(orbGeo, orbMat)
       orbMesh.position.y = isFireStep ? 0.55 : 0.28
       orbMesh.userData = { stepIndex: idx }
+      if (idx === 3 && isFireScenario) {
+        // Hide toy-like floating orb directly on top of the realistic CO2 extinguisher!
+        orbMesh.visible = false
+      }
       group.add(orbMesh)
 
       // Pulsing floor target ring
@@ -2616,12 +2950,15 @@ export default function Scenario() {
       })
       const beamMesh = new THREE.Mesh(beamGeo, beamMat)
       beamMesh.position.y = isFireStep ? 0.85 : 0.50
+      if (idx === 3 && isFireScenario) {
+        beamMesh.visible = false
+      }
       group.add(beamMesh)
 
       // Floating billboard sprite label (Proportionate: 0.72m wide x 0.14m tall)
-      // Positioned right above the 3D model inside the central reticle
+      // Positioned cleanly above the 3D model inside the central reticle
       const badgeSprite = createStepBadgeSprite(idx + 1, step.label, step.color || '#E05A00')
-      badgeSprite.position.set(0, isFireStep ? 0.62 : 0.38, 0)
+      badgeSprite.position.set(0, isFireStep ? 0.62 : (idx === 3 ? 0.56 : 0.38), 0)
       badgeSprite.scale.set(0.72, 0.14, 1)
       group.add(badgeSprite)
 
@@ -2643,6 +2980,88 @@ export default function Scenario() {
     t.initTimestamp = performance.now()
     if (arModeRef.current && stepNodes[0]) {
       stepNodes[0].group.visible = true
+    }
+
+    // High-Pressure Animated CO2 Spray Particle Plume
+    t.triggerCO2Spray = () => {
+      if (!scene) return
+      const sprayGroup = new THREE.Group()
+      const smokeTex = getSmokeParticleTexture()
+      const particles = []
+      const count = 38
+
+      for (let i = 0; i < count; i++) {
+        const mat = new THREE.SpriteMaterial({
+          map: smokeTex,
+          color: '#FFFFFF',
+          transparent: true,
+          opacity: 0.88,
+          depthWrite: false,
+        })
+        const sp = new THREE.Sprite(mat)
+        const delay = (i / count) * 0.45
+        const speed = 2.4 + Math.random() * 1.6
+        const spreadX = (Math.random() - 0.5) * 0.55
+        const spreadY = (Math.random() - 0.5) * 0.35
+        const spreadZ = (Math.random() - 0.5) * 0.55
+
+        sprayGroup.add(sp)
+        particles.push({
+          sprite: sp,
+          delay,
+          speed,
+          dir: new THREE.Vector3(spreadX, 0.18 + spreadY, -1.5 + spreadZ).normalize(),
+          age: 0,
+          life: 0.75 + Math.random() * 0.45,
+          maxScale: 0.36 + Math.random() * 0.35,
+        })
+      }
+
+      const activeNode = stepNodes[3]
+      if (activeNode?.group) {
+        sprayGroup.position.copy(activeNode.group.position)
+        sprayGroup.position.y += 0.15
+        sprayGroup.rotation.copy(activeNode.group.rotation)
+      } else {
+        sprayGroup.position.set(1.5, 0.8, 2)
+      }
+
+      scene.add(sprayGroup)
+
+      const startTime = performance.now()
+      const sprayAnim = (now) => {
+        const elapsed = (now - startTime) / 1000
+        let allDead = true
+
+        particles.forEach(p => {
+          if (elapsed < p.delay) {
+            p.sprite.visible = false
+            allDead = false
+            return
+          }
+          p.sprite.visible = true
+          p.age += 0.016
+          const prog = p.age / p.life
+          if (prog < 1.0) {
+            allDead = false
+            const curDist = prog * p.speed
+            p.sprite.position.copy(p.dir).multiplyScalar(curDist)
+            const scale = p.maxScale * (0.28 + prog * 1.8)
+            p.sprite.scale.set(scale, scale, 1)
+            p.sprite.material.opacity = Math.max(0, 0.88 * (1 - prog))
+          } else {
+            p.sprite.visible = false
+          }
+        })
+
+        if (!allDead && elapsed < 1.8) {
+          requestAnimationFrame(sprayAnim)
+        } else {
+          scene.remove(sprayGroup)
+          sprayGroup.clear()
+        }
+      }
+      requestAnimationFrame(sprayAnim)
     }
 
     // 8. Raycasting Click, Touch & Drag Aiming Listeners
@@ -2673,14 +3092,23 @@ export default function Scenario() {
         if (consequenceFailureRef.current) return
         const activeIdx = currentStepRef.current
 
+        const activeStepObj = scenario?.steps?.[activeIdx]
+        if (activeStepObj?.is_decision_step) {
+          // If unplaced in AR mode, anchor it immediately
+          if (arModeRef.current && !placedStepsRef.current[activeIdx]) {
+            handlePlaceCurrentStep()
+          }
+          // Tapping directly on the 3D extinguisher in AR triggers the extinguish action!
+          handleDecisionChoice('small_safe')
+          return
+        }
+
         // If unplaced in AR mode, tapping the object places it immediately
         if (arModeRef.current && !placedStepsRef.current[activeIdx]) {
           handlePlaceCurrentStep()
           return
         }
 
-        const activeStepObj = scenario?.steps?.[activeIdx]
-        if (activeStepObj?.is_decision_step) return
         handleStepClick(activeIdx)
       }
     }
@@ -3855,28 +4283,95 @@ export default function Scenario() {
               </p>
             </div>
 
-            <button
-              onClick={handleRetryStep}
-              style={{
-                background: '#E05A00',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: 12,
-                padding: '14px 22px',
-                fontSize: '0.98rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                boxShadow: '0 4px 18px rgba(224, 90, 0, 0.45)',
-              }}
-            >
-              <RotateCcw size={19} />
-              <span>Retry This Step</span>
-            </button>
+            {consequenceFailure.isDecisionTimeout ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
+                <button
+                  onClick={() => handleDecisionChoice('small_safe')}
+                  style={{
+                    background: 'linear-gradient(135deg, #10B981, #059669)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: 12,
+                    padding: '14px 20px',
+                    fontSize: '0.96rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
+                  }}
+                >
+                  <span>🧯 Suppress Fire with CO₂ (Small &amp; Safe)</span>
+                </button>
+
+                <button
+                  onClick={() => handleDecisionChoice('not_safe')}
+                  style={{
+                    background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: 12,
+                    padding: '14px 20px',
+                    fontSize: '0.96rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    boxShadow: '0 4px 16px rgba(239, 68, 68, 0.4)',
+                  }}
+                >
+                  <span>🏃 Evacuate Immediately (Not Safe)</span>
+                </button>
+
+                <button
+                  onClick={handleRetryStep}
+                  style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    color: '#94A3B8',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 10,
+                    padding: '10px 16px',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <RotateCcw size={15} />
+                  <span>Reset Timer &amp; Reassess</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleRetryStep}
+                style={{
+                  background: '#E05A00',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: 12,
+                  padding: '14px 22px',
+                  fontSize: '0.98rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 18px rgba(224, 90, 0, 0.45)',
+                }}
+              >
+                <RotateCcw size={19} />
+                <span>Retry This Step</span>
+              </button>
+            )}
           </div>
         </div>
       )}
