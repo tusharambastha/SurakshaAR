@@ -1467,6 +1467,21 @@ export default function Scenario() {
     isWebXrSupported: false,
   })
 
+  // Surface detection state for real-world plane anchoring
+  const [surfaceDetection, setSurfaceDetection] = useState({
+    detected: false,
+    distance: 0,
+    surfaceType: 'none',
+    reason: 'searching',
+  })
+  const surfaceDetectionRef = useRef({
+    detected: false,
+    distance: 0,
+    hitPos: null,
+    surfaceType: 'none',
+    reason: 'searching',
+  })
+
   // ── Step Countdown Timer & Consequence System ─────────────────────────────
   const getStepDuration = (idx) => (idx <= 1 ? 20 : 15)
   const [timerSeconds, setTimerSeconds]   = useState(20)
@@ -1512,6 +1527,7 @@ export default function Scenario() {
     anchoredMode: null,
     placedPositions: {},
     placedRotations: {},
+    surfaceState: { detected: false, distance: 0, hitPos: null, reason: 'searching' },
   })
 
   // Sensor Permission Handler for Android & iOS
@@ -1564,33 +1580,30 @@ export default function Scenario() {
 
   // ── Tap-to-Place AR Placement Mechanics ────────────────────────────────────
   const handlePlaceCurrentStep = useCallback(() => {
+    // FIX 1: Enforce Surface Detection Plausibility
+    // Virtual objects must only be placed on detected real surfaces, never in empty air/ceiling/sky
+    const surfaceState = surfaceDetectionRef.current
+    if (!surfaceState?.detected || !surfaceState?.hitPos) {
+      console.warn('[SurakshaAR] Placement blocked: No valid surface detected at current camera aim.')
+      return
+    }
+
     requestSensorPermissions()
 
     const t = threeRef.current
     const activeIdx = currentStepRef.current
     const activeNode = t.stepNodes[activeIdx]
     const camera = t.camera
+    const placedPos = surfaceState.hitPos.clone()
 
     if (camera && activeNode) {
-      // 1. Capture camera's live forward direction at the exact moment of tap
-      const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize()
-
-      // 2. Compute placement point ~2.0m along whatever direction camera is pointed RIGHT NOW
-      const placementDist = 2.0
-      const placedPos = new THREE.Vector3()
-        .copy(camera.position)
-        .addScaledVector(camForward, placementDist)
-
-      // Place near floor/table level along aim ray
-      placedPos.y = Math.max(0.15, camera.position.y + camForward.y * placementDist - 0.25)
-
-      // 3. Lock dynamic position & orientation in world coordinates
       t.placedPositions[activeIdx] = placedPos.clone()
       activeNode.group.position.copy(placedPos)
       activeNode.group.lookAt(camera.position.x, placedPos.y, camera.position.z)
       t.placedRotations[activeIdx] = activeNode.group.quaternion.clone()
+      activeNode.group.visible = true
 
-      // 4. Update live debug state with placed coordinates
+      // Update live debug state with placed coordinates
       setSensorDebug(prev => ({
         ...prev,
         placedCoords: {
@@ -1599,7 +1612,7 @@ export default function Scenario() {
           z: placedPos.z.toFixed(2),
         },
       }))
-      console.log(`[SurakshaAR] Tap-to-Place Step ${activeIdx}: placed at [${placedPos.x.toFixed(2)}, ${placedPos.y.toFixed(2)}, ${placedPos.z.toFixed(2)}] along live camForward [${camForward.x.toFixed(2)}, ${camForward.y.toFixed(2)}, ${camForward.z.toFixed(2)}]`)
+      console.log(`[SurakshaAR] Tap-to-Place Step ${activeIdx}: Anchored on detected surface at [${placedPos.x.toFixed(2)}, ${placedPos.y.toFixed(2)}, ${placedPos.z.toFixed(2)}] (${surfaceState.distance.toFixed(1)}m away)`)
     }
 
     setPlacedSteps(prev => ({ ...prev, [activeIdx]: true }))
@@ -2766,7 +2779,7 @@ export default function Scenario() {
           camera.quaternion.setFromEuler(_euler)
         }
 
-        // Live Sensor Debug HUD throttled state update (~6 updates/sec)
+        // Live Sensor Debug HUD & Surface Detection throttled state update (~6 updates/sec)
         const now = performance.now()
         if (!t.lastDebugUpdate || now - t.lastDebugUpdate > 160) {
           t.lastDebugUpdate = now
@@ -2780,6 +2793,12 @@ export default function Scenario() {
             gamma: t.deviceRot?.gamma ?? 0,
             camFwd: { x: camFwd.x, y: camFwd.y, z: camFwd.z },
           }))
+          setSurfaceDetection({
+            detected: t.surfaceState?.detected ?? false,
+            distance: t.surfaceState?.distance ?? 0,
+            surfaceType: xrTrackingType === 'webxr' ? 'webxr_hit' : 'approximate_floor',
+            reason: t.surfaceState?.reason ?? 'searching',
+          })
         }
 
         const activeIdx = currentStepRef.current
@@ -2796,19 +2815,50 @@ export default function Scenario() {
             }
             activeNode.group.visible = true
           } else {
-            // Preview mode: object floats dynamically along the LIVE camera forward ray at 2.0m
+            // FIX 1: Enforce Surface Detection for Virtual Object Preview
+            // Virtual objects must ONLY appear on detected real surfaces, never in empty space/sky/ceiling
             const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize()
-            const forwardDist = 2.0
-            const previewPos = new THREE.Vector3()
-              .copy(camera.position)
-              .addScaledVector(camForward, forwardDist)
 
-            // Keep object at comfortable elevation along aim ray
-            previewPos.y = Math.max(0.15, camera.position.y + camForward.y * forwardDist - 0.25)
+            // Downward pitch angle check: aiming towards floor or table level
+            // camForward.y < -0.18 ensures camera is tilted down toward ground, not horizontal/sky/ceiling
+            // camForward.y > -0.96 prevents placing inside trainee's feet
+            const isAngleDown = camForward.y < -0.18 && camForward.y > -0.96
+            let isSurfaceDetected = false
+            let surfaceDist = 0
+            let hitPos = null
 
-            activeNode.group.position.copy(previewPos)
-            activeNode.group.lookAt(camera.position.x, previewPos.y, camera.position.z)
-            activeNode.group.visible = true
+            if (isAngleDown) {
+              const floorY = 0.05
+              const distToFloor = (camera.position.y - floorY) / (-camForward.y)
+              if (distToFloor >= 0.9 && distToFloor <= 4.2) {
+                isSurfaceDetected = true
+                surfaceDist = distToFloor
+                hitPos = new THREE.Vector3()
+                  .copy(camera.position)
+                  .addScaledVector(camForward, distToFloor)
+                hitPos.y = floorY
+              }
+            }
+
+            t.surfaceState = {
+              detected: isSurfaceDetected,
+              distance: surfaceDist,
+              hitPos,
+              reason: !isAngleDown
+                ? (camForward.y >= -0.18 ? 'no_surface_horizontal_or_sky' : 'too_close_down')
+                : (surfaceDist > 4.2 ? 'surface_too_far' : 'surface_too_close'),
+            }
+            surfaceDetectionRef.current = t.surfaceState
+
+            if (isSurfaceDetected && hitPos) {
+              // Surface detected: object sits neatly on the detected ground plane
+              activeNode.group.position.copy(hitPos)
+              activeNode.group.lookAt(camera.position.x, hitPos.y, camera.position.z)
+              activeNode.group.visible = true
+            } else {
+              // NO SURFACE DETECTED: Hide virtual object completely! No floating in mid-air
+              activeNode.group.visible = false
+            }
           }
         }
 
@@ -3043,6 +3093,7 @@ export default function Scenario() {
             onResetPlacement={handleResetPlacement}
             xrTrackingType={xrTrackingType}
             sensorDebug={sensorDebug}
+            surfaceDetection={surfaceDetection}
           />
         </>
       )}
