@@ -1,45 +1,54 @@
 /**
  * SurakshaAR — Real Email Verification Dispatcher
- * 
- * Directly dispatches genuine 6-digit OTP verification codes to recipient Gmail.
+ *
+ * Sends genuine 6-digit OTP verification codes via EmailJS.
+ * Sender: surakshaar.in@gmail.com
  */
 
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwwwICetlPLk07rUsUkGWTJIRSMI1zd_-5qk0FY9IqQ_NN3mJpNXdtjq0NYkH86xGxH/exec'
+const EMAILJS_SERVICE_ID  = 'service_9sh8spp'
+const EMAILJS_TEMPLATE_ID = 'template_ks2uh4v'
+const EMAILJS_PUBLIC_KEY  = 'nLL0hOeHuCaOdXfMi'
+const EMAILJS_API_URL     = 'https://api.emailjs.com/api/v1.0/email/send'
 
 export async function sendEmailOtp({ email, code, fullName }) {
-  const apiUrl = import.meta.env.VITE_EMAIL_API_URL || DEFAULT_SCRIPT_URL
   const cleanEmail = (email || '').trim().toLowerCase()
-  const cleanName = (fullName || '').trim() || 'Trainee'
+  const cleanName  = (fullName || '').trim() || 'Trainee'
 
   console.log(`[SurakshaAR Auth] Dispatching real OTP ${code} to ${cleanEmail}...`)
 
-  if (apiUrl && apiUrl.startsWith('http')) {
-    try {
-      // 1. Try POST with text/plain to bypass CORS preflight restrictions
-      await fetch(apiUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          code,
-          fullName: cleanName,
-          appName: 'SurakshaAR',
-        }),
-      })
+  try {
+    const res = await fetch(EMAILJS_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id:  EMAILJS_SERVICE_ID,
+        template_id: EMAILJS_TEMPLATE_ID,
+        user_id:     EMAILJS_PUBLIC_KEY,
+        template_params: {
+          email:    cleanEmail,   // recipient — map to "To Email" in template
+          name:     cleanName,
+          code:     code,
+          appName:  'SurakshaAR',
+        },
+      }),
+    })
 
-      // 2. Also send GET trigger for Google Apps Script environments that support doGet
-      const getUrl = `${apiUrl}?email=${encodeURIComponent(cleanEmail)}&code=${encodeURIComponent(code)}&name=${encodeURIComponent(cleanName)}`
-      fetch(getUrl, { mode: 'no-cors' }).catch(() => {})
-
+    if (res.ok) {
+      console.log('[SurakshaAR Auth] ✅ OTP email sent via EmailJS successfully.')
       return { success: true }
-    } catch (err) {
-      console.warn('[EmailService] Dispatch attempt warning:', err)
+    } else {
+      const errText = await res.text()
+      console.warn('[SurakshaAR Auth] EmailJS send failed:', errText)
     }
+  } catch (err) {
+    console.warn('[SurakshaAR Auth] EmailJS fetch error:', err)
   }
 
-  // Developer console notification for debug
-  console.log(`%c[SurakshaAR Auth] Verification Code for ${cleanEmail}: ${code}`, 'color: #E05A00; font-weight: bold; font-size: 14px;')
+  // Developer console fallback for debug
+  console.log(
+    `%c[SurakshaAR Auth] Verification Code for ${cleanEmail}: ${code}`,
+    'color:#E05A00;font-weight:bold;font-size:14px;'
+  )
 
   return { success: true }
 }
