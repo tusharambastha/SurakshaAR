@@ -1490,6 +1490,8 @@ export default function Scenario() {
     clock: new THREE.Clock(),
     deviceRot: { alpha: 0, beta: 90, gamma: 0 },
     hasRealOrientation: false,
+    dragYaw: 0,
+    dragPitch: 0,
     initTimestamp: 0,
     anchoredStep: -1,
     anchoredMode: null,
@@ -1512,13 +1514,36 @@ export default function Scenario() {
 
   // ── Tap-to-Place AR Placement Mechanics ────────────────────────────────────
   const handlePlaceCurrentStep = useCallback(() => {
+    // Request gyro permission on user gesture (iOS Safari requirement)
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().catch(() => {})
+    }
+
     const t = threeRef.current
     const activeIdx = currentStepRef.current
     const activeNode = t.stepNodes[activeIdx]
-    if (activeNode) {
-      t.placedPositions[activeIdx] = activeNode.group.position.clone()
+    const camera = t.camera
+
+    if (camera && activeNode) {
+      // 1. Capture camera's live forward direction at the exact moment of tap
+      const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize()
+
+      // 2. Compute placement point ~2.0m along whatever direction camera is pointed RIGHT NOW
+      const placementDist = 2.0
+      const placedPos = new THREE.Vector3()
+        .copy(camera.position)
+        .addScaledVector(camForward, placementDist)
+
+      // Place near floor/table level along aim ray
+      placedPos.y = Math.max(0.15, camera.position.y + camForward.y * placementDist - 0.25)
+
+      // 3. Lock dynamic position & orientation in world coordinates
+      t.placedPositions[activeIdx] = placedPos.clone()
+      activeNode.group.position.copy(placedPos)
+      activeNode.group.lookAt(camera.position.x, placedPos.y, camera.position.z)
       t.placedRotations[activeIdx] = activeNode.group.quaternion.clone()
     }
+
     setPlacedSteps(prev => ({ ...prev, [activeIdx]: true }))
     placedStepsRef.current[activeIdx] = true
     setIsTimerRunning(true)
@@ -2426,11 +2451,9 @@ export default function Scenario() {
     t.initTimestamp = performance.now()
     if (arModeRef.current && stepNodes[0]) {
       stepNodes[0].group.visible = true
-      stepNodes[0].group.position.set(0, 1.18, -1.7)
-      stepNodes[0].group.lookAt(0, 1.18, 0)
     }
 
-    // 8. Raycasting Click & Touch Listener
+    // 8. Raycasting Click, Touch & Drag Aiming Listeners
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
 
@@ -2470,7 +2493,48 @@ export default function Scenario() {
       }
     }
 
-    canvas.addEventListener('click', handlePointerInteract)
+    let isPointerDown = false
+    let startX = 0
+    let startY = 0
+    let hasDragged = false
+
+    function onPointerDown(e) {
+      if (!arModeRef.current) return
+      isPointerDown = true
+      hasDragged = false
+      startX = e.clientX ?? e.touches?.[0]?.clientX ?? 0
+      startY = e.clientY ?? e.touches?.[0]?.clientY ?? 0
+    }
+
+    function onPointerMove(e) {
+      if (!arModeRef.current || !isPointerDown) return
+      const currentX = e.clientX ?? e.touches?.[0]?.clientX ?? 0
+      const currentY = e.clientY ?? e.touches?.[0]?.clientY ?? 0
+      const dx = currentX - startX
+      const dy = currentY - startY
+
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        hasDragged = true
+        startX = currentX
+        startY = currentY
+        // Horizontal drag pans camera yaw left/right
+        t.dragYaw -= dx * 0.005
+        // Vertical drag tilts camera pitch up/down
+        t.dragPitch = Math.max(-1.1, Math.min(1.1, t.dragPitch - dy * 0.005))
+      }
+    }
+
+    function onPointerUp(e) {
+      if (!arModeRef.current) return
+      isPointerDown = false
+      if (!hasDragged) {
+        handlePointerInteract(e)
+      }
+    }
+
+    canvas.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', onPointerUp)
 
     // 9. Window Resize
     function onResize() {
@@ -2482,23 +2546,21 @@ export default function Scenario() {
     }
     window.addEventListener('resize', onResize)
 
-    // 10. Device Orientation Handler for Camera AR (Handheld mobile devices only)
-    const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)
+    // 10. Device Orientation Handler for Camera AR (All mobile & tablet devices)
     function onDeviceRot(e) {
-      if (isTouchDevice && e.alpha !== null && e.beta !== null) {
+      if (e.alpha !== null && e.beta !== null) {
         t.deviceRot = {
           alpha: e.alpha,
           beta: e.beta,
           gamma: e.gamma ?? 0,
         }
-        if (!t.hasRealOrientation) {
-          t.hasRealOrientation = true
-          t.anchoredStep = -1
-          t.initTimestamp = performance.now()
-        }
+        t.hasRealOrientation = true
       }
     }
-    window.addEventListener('deviceorientation', onDeviceRot)
+    window.addEventListener('deviceorientation', onDeviceRot, { passive: true })
+    if ('ondeviceorientationabsolute' in window) {
+      window.addEventListener('deviceorientationabsolute', onDeviceRot, { passive: true })
+    }
 
     // 11. Animation Loop
     function renderLoop() {
@@ -2573,14 +2635,20 @@ export default function Scenario() {
         if (controls) controls.enabled = false
         camera.position.set(0, 1.4, 0)
 
-        const { alpha, beta, gamma } = t.deviceRot
-        const euler = new THREE.Euler(
-          THREE.MathUtils.degToRad(beta - 90),
-          THREE.MathUtils.degToRad(alpha),
-          THREE.MathUtils.degToRad(-gamma),
-          'YXZ'
-        )
-        camera.quaternion.setFromEuler(euler)
+        if (t.hasRealOrientation) {
+          const { alpha, beta, gamma } = t.deviceRot
+          const euler = new THREE.Euler(
+            THREE.MathUtils.degToRad(beta - 90) + t.dragPitch,
+            THREE.MathUtils.degToRad(alpha) + t.dragYaw,
+            THREE.MathUtils.degToRad(-gamma),
+            'YXZ'
+          )
+          camera.quaternion.setFromEuler(euler)
+        } else {
+          // Dynamic camera orientation from drag aim (desktop webcam / laptop / gyro-less)
+          const euler = new THREE.Euler(t.dragPitch, t.dragYaw, 0, 'YXZ')
+          camera.quaternion.setFromEuler(euler)
+        }
 
         const activeIdx = currentStepRef.current
         const activeNode = t.stepNodes[activeIdx]
@@ -2596,15 +2664,15 @@ export default function Scenario() {
             }
             activeNode.group.visible = true
           } else {
-            // Preview mode: object floats along camera forward ray at 1.85m
-            const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
-            const forwardDist = 1.85
+            // Preview mode: object floats dynamically along the LIVE camera forward ray at 2.0m
+            const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize()
+            const forwardDist = 2.0
             const previewPos = new THREE.Vector3()
               .copy(camera.position)
               .addScaledVector(camForward, forwardDist)
 
-            // Keep object at comfortable elevation relative to camera height
-            previewPos.y = Math.max(camera.position.y - 0.75, previewPos.y)
+            // Keep object at comfortable elevation along aim ray
+            previewPos.y = Math.max(0.15, camera.position.y + camForward.y * forwardDist - 0.25)
 
             activeNode.group.position.copy(previewPos)
             activeNode.group.lookAt(camera.position.x, previewPos.y, camera.position.z)
@@ -2681,9 +2749,14 @@ export default function Scenario() {
     // 12. Cleanup on unmount
     return () => {
       if (t.animId) cancelAnimationFrame(t.animId)
-      canvas.removeEventListener('click', handlePointerInteract)
+      canvas.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('pointermove', onPointerMove)
+      window.removeEventListener('pointerup', onPointerUp)
       window.removeEventListener('resize', onResize)
       window.removeEventListener('deviceorientation', onDeviceRot)
+      if ('ondeviceorientationabsolute' in window) {
+        window.removeEventListener('deviceorientationabsolute', onDeviceRot)
+      }
       fireAudioRef.current.stop()
       controls.dispose()
       renderer.dispose()
