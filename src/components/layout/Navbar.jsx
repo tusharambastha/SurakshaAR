@@ -16,6 +16,199 @@ import {
 import VideoTutorialModal from '../ui/VideoTutorialModal'
 import { UserAvatar } from '../ui/UserAvatar'
 
+const DRAWER_STRINGS = {
+  en: {
+    traineeOfficer: 'Trainee Officer',
+    home: 'Home',
+    dashboard: 'Dashboard',
+    adminDashboard: 'Admin Dashboard',
+    myCertificates: 'My Certificates',
+    tutorial: 'Tutorial / How It Works',
+    about: 'About SurakshaAR',
+    faq: 'FAQ',
+    contactUs: 'Contact Us',
+    emergencyNumbers: 'Emergency Numbers',
+    helpSupport: 'Help & Support',
+    settings: 'Settings',
+    language: 'Language',
+    darkMode: 'Dark Mode',
+    signOut: 'Sign Out',
+    notifications: 'Notifications',
+    newBadge: 'new',
+    markAllRead: 'Mark all read',
+    noNewNotifications: 'No new notifications',
+    viewProfile: 'View Profile',
+    adminPanel: 'Admin Panel',
+    close: 'Close',
+    signIn: 'Sign In',
+  },
+  hi: {
+    traineeOfficer: 'प्रशिक्षु अधिकारी',
+    home: 'होम',
+    dashboard: 'डैशबोर्ड',
+    adminDashboard: 'एडमिन डैशबोर्ड',
+    myCertificates: 'मेरे प्रमाणपत्र',
+    tutorial: 'ट्यूटोरियल / कैसे काम करता है',
+    about: 'SurakshaAR के बारे में',
+    faq: 'अक्सर पूछे जाने वाले प्रश्न (FAQ)',
+    contactUs: 'संपर्क करें',
+    emergencyNumbers: 'आपातकालीन नंबर',
+    helpSupport: 'सहायता और समर्थन',
+    settings: 'सेटिंग्स',
+    language: 'भाषा',
+    darkMode: 'डार्क मोड',
+    signOut: 'साइन आउट',
+    notifications: 'सूचनाएं',
+    newBadge: 'नई',
+    markAllRead: 'सभी पढ़ा हुआ चिह्नित करें',
+    noNewNotifications: 'कोई नई सूचना नहीं',
+    viewProfile: 'प्रोफाइल देखें',
+    adminPanel: 'एडमिन पैनल',
+    close: 'बंद करें',
+    signIn: 'साइन इन करें',
+  },
+  sat: {
+    traineeOfficer: 'ᱥᱤᱠᱷᱱᱟᱹᱛᱤᱭᱟᱹ ᱟᱹᱢᱟᱹᱞᱤᱭᱟᱹ',
+    home: 'ᱚᱲᱟᱜ',
+    dashboard: 'ᱰᱮᱥᱵᱳᱨᱰ',
+    adminDashboard: 'ᱮᱰᱢᱤᱱ ᱰᱮᱥᱵᱳᱨᱰ',
+    myCertificates: 'ᱤᱧᱟᱜ ᱥᱟᱨᱴᱤᱯᱷᱤᱠᱮᱴ',
+    tutorial: 'ᱴᱤᱭᱩᱴᱳᱨᱤᱭᱟᱞ / ᱪᱮᱫ ᱞᱮᱠᱟ ᱠᱟᱹᱢᱤᱭᱟ',
+    about: 'SurakshaAR ᱵᱟᱵᱚᱛ',
+    faq: 'ᱡᱟᱣ ᱠᱩᱠᱞᱤ (FAQ)',
+    contactUs: 'ᱡᱚᱯᱲᱟᱣ ᱢᱮ',
+    emergencyNumbers: 'ᱟᱯᱟᱛᱠᱟᱞᱤᱱ ᱮᱞ ᱠᱚ',
+    helpSupport: 'ᱜᱚᱲᱚ ᱟᱨ ᱥᱚᱦᱚᱫ',
+    settings: 'ᱥᱮᱴᱤᱝᱥ',
+    language: 'ᱯᱟᱹᱨᱥᱤ',
+    darkMode: 'ᱰᱟᱨᱠ ᱢᱳᱰ',
+    signOut: 'ᱥᱟᱭᱤᱱ ᱟᱣᱩᱴ',
+    notifications: 'ᱵᱟᱰᱟᱭᱪᱚ ᱠᱚ',
+    newBadge: 'ᱱᱟᱶᱟ',
+    markAllRead: 'ᱡᱚᱛᱚ ᱯᱟᱲᱦᱟᱣ ᱢᱮ',
+    noNewNotifications: 'ᱪᱮᱫ ᱱᱟᱶᱟ ᱵᱟᱰᱟᱭᱪᱚ ᱵᱟᱹᱱᱩᱜᱼᱟ',
+    viewProfile: 'ᱯᱨᱳᱯᱷᱟᱭᱤᱞ ᱧᱮᱞ ᱢᱮ',
+    adminPanel: 'ᱮᱰᱢᱤᱱ ᱯᱮᱱᱮᱞ',
+    close: 'ᱵᱚᱸᱫᱽ ᱢᱮ',
+    signIn: 'ᱥᱟᱭᱤᱱ ᱤᱱ ᱢᱮ',
+  },
+}
+
+const FAQ_DATA = {
+  en: [
+    { q: 'How do I start a training module?', a: 'Go to Dashboard → select a scenario card → tap "Start Training". The AR simulation will launch automatically.' },
+    { q: 'Can I use it offline?', a: 'Yes! Fire Safety, Gas Leak, and Confined Space modules are cached for offline field drills. You will see an OFFLINE badge when not connected.' },
+    { q: 'How do I get my certificate?', a: 'Complete all steps in a training scenario with a passing score. Your certificate is auto-generated and available under My Certificates.' },
+    { q: 'Which devices support native AR?', a: 'Chrome on Android with ARCore installed supports native AR plane detection. Other devices use the sensor/gyro fallback mode.' },
+    { q: 'How do I change the app language?', a: 'Open the navigation drawer (☰) → scroll to the bottom → select your language (English / हिंदी / ᱥᱟᱱᱛᱟᱲᱤ).' },
+  ],
+  hi: [
+    { q: 'प्रशिक्षण मॉड्यूल कैसे शुरू करें?', a: 'डैशबोर्ड पर जाएं → परिदृश्य कार्ड चुनें → "प्रशिक्षण शुरू करें" पर टैप करें। AR सिमुलेशन स्वतः शुरू होगा।' },
+    { q: 'क्या मैं इसे ऑफलाइन उपयोग कर सकता हूँ?', a: 'हाँ! अग्नि सुरक्षा, गैस रिसाव और सीमित स्थान मॉड्यूल ऑफलाइन अभ्यास के लिए कैश्ड हैं। कनेक्ट न होने पर OFFLINE बैज दिखेगा।' },
+    { q: 'मुझे अपना प्रमाणपत्र कैसे मिलेगा?', a: 'उत्तीर्ण अंकों के साथ प्रशिक्षण के सभी चरण पूरे करें। आपका प्रमाणपत्र स्वतः तैयार होकर "मेरे प्रमाणपत्र" में उपलब्ध होगा।' },
+    { q: 'कौन से डिवाइस मूल AR का समर्थन करते हैं?', a: 'ARCore स्थापित Android Chrome मूल AR का समर्थन करता है। अन्य डिवाइस जाइरो फॉलबैक मोड का उपयोग करते हैं।' },
+    { q: 'ऐप की भाषा कैसे बदलें?', a: 'नेविगेशन मेन्यू (☰) खोलें → नीचे स्क्रॉल करें → अपनी भाषा चुनें (English / हिंदी / ᱥᱟᱱᱛᱟᱲᱤ)।' },
+  ],
+  sat: [
+    { q: 'ᱥᱤᱠᱷᱱᱟᱹᱛ ᱢᱳᱰᱩᱞ ᱪᱮᱫ ᱞᱮᱠᱟᱛᱮ ᱮᱦᱚᱵᱟ?', a: 'ᱰᱮᱥᱵᱳᱨᱰ ᱛᱮ ᱥᱮᱱᱚᱜ ᱢᱮ → ᱠᱟᱨᱰ ᱵᱟᱪᱷᱟᱣ ᱢᱮ → "ᱥᱤᱠᱷᱱᱟᱹᱛ ᱮᱦᱚᱵ" ᱨᱮ ᱞᱤᱱ ᱢᱮ᱾ AR ᱥᱤᱢᱩᱞᱮᱥᱚᱱ ᱟᱡ ᱛᱮᱜᱮ ᱪᱟᱹᱞᱩᱜᱼᱟ᱾' },
+    { q: 'ᱪᱮᱫ ᱤᱧ ᱱᱚᱶᱟ ᱚᱯᱷᱞᱟᱭᱤᱱ ᱨᱮ ᱵᱮᱵᱷᱟᱨ ᱫᱟᱲᱮᱭᱟᱜᱼᱟ?', a: 'ᱦᱮᱸ! ᱥᱮᱸᱜᱮᱞ ᱨᱩᱠᱷᱤᱭᱟᱹ, ᱜᱮᱥ ᱞᱤᱠ ᱟᱨ ᱥᱟᱸᱜᱷᱟᱨ ᱴᱷᱟᱶ ᱢᱳᱰᱩᱞ ᱫᱚ ᱚᱯᱷᱞᱟᱭᱤᱱ ᱞᱟᱹᱜᱤᱫ ᱠᱮᱥ ᱢᱮᱱᱟᱜᱼᱟ᱾ ᱚᱯᱷᱞᱟᱭᱤᱱ ᱨᱮ OFFLINE ᱪᱤᱱᱦᱟᱹ ᱧᱮᱞᱚᱜᱼᱟ᱾' },
+    { q: 'ᱤᱧᱟᱜ ᱥᱟᱨᱴᱤᱯᱷᱤᱠᱮᱴ ᱪᱮᱫ ᱞᱮᱠᱟᱛᱮ ᱧᱟᱢᱚᱜᱼᱟ?', a: 'ᱯᱟᱥ ᱱᱚᱢᱵᱚᱨ ᱥᱟᱶ ᱡᱚᱛᱚ ᱫᱷᱟᱯ ᱯᱩᱨᱟᱹᱣ ᱢᱮ᱾ ᱥᱟᱨᱴᱤᱯᱷᱤᱠᱮᱴ ᱟᱡ ᱛᱮᱜᱮ ᱛᱮᱭᱟᱨᱚᱜᱼᱟ ᱟᱨ "ᱤᱧᱟᱜ ᱥᱟᱨᱴᱤᱯᱷᱤᱠᱮᱴ" ᱨᱮ ᱧᱟᱢᱚᱜᱼᱟ᱾' },
+    { q: 'ᱚᱠᱟ ᱰᱤᱵᱷᱟᱭᱤᱥ ᱨᱮ ᱱᱮᱴᱤᱵᱷ AR ᱪᱟᱹᱞᱩᱜᱼᱟ?', a: 'ARCore ᱢᱮᱱᱟᱜ Android Chrome ᱨᱮ AR ᱪᱟᱹᱞᱩᱜᱼᱟ᱾ ᱮᱴᱟᱜ ᱰᱤᱵᱷᱟᱭᱤᱥ ᱨᱮ ᱡᱟᱭᱨᱳ ᱢᱳᱰ ᱪᱟᱹᱞᱩᱜᱼᱟ᱾' },
+    { q: 'ᱮᱯ ᱨᱮᱱᱟᱜ ᱯᱟᱹᱨᱥᱤ ᱪᱮᱫ ᱞᱮᱠᱟᱛᱮ ᱵᱚᱫᱚᱞᱟ?', a: 'ᱢᱮᱱᱩ (☰) ᱡᱷᱤᱡᱽ ᱢᱮ → ᱞᱟᱛᱟᱨ ᱥᱮᱱᱚᱜ ᱢᱮ → ᱯᱟᱹᱨᱥᱤ ᱵᱟᱪᱷᱟᱣ ᱢᱮ (English / हिंदी / ᱥᱟᱱᱛᱟᱲᱤ)᱾' },
+  ],
+}
+
+const HELP_DATA = {
+  en: {
+    items: [
+      { icon: '📱', title: 'AR Not Working?', desc: 'Make sure you have a stable internet connection and camera permission is granted. On Android Chrome, tap "📡 Native ARCore" for best results.' },
+      { icon: '🔑', title: 'Login / OTP Issues', desc: 'Check your spam folder. OTP expires in 10 minutes. If not received, tap "Resend OTP". Contact surakshaar.in@gmail.com if issue persists.' },
+      { icon: '📜', title: 'Certificate Not Generated', desc: 'Certificates are generated only after completing all training steps with a minimum passing score. Ensure you are online during completion.' },
+      { icon: '🔊', title: 'No Audio / Voice Guide', desc: 'Check your device volume and make sure your browser is not muted. Some browsers block autoplay — tap the screen to unlock audio.' },
+      { icon: '🌐', title: 'Offline Mode', desc: 'SurakshaAR works offline for cached modules. If a module shows "Unavailable Offline", connect to the internet and reload once to cache it.' },
+    ],
+    stillNeedHelp: 'Still need help? Email us at',
+  },
+  hi: {
+    items: [
+      { icon: '📱', title: 'AR काम नहीं कर रहा?', desc: 'सुनिश्चित करें कि इंटरनेट कनेक्शन स्थिर है और कैमरा अनुमति दी गई है। Android Chrome पर बेहतर परिणाम के लिए "📡 Native ARCore" चुनें।' },
+      { icon: '🔑', title: 'लॉगिन / OTP समस्या', desc: 'स्पैम फ़ोल्डर जांचें। OTP 10 मिनट में समाप्त होता है। न मिलने पर "OTP पुनः भेजें" पर टैप करें। समस्या जारी रहने पर ईमेल करें।' },
+      { icon: '📜', title: 'प्रमाणपत्र तैयार नहीं हुआ', desc: 'उत्तीर्ण अंक के साथ सभी चरण पूरे करने पर ही प्रमाणपत्र बनता है। पूरा करते समय इंटरनेट से जुड़े रहना सुनिश्चित करें।' },
+      { icon: '🔊', title: 'आवाज या गाइड नहीं आ रही', desc: 'डिवाइस का वॉल्यूम जांचें। यदि ब्राउज़र ऑटोप्ले रोकता है, तो आवाज अनलॉक करने के लिए स्क्रीन पर एक बार टैप करें।' },
+      { icon: '🌐', title: 'ऑफलाइन मोड', desc: 'SurakshaAR कैश्ड मॉड्यूल के लिए ऑफलाइन काम करता है। यदि "Unavailable Offline" दिखे, तो इंटरनेट जोड़कर रीलोड करें।' },
+    ],
+    stillNeedHelp: 'अभी भी सहायता चाहिए? हमें ईमेल करें:',
+  },
+  sat: {
+    items: [
+      { icon: '📱', title: 'AR ᱵᱟᱝ ᱠᱟᱹᱢᱤ ᱠᱟᱱᱟ?', desc: 'ᱠᱮᱢᱨᱟ ᱪᱷᱟᱹᱲ ᱮᱢ ᱟᱠᱟᱱᱟ ᱢᱮᱱᱛᱮ ᱯᱟᱨᱠᱷᱟᱣ ᱢᱮ᱾ Android Chrome ᱨᱮ ᱵᱷᱟᱹᱜᱤ ᱚᱨᱡᱚ ᱞᱟᱹᱜᱤᱫ "📡 Native ARCore" ᱵᱟᱪᱷᱟᱣ ᱢᱮ᱾' },
+      { icon: '🔑', title: 'ᱞᱚᱜᱤᱱ / OTP ᱮᱴᱠᱮᱴᱚᱬᱮ', desc: 'ᱥᱯᱟᱢ ᱯᱷᱳᱞᱰᱟᱨ ᱧᱮᱞ ᱢᱮ᱾ OTP ᱑᱐ ᱴᱤᱲᱤᱡ ᱨᱮ ᱪᱟᱵᱟᱜᱼᱟ᱾ ᱵᱟᱝ ᱧᱟᱢ ᱞᱮᱠᱷᱟᱱ "ᱫᱚᱦᱲᱟ OTP ᱠᱩᱞ" ᱞᱤᱱ ᱢᱮ᱾' },
+      { icon: '📜', title: 'ᱥᱟᱨᱴᱤᱯᱷᱤᱠᱮᱴ ᱵᱟᱝ ᱵᱮᱱᱟᱣ ᱞᱮᱱᱟ', desc: 'ᱯᱟᱥ ᱱᱚᱢᱵᱚᱨ ᱥᱟᱶ ᱡᱚᱛᱚ ᱫᱷᱟᱯ ᱯᱩᱨᱟᱹᱣ ᱞᱮᱠᱷᱟᱱ ᱜᱮ ᱥᱟᱨᱴᱤᱯᱷᱤᱠᱮᱴ ᱵᱮᱱᱟᱣᱜᱼᱟ᱾ ᱚᱱᱞᱟᱭᱤᱱ ᱛᱟᱦᱮᱸᱱ ᱞᱟᱹᱠᱛᱤ᱾' },
+      { icon: '🔊', title: 'ᱥᱟᱰᱮ / ᱟᱲᱟᱝ ᱵᱟᱝ ᱟᱸᱡᱚᱢᱚᱜ ᱠᱟᱱᱟ', desc: 'ᱰᱤᱵᱷᱟᱭᱤᱥ ᱵᱷᱚᱞᱤᱭᱩᱢ ᱪᱮᱠ ᱢᱮ᱾ ᱡᱩᱫᱤ ᱵᱨᱟᱣᱡᱟᱨ ᱚᱴᱳᱯᱞᱮ ᱮᱴᱠᱮᱴᱚᱬᱮᱭᱟ, ᱛᱚᱵᱮ ᱥᱠᱨᱤᱱ ᱨᱮ ᱢᱤᱫ ᱫᱷᱟᱣ ᱞᱤᱱ ᱢᱮ᱾' },
+      { icon: '🌐', title: 'ᱚᱯᱷᱞᱟᱭᱤᱱ ᱢᱳᱰ', desc: 'SurakshaAR ᱫᱚ ᱠᱮᱥ ᱟᱠᱟᱱ ᱢᱳᱰᱩᱞ ᱞᱟᱹᱜᱤᱫ ᱚᱯᱷᱞᱟᱭᱤᱱ ᱠᱟᱹᱢᱤᱭᱟ᱾ ᱤᱱᱴᱟᱨᱱᱮᱴ ᱡᱚᱲᱟᱣ ᱠᱟᱛᱮ ᱫᱚᱦᱲᱟ ᱨᱤᱞᱳᱰ ᱢᱮ᱾' },
+    ],
+    stillNeedHelp: 'ᱟᱨᱦᱚᱸ ᱜᱚᱲᱚ ᱞᱟᱹᱠᱛᱤ ᱠᱟᱱᱟ? ᱤᱢᱮᱞ ᱢᱮ:',
+  },
+}
+
+const EMERGENCY_ITEMS = [
+  { emoji: '🚒', dept_en: 'Fire Department', dept_hi: 'अग्निशमन विभाग', dept_sat: 'ᱥᱮᱸᱜᱮᱞ ᱤᱬᱤᱡ ᱵᱤᱵᱷᱟᱜᱽ', number: '101', color: '#DC2626' },
+  { emoji: '🚑', dept_en: 'Ambulance / Medical', dept_hi: 'एम्बुलेंस / चिकित्सा', dept_sat: 'ᱮᱢᱵᱩᱞᱮᱱᱥ / ᱨᱟᱱ ᱢᱩᱨᱜᱟᱹᱱ', number: '108', color: '#DC2626' },
+  { emoji: '🚓', dept_en: 'Police', dept_hi: 'पुलिस', dept_sat: 'ᱯᱩᱞᱤᱥ', number: '100', color: '#1D4ED8' },
+  { emoji: '📞', dept_en: 'National Emergency (All)', dept_hi: 'राष्ट्रीय आपातकालीन (समग्र)', dept_sat: 'ᱡᱟᱹᱛᱤᱭᱟᱹᱨᱤ ᱟᱯᱟᱛᱠᱟᱞ (ᱡᱚᱛᱚ)', number: '112', color: '#DC2626' },
+  { emoji: '🌊', dept_en: 'Disaster Management (NDMA)', dept_hi: 'आपदा प्रबंधन (NDMA)', dept_sat: 'ᱟᱯᱚᱫᱽ ᱯᱚᱨᱤᱪᱟᱞᱚᱱ (NDMA)', number: '1078', color: '#D97706' },
+  { emoji: '☣️', dept_en: 'Chemical Emergency (Toll-Free)', dept_hi: 'रासायनिक आपातकाल (टोल-फ्री)', dept_sat: 'ᱠᱮᱢᱤᱠᱟᱞ ᱟᱯᱟᱛᱠᱟᱞ (ᱴᱳᱞ-ᱯᱷᱨᱤ)', number: '1800-180-4104', color: '#7C3AED' },
+  { emoji: '⚡', dept_en: 'Electricity / Power Emergency', dept_hi: 'बिजली आपातकाल', dept_sat: 'ᱵᱤᱡᱽᱞᱤ ᱟᱯᱟᱛᱠᱟᱞ', number: '1912', color: '#D97706' },
+  { emoji: '🔥', dept_en: 'Gas / LPG Emergency', dept_hi: 'गैस / एलपीजी आपातकाल', dept_sat: 'ᱜᱮᱥ / LPG ᱟᱯᱟᱛᱠᱟᱞ', number: '1906', color: '#DC2626' },
+  { emoji: '🏭', dept_en: 'Industrial Safety Helpline', dept_hi: 'औद्योगिक सुरक्षा हेल्पलाइन', dept_sat: 'ᱠᱟᱹᱨᱜᱟᱲ ᱥᱩᱨᱠᱷᱟ ᱦᱮᱞᱯᱞᱟᱭᱤᱱ', number: '1800-3000-3600', color: '#059669' },
+  { emoji: '🏥', dept_en: 'Women Helpline', dept_hi: 'महिला हेल्पलाइन', dept_sat: 'ᱛᱤᱨᱞᱟᱹ ᱦᱮᱞᱯᱞᱟᱭᱤᱱ', number: '1091', color: '#DB2777' },
+]
+
+const CONTACT_MODAL_STRINGS = {
+  en: {
+    emailSupport: 'Email Support',
+    respTime: 'Response within 24 hours on working days',
+    queriesAbout: 'For Queries About',
+    bullets: [
+      'Training module issues or bugs',
+      'Certificate download problems',
+      'Account or login help',
+      'Institutional / bulk enrollment',
+      'Partnership & collaboration',
+    ],
+    supportHours: 'Support hours: Mon–Sat, 9 AM – 6 PM IST',
+    viewFullPage: 'View Full Contact Page →',
+  },
+  hi: {
+    emailSupport: 'ईमेल सहायता',
+    respTime: 'कार्य दिवसों पर 24 घंटे के भीतर उत्तर',
+    queriesAbout: 'निम्नलिखित प्रश्नों के लिए',
+    bullets: [
+      'प्रशिक्षण मॉड्यूल की समस्याएं या त्रुटियां',
+      'प्रमाणपत्र डाउनलोड करने में समस्या',
+      'खाता या लॉगिन सहायता',
+      'संस्थागत / बल्क नामांकन',
+      'साझेदारी और सहयोग',
+    ],
+    supportHours: 'सहायता समय: सोम-शनि, सुबह 9 से शाम 6 बजे IST',
+    viewFullPage: 'पूरा संपर्क पृष्ठ देखें →',
+  },
+  sat: {
+    emailSupport: 'ᱤᱢᱮᱞ ᱜᱚᱲᱚ',
+    respTime: 'ᱠᱟᱹᱢᱤ ᱢᱟᱦᱟᱸ ᱨᱮ ᱒᱔ ᱴᱟᱲᱟᱝ ᱵᱷᱤᱛᱨᱤ ᱛᱮᱞᱟ',
+    queriesAbout: 'ᱱᱚᱶᱟ ᱠᱩᱠᱞᱤ ᱠᱚ ᱞᱟᱹᱜᱤᱫ',
+    bullets: [
+      'ᱥᱤᱠᱷᱱᱟᱹᱛ ᱢᱳᱰᱩᱞ ᱮᱴᱠᱮᱴᱚᱬᱮ ᱥᱮ ᱵᱟᱜᱽ',
+      'ᱥᱟᱨᱴᱤᱯᱷᱤᱠᱮᱴ ᱰᱟᱣᱩᱱᱞᱳᱰ ᱮᱴᱠᱮᱴᱚᱬᱮ',
+      'ᱮᱠᱟᱣᱩᱱᱴ ᱥᱮ ᱞᱚᱜᱤᱱ ᱜᱚᱲᱚ',
+      'ᱤᱱᱥᱴᱤᱴᱤᱭᱩᱴ / ᱢᱤᱫ ᱥᱟᱶᱛᱮ ᱮᱱᱨᱳᱞ',
+      'ᱥᱟᱶᱛᱮᱱ ᱟᱨ ᱥᱚᱦᱚᱫ',
+    ],
+    supportHours: 'ᱜᱚᱲᱚ ᱚᱠᱛᱚ: ᱥᱤᱸᱜᱮ-ᱧᱩᱦᱩᱢ, ᱥᱮᱛᱟᱜ ᱙ ᱠᱷᱚᱱ ᱟᱹᱭᱩᱵ ᱖ IST',
+    viewFullPage: 'ᱯᱩᱨᱟᱹ ᱡᱚᱯᱲᱟᱣ ᱥᱟᱦᱴᱟ ᱧᱮᱞ ᱢᱮ →',
+  },
+}
+
 export function Navbar() {
   const { user, profile, signOut } = useAuth()
   const { lang, setLang, T } = useLang()
@@ -23,6 +216,11 @@ export function Navbar() {
   const { isOnline } = useOffline()
   const navigate = useNavigate()
   const location = useLocation()
+
+  const drawerT = DRAWER_STRINGS[lang] ?? DRAWER_STRINGS.en
+  const faqList = FAQ_DATA[lang] ?? FAQ_DATA.en
+  const helpData = HELP_DATA[lang] ?? HELP_DATA.en
+  const contactModal = CONTACT_MODAL_STRINGS[lang] ?? CONTACT_MODAL_STRINGS.en
 
   // State
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -379,23 +577,7 @@ export function Navbar() {
 
               {/* Notification Dropdown Panel */}
               {notifOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 8px)',
-                    right: 0,
-                    width: 'clamp(290px, 86vw, 360px)',
-                    background: 'var(--color-surface)',
-                    border: '1px solid var(--color-border-strong, var(--color-border))',
-                    borderRadius: 'var(--radius-lg, 14px)',
-                    boxShadow: 'var(--shadow-xl)',
-                    zIndex: 300,
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    animation: 'slideDownFade 0.15s ease-out',
-                  }}
-                >
+                <div className="notif-dropdown">
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -407,11 +589,11 @@ export function Navbar() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Bell size={15} color="var(--color-brand)" />
                       <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                        Notifications
+                        {drawerT.notifications}
                       </span>
                       {unreadCount > 0 && (
                         <span className="badge badge-brand" style={{ fontSize: '0.65rem', padding: '2px 6px' }}>
-                          {unreadCount} new
+                          {unreadCount} {drawerT.newBadge}
                         </span>
                       )}
                     </div>
@@ -429,7 +611,7 @@ export function Navbar() {
                           padding: 0,
                         }}
                       >
-                        Mark all read
+                        {drawerT.markAllRead}
                       </button>
                     )}
                   </div>
@@ -443,7 +625,7 @@ export function Navbar() {
                   }}>
                     {notifications.length === 0 ? (
                       <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--text-xs)' }}>
-                        No new notifications
+                        {drawerT.noNewNotifications}
                       </div>
                     ) : (
                       notifications.map(n => {
@@ -583,7 +765,7 @@ export function Navbar() {
                       <UserAvatar user={user} profile={profile} size={36} />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {profile?.full_name || 'Trainee Officer'}
+                          {profile?.full_name || drawerT.traineeOfficer}
                         </div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {user?.email}
@@ -606,7 +788,7 @@ export function Navbar() {
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <User size={15} color="var(--color-brand)" />
-                      View Profile
+                      {drawerT.viewProfile}
                     </button>
 
                     {/* Sign Out */}
@@ -627,7 +809,7 @@ export function Navbar() {
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                     >
                       <LogOut size={15} />
-                      Sign Out
+                      {drawerT.signOut}
                     </button>
                   </div>
                 )}
@@ -737,7 +919,7 @@ export function Navbar() {
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
               }}>
-                {profile?.full_name || 'Trainee Officer'}
+                {profile?.full_name || drawerT.traineeOfficer}
               </div>
               <div style={{
                 fontSize: '0.72rem',
@@ -769,7 +951,7 @@ export function Navbar() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Home size={18} color="var(--color-brand)" />
-              <span>{T('home')}</span>
+              <span>{drawerT.home}</span>
             </div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
@@ -782,20 +964,7 @@ export function Navbar() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <LayoutDashboard size={18} color="#0284C7" />
-              <span>{isAdmin ? 'Admin Dashboard' : T('dashboard')}</span>
-            </div>
-            <ChevronRight size={14} color="var(--color-text-muted)" />
-          </button>
-
-          {/* 🎯 Training Modules */}
-          <button
-            type="button"
-            onClick={handleTrainingModulesClick}
-            style={navItemStyle(false)}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Target size={18} color="#16A34A" />
-              <span>Training Modules</span>
+              <span>{isAdmin ? drawerT.adminDashboard : drawerT.dashboard}</span>
             </div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
@@ -808,51 +977,11 @@ export function Navbar() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Award size={18} color="#D97706" />
-              <span>My Certificates</span>
+              <span>{drawerT.myCertificates}</span>
             </div>
             {userCerts.length > 0 && (
               <span className="badge badge-success" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
                 {userCerts.length}
-              </span>
-            )}
-            <ChevronRight size={14} color="var(--color-text-muted)" />
-          </button>
-
-          {/* 🛡️ Safety Tips */}
-          <button
-            type="button"
-            onClick={() => {
-              setDrawerOpen(false)
-              navigate('/safety-tips')
-            }}
-            style={navItemStyle(location.pathname === '/safety-tips')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <ShieldCheck size={18} color="var(--color-brand)" />
-              <span>{lang === 'sat' ? 'ᱥᱩᱨᱠᱷᱟ ᱴᱤᱯᱥ' : lang === 'hi' ? 'सुरक्षा टिप्स' : 'Safety Tips'}</span>
-            </div>
-            <span className="badge badge-brand" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
-              {lang === 'sat' ? '᱕ ᱢᱳᱰᱩᱞ' : lang === 'hi' ? '5 मॉड्यूल' : '5 Modules'}
-            </span>
-            <ChevronRight size={14} color="var(--color-text-muted)" />
-          </button>
-
-          {/* 🔔 Notifications */}
-          <button
-            type="button"
-            onClick={() => {
-              setDrawerOpen(false)
-              setNotifOpen(true)
-            }}
-            style={navItemStyle(false)}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Bell size={18} color="var(--color-brand)" />
-              <span>Notifications</span>
-            </div>
-            {unreadCount > 0 && (
-              <span className="badge badge-brand" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
-                {unreadCount}
               </span>
             )}
             <ChevronRight size={14} color="var(--color-text-muted)" />
@@ -869,38 +998,38 @@ export function Navbar() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <PlayCircle size={18} color="#8B5CF6" />
-              <span>Tutorial / How It Works</span>
+              <span>{drawerT.tutorial}</span>
             </div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
 
           {/* ℹ About SurakshaAR */}
           <button type="button" onClick={() => { setDrawerOpen(false); setShowAboutModal(true) }} style={navItemStyle(false)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Info size={18} color="#0284C7" /><span>About SurakshaAR</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Info size={18} color="#0284C7" /><span>{drawerT.about}</span></div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
 
           {/* ❓ FAQ */}
           <button type="button" onClick={() => { setDrawerOpen(false); setShowFAQModal(true) }} style={navItemStyle(false)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><HelpCircle size={18} color="#8B5CF6" /><span>FAQ</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><HelpCircle size={18} color="#8B5CF6" /><span>{drawerT.faq}</span></div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
 
           {/* 📧 Contact Us */}
           <button type="button" onClick={() => { setDrawerOpen(false); setShowContactModal(true) }} style={navItemStyle(false)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Mail size={18} color="#059669" /><span>Contact Us</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Mail size={18} color="#059669" /><span>{drawerT.contactUs}</span></div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
 
           {/* 🚨 Emergency Numbers */}
           <button type="button" onClick={() => { setDrawerOpen(false); setShowEmergencyModal(true) }} style={navItemStyle(false)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Phone size={18} color="#DC2626" /><span>Emergency Numbers</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Phone size={18} color="#DC2626" /><span>{drawerT.emergencyNumbers}</span></div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
 
           {/* 🆘 Help & Support */}
           <button type="button" onClick={() => { setDrawerOpen(false); setShowHelpModal(true) }} style={navItemStyle(false)}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><LifeBuoy size={18} color="#F59E0B" /><span>Help &amp; Support</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><LifeBuoy size={18} color="#F59E0B" /><span>{drawerT.helpSupport}</span></div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
 
@@ -919,7 +1048,7 @@ export function Navbar() {
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Settings size={18} color="#64748B" />
-              <span>Settings</span>
+              <span>{drawerT.settings}</span>
             </div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
@@ -948,7 +1077,7 @@ export function Navbar() {
               letterSpacing: '0.04em',
             }}>
               <Globe size={13} />
-              <span>Language</span>
+              <span>{drawerT.language}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
               {SUPPORTED_LANGUAGES.map(l => {
@@ -997,7 +1126,7 @@ export function Navbar() {
                 <Sun size={16} color="var(--color-brand)" />
               )}
               <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                Dark Mode
+                {drawerT.darkMode}
               </span>
             </div>
 
@@ -1053,7 +1182,7 @@ export function Navbar() {
               }}
             >
               <LogOut size={15} />
-              <span>{T('logout')}</span>
+              <span>{drawerT.signOut}</span>
             </button>
           ) : (
             <button
@@ -1061,7 +1190,7 @@ export function Navbar() {
               onClick={() => handleNavigate('/login')}
               className="btn btn-primary btn-sm btn-full"
             >
-              <span>{T('login')}</span>
+              <span>{drawerT.signIn}</span>
             </button>
           )}
 
@@ -1113,7 +1242,7 @@ export function Navbar() {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
                 <Settings size={18} color="#64748B" />
-                <span>Settings</span>
+                <span>{drawerT.settings}</span>
               </div>
               <button
                 type="button"
@@ -1125,10 +1254,18 @@ export function Navbar() {
             </div>
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
-                Preferences like <strong>Language</strong> and <strong>Dark Mode</strong> can be toggled directly at the bottom of the navigation drawer.
+                {lang === 'hi'
+                  ? 'भाषा और डार्क मोड जैसी प्राथमिकताएं नेविगेशन मेन्यू के नीचे से सीधे बदली जा सकती हैं।'
+                  : lang === 'sat'
+                  ? 'ᱯᱟᱹᱨᱥᱤ ᱟᱨ ᱰᱟᱨᱠ ᱢᱳᱰ ᱞᱮᱠᱟᱱ ᱥᱮᱴᱤᱝᱥ ᱫᱚ ᱢᱮᱱᱩ ᱨᱮᱱᱟᱜ ᱞᱟᱛᱟᱨ ᱠᱷᱚᱱ ᱥᱚᱡᱷᱮ ᱵᱚᱫᱚᱞ ᱫᱟᱲᱮᱭᱟᱜᱼᱟ᱾'
+                  : 'Preferences like Language and Dark Mode can be toggled directly at the bottom of the navigation drawer.'}
               </p>
               <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
-                Sign in to your trainee account to configure your personal profile, department, and site location preferences.
+                {lang === 'hi'
+                  ? 'अपनी व्यक्तिगत प्रोफ़ाइल, विभाग और कार्यस्थल की प्राथमिकताओं को कॉन्फ़िगर करने के लिए अपने खाते में साइन इन करें।'
+                  : lang === 'sat'
+                  ? 'ᱟᱢᱟᱜ ᱱᱤᱡᱮᱨᱟᱜ ᱯᱨᱳᱯᱷᱟᱭᱤᱞ, ᱵᱤᱵᱷᱟᱜᱽ ᱟᱨ ᱠᱟᱹᱢᱤ ᱴᱷᱟᱶ ᱥᱮᱴᱤᱝ ᱞᱟᱹᱜᱤᱫ ᱥᱟᱭᱤᱱ ᱤᱱ ᱢᱮ᱾'
+                  : 'Sign in to your trainee account to configure your personal profile, department, and site location preferences.'}
               </p>
               <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                 <button
@@ -1136,14 +1273,14 @@ export function Navbar() {
                   className="btn btn-primary btn-sm btn-full"
                   onClick={() => { setShowSettingsModal(false); navigate('/login') }}
                 >
-                  Sign In
+                  {drawerT.signIn}
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm btn-full"
                   onClick={() => setShowSettingsModal(false)}
                 >
-                  Close
+                  {drawerT.close}
                 </button>
               </div>
             </div>
@@ -1155,22 +1292,30 @@ export function Navbar() {
       {[
         {
           key: 'about', show: showAboutModal, onClose: () => setShowAboutModal(false),
-          icon: <Info size={18} color="#0284C7" />, title: 'About SurakshaAR',
+          icon: <Info size={18} color="#0284C7" />, title: drawerT.about,
           body: (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ display: 'flex', justifyContent: 'center' }}>
                 <img src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`} alt="SurakshaAR" style={{ height: 52, objectFit: 'contain' }} />
               </div>
               <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
-                <strong>SurakshaAR</strong> is an AI-powered <strong>Augmented Reality Industrial Safety Training Platform</strong> built for SIH 2026 (Problem Statement SIH26041).
+                {lang === 'hi'
+                  ? <><strong>SurakshaAR</strong> एक AI-संचालित <strong>ऑगमेंटेड रियलिटी औद्योगिक सुरक्षा प्रशिक्षण मंच</strong> है जो SIH 2026 (समस्या विवरण SIH26041) के लिए विकसित किया गया है।</>
+                  : lang === 'sat'
+                  ? <><strong>SurakshaAR</strong> ᱫᱚ SIH 2026 (Problem Statement SIH26041) ᱞᱟᱹᱜᱤᱫ ᱵᱮᱱᱟᱣ ᱟᱠᱟᱱ AI-ᱪᱟᱹᱞᱩ <strong>Augmented Reality ᱠᱟᱹᱨᱜᱟᱲ ᱥᱩᱨᱠᱷᱟ ᱥᱤᱠᱷᱱᱟᱹᱛ ᱯᱞᱮᱴᱯᱷᱚᱨᱢ</strong> ᱠᱟᱱᱟ᱾</>
+                  : <><strong>SurakshaAR</strong> is an AI-powered <strong>Augmented Reality Industrial Safety Training Platform</strong> built for SIH 2026 (Problem Statement SIH26041).</>}
               </p>
               <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
-                It provides immersive AR-based scenario training for fire hazards, gas leaks, electrical safety, and more — helping industrial workers build real reflexes in a safe, gamified environment.
+                {lang === 'hi'
+                  ? 'यह आग के खतरे, गैस रिसाव, विद्युत सुरक्षा आदि के लिए इमर्सिव AR-आधारित परिदृश्य प्रशिक्षण प्रदान करता है - जिससे औद्योगिक श्रमिकों को सुरक्षित वातावरण में वास्तविक कौशल विकसित करने में मदद मिलती है।'
+                  : lang === 'sat'
+                  ? 'ᱱᱚᱶᱟ ᱫᱚ ᱥᱮᱸᱜᱮᱞ ᱵᱚᱛᱚᱨ, ᱜᱮᱥ ᱞᱤᱠ, ᱵᱤᱡᱽᱞᱤ ᱥᱩᱨᱠᱷᱟ ᱮᱢᱟᱱ ᱞᱟᱹᱜᱤᱫ AR ᱥᱤᱠᱷᱱᱟᱹᱛ ᱮᱢᱚᱜᱼᱟ — ᱡᱟᱦᱟᱸ ᱛᱮ ᱠᱟᱹᱢᱤᱭᱟᱹ ᱠᱚ ᱥᱩᱨᱠᱷᱤᱛ ᱛᱮ ᱥᱟᱹᱨᱤ ᱦᱩᱱᱟᱹᱨ ᱠᱚ ᱥᱮᱬᱟᱭᱟ᱾'
+                  : 'It provides immersive AR-based scenario training for fire hazards, gas leaks, electrical safety, and more — helping industrial workers build real reflexes in a safe, gamified environment.'}
               </p>
               <div style={{ background: 'var(--color-surface-alt)', borderRadius: 10, padding: '12px 14px', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                 🏆 Smart India Hackathon 2026 &nbsp;|&nbsp; SIH26041<br />
-                🛡️ Industrial Safety Training via WebXR + AR Foundation<br />
-                🌐 Multilingual: English, Hindi, Santali (ᱥᱟᱱᱛᱟᱲᱤ)
+                🛡️ {lang === 'hi' ? 'WebXR + AR Foundation द्वारा औद्योगिक सुरक्षा प्रशिक्षण' : lang === 'sat' ? 'WebXR + AR Foundation ᱦᱚᱛᱮᱛᱮ ᱠᱟᱹᱨᱜᱟᱲ ᱥᱩᱨᱠᱷᱟ ᱥᱤᱠᱷᱱᱟᱹᱛ' : 'Industrial Safety Training via WebXR + AR Foundation'}<br />
+                🌐 {lang === 'hi' ? 'त्रिभाषी: अंग्रेजी, हिंदी, संथाली (ᱥᱟᱱᱛᱟᱲᱤ)' : lang === 'sat' ? 'ᱯᱮᱭᱟ ᱯᱟᱹᱨᱥᱤ: English, Hindi, ᱥᱟᱱᱛᱟᱲᱤ' : 'Multilingual: English, Hindi, Santali (ᱥᱟᱱᱛᱟᱲᱤ)'}
               </div>
               <button
                 type="button"
@@ -1178,24 +1323,18 @@ export function Navbar() {
                 onClick={() => { setShowAboutModal(false); navigate('/about') }}
                 style={{ marginTop: 4, fontSize: '0.8rem' }}
               >
-                View Full About Page →
+                {lang === 'hi' ? 'पूरा परिचय पृष्ठ देखें →' : lang === 'sat' ? 'ᱯᱩᱨᱟᱹ ᱵᱟᱵᱚᱛ ᱥᱟᱦᱴᱟ ᱧᱮᱞ ᱢᱮ →' : 'View Full About Page →'}
               </button>
             </div>
           ),
         },
         {
           key: 'faq', show: showFAQModal, onClose: () => setShowFAQModal(false),
-          icon: <HelpCircle size={18} color="#8B5CF6" />, title: 'Frequently Asked Questions',
+          icon: <HelpCircle size={18} color="#8B5CF6" />, title: drawerT.faq,
           body: (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {[
-                { q: 'How do I start a training module?', a: 'Go to Dashboard → select a scenario card → tap "Start Training". The AR simulation will launch automatically.' },
-                { q: 'Can I use it offline?', a: 'Yes! Fire Safety, Gas Leak, and Confined Space modules are cached for offline field drills. You will see an OFFLINE badge when not connected.' },
-                { q: 'How do I get my certificate?', a: 'Complete all steps in a training scenario with a passing score. Your certificate is auto-generated and available under My Certificates.' },
-                { q: 'Which devices support native AR?', a: 'Chrome on Android with ARCore installed supports native AR plane detection. Other devices use the sensor/gyro fallback mode.' },
-                { q: 'How do I change the app language?', a: 'Open the navigation drawer (☰) → scroll to the bottom → select your language (English / हिंदी / ᱥᱟᱱᱛᱟᱲᱤ).' },
-              ].map(({ q, a }, i) => (
-                <div key={i} style={{ borderBottom: i < 4 ? '1px solid var(--color-border)' : 'none', paddingBottom: i < 4 ? 12 : 0 }}>
+              {faqList.map(({ q, a }, i) => (
+                <div key={i} style={{ borderBottom: i < faqList.length - 1 ? '1px solid var(--color-border)' : 'none', paddingBottom: i < faqList.length - 1 ? 12 : 0 }}>
                   <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>Q: {q}</div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>A: {a}</div>
                 </div>
@@ -1205,28 +1344,26 @@ export function Navbar() {
         },
         {
           key: 'contact', show: showContactModal, onClose: () => setShowContactModal(false),
-          icon: <Mail size={18} color="#059669" />, title: 'Contact Us',
+          icon: <Mail size={18} color="#059669" />, title: drawerT.contactUs,
           body: (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ background: 'var(--color-surface-alt)', borderRadius: 12, padding: '14px 16px' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>📧 Email Support</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>📧 {contactModal.emailSupport}</div>
                 <a href="mailto:surakshaar.in@gmail.com" style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-brand)', textDecoration: 'none' }}>
                   surakshaar.in@gmail.com
                 </a>
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 4 }}>Response within 24 hours on working days</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 4 }}>{contactModal.respTime}</div>
               </div>
               <div style={{ background: 'var(--color-surface-alt)', borderRadius: 12, padding: '14px 16px' }}>
-                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>📋 For Queries About</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>📋 {contactModal.queriesAbout}</div>
                 <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 2 }}>
-                  <li>Training module issues or bugs</li>
-                  <li>Certificate download problems</li>
-                  <li>Account or login help</li>
-                  <li>Institutional / bulk enrollment</li>
-                  <li>Partnership & collaboration</li>
+                  {contactModal.bullets.map((b, i) => (
+                    <li key={i}>{b}</li>
+                  ))}
                 </ul>
               </div>
               <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                🕐 Support hours: Mon–Sat, 9 AM – 6 PM IST
+                🕐 {contactModal.supportHours}
               </div>
               <button
                 type="button"
@@ -1234,62 +1371,52 @@ export function Navbar() {
                 onClick={() => { setShowContactModal(false); navigate('/contact') }}
                 style={{ marginTop: 4, fontSize: '0.8rem' }}
               >
-                View Full Contact Page →
+                {contactModal.viewFullPage}
               </button>
             </div>
           ),
         },
         {
           key: 'emergency', show: showEmergencyModal, onClose: () => setShowEmergencyModal(false),
-          icon: <Phone size={18} color="#DC2626" />, title: '🚨 Emergency Numbers',
+          icon: <Phone size={18} color="#DC2626" />, title: drawerT.emergencyNumbers,
           body: (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                Save these numbers. In a real emergency, call immediately — do not delay.
+                {lang === 'hi'
+                  ? 'इन नंबरों को सहेजें। वास्तविक आपात स्थिति में तुरंत कॉल करें - देरी न करें।'
+                  : lang === 'sat'
+                  ? 'ᱱᱚᱶᱟ ᱮᱞ ᱠᱚ ᱥᱟᱧᱪᱟᱣ ᱢᱮ᱾ ᱥᱟᱹᱨᱤ ᱟᱯᱟᱛ ᱚᱠᱛᱚ ᱨᱮ ᱞᱚᱜᱚᱱ ᱠᱚᱞ ᱢᱮ - ᱟᱞᱚᱢ ᱵᱤᱞᱚᱢᱟ᱾'
+                  : 'Save these numbers. In a real emergency, call immediately — do not delay.'}
               </div>
-              {[
-                { emoji: '🚒', dept: 'Fire Department', number: '101', color: '#DC2626' },
-                { emoji: '🚑', dept: 'Ambulance / Medical', number: '108', color: '#DC2626' },
-                { emoji: '🚓', dept: 'Police', number: '100', color: '#1D4ED8' },
-                { emoji: '📞', dept: 'National Emergency (All)', number: '112', color: '#DC2626' },
-                { emoji: '🌊', dept: 'Disaster Management (NDMA)', number: '1078', color: '#D97706' },
-                { emoji: '☣️', dept: 'Chemical Emergency (Toll-Free)', number: '1800-180-4104', color: '#7C3AED' },
-                { emoji: '⚡', dept: 'Electricity / Power Emergency', number: '1912', color: '#D97706' },
-                { emoji: '🔥', dept: 'Gas / LPG Emergency', number: '1906', color: '#DC2626' },
-                { emoji: '🏭', dept: 'Industrial Safety Helpline', number: '1800-3000-3600', color: '#059669' },
-                { emoji: '🏥', dept: 'Women Helpline', number: '1091', color: '#DB2777' },
-              ].map(({ emoji, dept, number, color }) => (
-                <div key={number} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  background: 'var(--color-surface-alt)', borderRadius: 10, padding: '10px 14px',
-                  border: '1px solid var(--color-border)',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>{emoji}</span>
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>{dept}</div>
+              {EMERGENCY_ITEMS.map(({ emoji, dept_en, dept_hi, dept_sat, number, color }) => {
+                const dept = lang === 'hi' ? dept_hi : lang === 'sat' ? dept_sat : dept_en
+                return (
+                  <div key={number} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    background: 'var(--color-surface-alt)', borderRadius: 10, padding: '10px 14px',
+                    border: '1px solid var(--color-border)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>{emoji}</span>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>{dept}</div>
+                      </div>
                     </div>
+                    <a href={`tel:${number.replace(/-/g, '')}`} style={{ fontSize: '1rem', fontWeight: 800, color, textDecoration: 'none', letterSpacing: '0.03em' }}>
+                      {number}
+                    </a>
                   </div>
-                  <a href={`tel:${number.replace(/-/g, '')}`} style={{ fontSize: '1rem', fontWeight: 800, color, textDecoration: 'none', letterSpacing: '0.03em' }}>
-                    {number}
-                  </a>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ),
         },
         {
           key: 'help', show: showHelpModal, onClose: () => setShowHelpModal(false),
-          icon: <LifeBuoy size={18} color="#F59E0B" />, title: 'Help & Support',
+          icon: <LifeBuoy size={18} color="#F59E0B" />, title: drawerT.helpSupport,
           body: (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {[
-                { icon: '📱', title: 'AR Not Working?', desc: 'Make sure you have a stable internet connection and camera permission is granted. On Android Chrome, tap "📡 Native ARCore" for best results.' },
-                { icon: '🔑', title: 'Login / OTP Issues', desc: 'Check your spam folder. OTP expires in 10 minutes. If not received, tap "Resend OTP". Contact surakshaar.in@gmail.com if issue persists.' },
-                { icon: '📜', title: 'Certificate Not Generated', desc: 'Certificates are generated only after completing all training steps with a minimum passing score. Ensure you are online during completion.' },
-                { icon: '🔊', title: 'No Audio / Voice Guide', desc: 'Check your device volume and make sure your browser is not muted. Some browsers block autoplay — tap the screen to unlock audio.' },
-                { icon: '🌐', title: 'Offline Mode', desc: 'SurakshaAR works offline for cached modules. If a module shows "Unavailable Offline", connect to the internet and reload once to cache it.' },
-              ].map(({ icon, title, desc }) => (
+              {helpData.items.map(({ icon, title, desc }) => (
                 <div key={title} style={{ display: 'flex', gap: 12, paddingBottom: 12, borderBottom: '1px solid var(--color-border)' }}>
                   <span style={{ fontSize: 22, flexShrink: 0 }}>{icon}</span>
                   <div>
@@ -1299,7 +1426,7 @@ export function Navbar() {
                 </div>
               ))}
               <div style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-                Still need help? Email us at{' '}
+                {helpData.stillNeedHelp}{' '}
                 <a href="mailto:surakshaar.in@gmail.com" style={{ color: 'var(--color-brand)', fontWeight: 700 }}>surakshaar.in@gmail.com</a>
               </div>
             </div>

@@ -54,6 +54,7 @@ export const MODULE_SAFETY_TIPS = [
     badge_sat: 'PPE ᱢᱟᱱᱚᱠ',
     color: '#059669',
     bgColor: '#ECFDF5',
+    coming_soon: true,
     tips: [
       'Inspect all PPE for cracks, tears, and expiry before entering the active worksite.',
       'Wear certified industrial safety helmet (IS 2925) with chin strap secured.',
@@ -128,6 +129,7 @@ export const MODULE_SAFETY_TIPS = [
     badge_sat: 'ᱦᱟᱭ ᱵᱷᱳᱞᱴᱮᱡᱽ',
     color: '#7C3AED',
     bgColor: '#F5F3FF',
+    coming_soon: true,
     tips: [
       'Strictly respect arc-flash boundaries and high-voltage warning perimeters.',
       'Wear rated dielectric gloves (tested within 6 months) and arc-rated face shield.',

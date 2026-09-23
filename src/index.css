@@ -1016,3 +1016,33 @@ tr:hover td { background: var(--color-bg); }
     display: none !important;
   }
 }
+
+/* ── Notifications Dropdown ── */
+.notif-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: clamp(290px, 86vw, 360px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong, var(--color-border));
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: var(--shadow-xl);
+  z-index: 300;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideDownFade 0.15s ease-out;
+}
+
+@media (max-width: 640px) {
+  .notif-dropdown {
+    position: fixed;
+    top: calc(var(--navbar-height) + 8px);
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: 380px;
+    margin: 0 auto;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+  }
+}

@@ -6,7 +6,7 @@ import { useLang } from '../contexts/LanguageContext'
 import { MODULE_SAFETY_TIPS } from '../data/moduleSafetyTips'
 import {
   ShieldCheck, Check, ChevronDown, ChevronUp, ArrowRight,
-  Lightbulb, AlertTriangle, Play, Sparkles, Filter, ChevronRight,
+  Lightbulb, AlertTriangle, Play, Sparkles, Filter, ChevronRight, Clock,
 } from 'lucide-react'
 
 export default function SafetyTips() {
@@ -55,6 +55,8 @@ export default function SafetyTips() {
       expandAll: 'Expand All',
       tipsCount: '{0} Critical Tips',
       startAR: 'Start AR Simulation',
+      comingSoon: 'Coming Soon',
+      ppeNotice: 'Always verify PPE and situational hazards before training',
       emergencyNoticeTitle: 'Workplace Safety Reminder',
       emergencyNoticeBody: 'These safety tips provide critical operational baselines. In live emergencies, always follow your plant’s official SOP, supervisor command, and emergency evacuation signals.',
       viewDashboard: 'Back to Dashboard',
@@ -68,6 +70,8 @@ export default function SafetyTips() {
       expandAll: 'सभी खोलें',
       tipsCount: '{0} महत्वपूर्ण टिप्स',
       startAR: 'AR सिमुलेशन शुरू करें',
+      comingSoon: 'जल्द आ रहा है',
+      ppeNotice: 'प्रशिक्षण से पहले हमेशा पीपीई और कार्यस्थल के खतरों की जांच करें',
       emergencyNoticeTitle: 'कार्यस्थल सुरक्षा अनुस्मारक',
       emergencyNoticeBody: 'ये सुरक्षा टिप्स बुनियादी जानकारी प्रदान करते हैं। वास्तविक आपात स्थिति में हमेशा अपने कारखाने की मानक संचालन प्रक्रिया (SOP) और सायरन का पालन करें।',
       viewDashboard: 'डैशबोर्ड पर वापस जाएं',
@@ -81,6 +85,8 @@ export default function SafetyTips() {
       expandAll: 'ᱡᱚᱛᱚ ᱡᱷᱤᱡᱽ ᱢᱮ',
       tipsCount: '{0} ᱜᱚᱴᱟᱝ ᱞᱟᱹᱠᱛᱤᱭᱟᱱ ᱴᱤᱯᱥ',
       startAR: 'AR ᱥᱤᱠᱷᱟᱣ ᱮᱦᱚᱵ ᱢᱮ',
+      comingSoon: 'ᱞᱚᱜᱚᱱ ᱦᱤᱡᱩᱜ ᱠᱟᱱᱟ',
+      ppeNotice: 'ᱥᱤᱠᱷᱱᱟᱹᱛ ᱞᱟᱦᱟ ᱡᱟᱣᱜᱮ PPE ᱟᱨ ᱵᱚᱛᱚᱨ ᱯᱟᱨᱠᱷᱟᱣ ᱢᱮ',
       emergencyNoticeTitle: 'ᱠᱟᱹᱢᱤ ᱴᱷᱟᱶ ᱥᱩᱨᱠᱷᱟ ᱩᱭᱦᱟᱹᱨ',
       emergencyNoticeBody: 'ᱱᱚᱶᱟ ᱥᱩᱨᱠᱷᱟ ᱴᱤᱯᱥ ᱫᱚ ᱵᱩᱱᱤᱭᱟᱹᱫᱽ ᱜᱮᱭᱟᱱ ᱞᱟᱹᱜᱤᱫ ᱠᱟᱱᱟ᱾ ᱥᱟᱹᱨᱤ ᱟᱯᱟᱛᱠᱟᱞᱤᱱ ᱚᱠᱛᱚ ᱨᱮ ᱠᱟᱹᱨᱜᱟᱲ ᱨᱮᱱᱟᱜ ᱚᱯᱷᱤᱥᱤᱭᱟᱞ SOP ᱟᱨ ᱥᱟᱭᱨᱮᱱ ᱯᱟᱸᱡᱟᱭ ᱢᱮ᱾',
       viewDashboard: 'ᱰᱮᱥᱵᱳᱨᱰ ᱛᱮ ᱨᱩᱣᱟᱹᱲ',
@@ -447,24 +453,45 @@ export default function SafetyTips() {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                           <Lightbulb size={14} color="var(--color-brand)" />
-                          <span>Always verify PPE and situational hazards before training</span>
+                          <span>{t.ppeNotice}</span>
                         </div>
 
-                        <button
-                          type="button"
-                          className="btn btn-primary"
-                          onClick={() => navigate(`/scenario/${mod.id}`)}
-                          style={{
-                            padding: '8px 16px',
-                            fontSize: '0.84rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 8,
-                          }}
-                        >
-                          <Play size={14} />
-                          <span>{t.startAR}</span>
-                        </button>
+                        {mod.coming_soon ? (
+                          <div
+                            style={{
+                              padding: '8px 16px',
+                              fontSize: '0.84rem',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              borderRadius: 'var(--radius-md, 8px)',
+                              background: 'var(--color-surface-alt)',
+                              color: 'var(--color-text-muted)',
+                              border: '1px solid var(--color-border)',
+                              cursor: 'not-allowed',
+                            }}
+                          >
+                            <Clock size={14} />
+                            <span>{t.comingSoon}</span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => navigate(`/scenario/${mod.id}`)}
+                            style={{
+                              padding: '8px 16px',
+                              fontSize: '0.84rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 8,
+                            }}
+                          >
+                            <Play size={14} />
+                            <span>{t.startAR}</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
