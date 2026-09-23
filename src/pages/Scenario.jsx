@@ -2748,7 +2748,7 @@ export default function Scenario() {
       if (t.hazardGroup && !t.flameExtinguished) {
         const hMult = fireEscalatedRef.current ? 2.2 : 1.0
         t.hazardGroup.scale.setScalar((1 + Math.sin(elapsed * 8) * 0.08) * hMult)
-        if (t.flameMeshes) {
+        if (t.flameMeshes && t.flameMeshes.length >= 2 && t.flameMeshes[0] && t.flameMeshes[1]) {
           t.flameMeshes[0].scale.set((1 + Math.sin(elapsed * 14) * 0.12) * hMult, (1 + Math.cos(elapsed * 12) * 0.15) * hMult, (1 + Math.sin(elapsed * 11) * 0.12) * hMult)
           t.flameMeshes[1].scale.set((1 + Math.cos(elapsed * 16) * 0.10) * hMult, (1 + Math.sin(elapsed * 15) * 0.18) * hMult, (1 + Math.cos(elapsed * 13) * 0.10) * hMult)
         }
