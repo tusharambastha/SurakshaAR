@@ -4,7 +4,7 @@
  * Directly dispatches genuine 6-digit OTP verification codes to recipient Gmail.
  */
 
-const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzey4C7ZGgvpsr61X7FLPkFDgGllhqhXzHCy9QPh4LYT31HvK_T7nvfPHFCu4IRS8qp/exec'
+const DEFAULT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwwwICetlPLk07rUsUkGWTJIRSMI1zd_-5qk0FY9IqQ_NN3mJpNXdtjq0NYkH86xGxH/exec'
 
 export async function sendEmailOtp({ email, code, fullName }) {
   const apiUrl = import.meta.env.VITE_EMAIL_API_URL || DEFAULT_SCRIPT_URL
