@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import {
   Volume2, CheckCircle2, AlertTriangle, Flame, Wind, Zap, Shield, Target,
-  ArrowRight, Monitor, X, WifiOff, Printer, Compass, ChevronLeft, ChevronRight,
+  ArrowRight, Monitor, X, Printer, Compass, ChevronLeft, ChevronRight,
   RotateCcw, MapPin, Bell, DoorOpen, Navigation, Cog, Lock
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { speak } from '../../lib/voice'
 
 // Visual icon lookup for spatial station steps
@@ -24,6 +23,59 @@ const MACHINERY_STATION_ICONS = {
   3: Zap,           // Step 3: Zero Energy Verification
   4: Shield,        // Step 4: Safety Guard
   5: MapPin,        // Step 5: Supervisor Sign-Off
+}
+
+export function getStepObjectName(stepIndex, hazardType = 'fire', lang = 'en') {
+  const isMachinery = hazardType === 'machinery'
+  const names = {
+    en: isMachinery ? [
+      'Machinery Hazard',
+      'Emergency Stop Button',
+      'LOTO Station',
+      'Zero Energy Point',
+      'Safety Guard',
+      'Supervisor Sign-Off',
+    ] : [
+      'Fire Hazard',
+      'Fire Alarm Call Point',
+      'PPE Safety Station',
+      'CO₂ Extinguisher',
+      'Fire Exit',
+      'Muster Point',
+    ],
+    hi: isMachinery ? [
+      'मशीनरी का खतरा',
+      'इमरजेंसी स्टॉप बटन',
+      'LOTO सुरक्षा स्टेशन',
+      'शून्य ऊर्जा जांच बिंदु',
+      'मशीन सुरक्षा गार्ड',
+      'पर्यवेक्षक साइन-ऑफ',
+    ] : [
+      'आग का खतरा',
+      'फायर अलार्म',
+      'पीपीई स्टेशन',
+      'अग्निशामक यंत्र',
+      'फायर एग्जिट',
+      'मस्टर पॉइंट',
+    ],
+    sat: isMachinery ? [
+      'ᱠᱟᱹᱨᱜᱟᱲ ᱵᱚᱛᱚᱨ',
+      'ᱤ-ᱥᱴᱚᱯ ᱵᱚᱴᱚᱱ',
+      'LOTO ᱥᱴᱮᱥᱚᱱ',
+      'ᱡᱤᱨᱳ ᱮᱱᱟᱨᱡᱤ ᱴᱷᱟᱶ',
+      'ᱥᱮᱯᱷᱴᱤ ᱜᱟᱨᱰ',
+      'ᱥᱩᱯᱟᱨᱵᱷᱟᱭᱤᱡᱟᱨ ᱴᱷᱟᱶ',
+    ] : [
+      'ᱥᱮᱸᱜᱮᱞ ᱵᱚᱛᱚᱨ',
+      'ᱯᱷᱟᱭᱟᱨ ᱟᱞᱟᱨᱢ',
+      'PPE ᱥᱴᱮᱥᱚᱱ',
+      'ᱯᱷᱟᱭᱟᱨ ᱮᱠᱥᱴᱤᱝᱜᱩᱭᱤᱥᱟᱨ',
+      'ᱯᱷᱟᱭᱟᱨ ᱮᱠᱡᱤᱴ',
+      'ᱢᱟᱥᱴᱟᱨ ᱯᱚᱭᱮᱱᱴ',
+    ],
+  }
+  const langList = names[lang] || names.en
+  return langList[stepIndex] || `Safety Object ${stepIndex + 1}`
 }
 
 export default function VirtualARHUD({
@@ -48,14 +100,18 @@ export default function VirtualARHUD({
   onRetryStep,
   positiveSuccess,
   onDecisionChoice,
+  isPlaced = true,
+  onPlaceObject,
+  onResetPlacement,
+  xrTrackingType = 'orientation',
 }) {
   const [trackerExpanded, setTrackerExpanded] = useState(true)
 
   const activeStep = steps[currentStep]
+  const objectName = getStepObjectName(currentStep, scenario?.hazard_type, lang)
   const isFire = scenario?.hazard_type === 'fire'
   const isGas = scenario?.hazard_type === 'gas_leak'
   const isMachinery = scenario?.hazard_type === 'machinery'
-  const isPPE = scenario?.hazard_type === 'ppe'
 
   // Hazard details and interactive AR marker badge
   const hazardMarker = isFire
@@ -205,31 +261,25 @@ export default function VirtualARHUD({
               </span>
             </div>
 
-            {/* Demo Mode vs Realistic Training Mode Toggle */}
-            {onToggleDemoMode && (
-              <button
-                type="button"
-                onClick={onToggleDemoMode}
-                title={demoMode ? 'Switch to Realistic Multi-Location Mode' : 'Switch to Fast Presentation Demo Mode'}
-                style={{
-                  background: demoMode ? 'rgba(224, 90, 0, 0.95)' : 'rgba(28, 32, 40, 0.90)',
-                  border: `1.5px solid ${demoMode ? '#F97316' : 'rgba(255, 255, 255, 0.25)'}`,
-                  color: '#FFFFFF',
-                  borderRadius: '20px',
-                  padding: '5px 10px',
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  boxShadow: demoMode ? '0 0 10px rgba(224, 90, 0, 0.5)' : 'none',
-                }}
-              >
-                {demoMode ? <Zap size={12} color="#FFFFFF" fill="#FFFFFF" /> : <Compass size={12} />}
-                <span>{demoMode ? '⚡ Demo Mode' : '🏢 Realistic'}</span>
-              </button>
-            )}
+            {/* Tap-to-Place / Tracking Mode Status Chip */}
+            <div
+              title={xrTrackingType === 'webxr' ? 'WebXR surface hit-testing active' : 'Orientation gyro world-locked tracking active'}
+              style={{
+                background: 'rgba(28, 32, 40, 0.90)',
+                border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                color: '#FFFFFF',
+                borderRadius: '20px',
+                padding: '5px 10px',
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <Target size={12} color="#F97316" />
+              <span>{xrTrackingType === 'webxr' ? '⚡ XR Hit-Test' : '📍 Tap-to-Place'}</span>
+            </div>
 
             {onToggleMode && (
               <button
@@ -429,8 +479,8 @@ export default function VirtualARHUD({
         {!allDone && (
           <div
             style={{
-              background: demoMode
-                ? 'rgba(16, 185, 129, 0.92)'
+              background: !isPlaced
+                ? 'rgba(234, 88, 12, 0.92)'
                 : inView
                 ? 'rgba(16, 185, 129, 0.90)'
                 : 'rgba(224, 90, 0, 0.92)',
@@ -442,24 +492,26 @@ export default function VirtualARHUD({
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
-              boxShadow: demoMode || inView
+              boxShadow: !isPlaced
+                ? '0 4px 16px rgba(234, 88, 12, 0.4)'
+                : inView
                 ? '0 4px 16px rgba(16, 185, 129, 0.4)'
                 : '0 4px 16px rgba(224, 90, 0, 0.4)',
               transition: 'background 0.2s ease',
             }}
           >
-            {demoMode ? (
+            {!isPlaced ? (
               <>
-                <Target size={16} />
+                <MapPin size={16} />
                 <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>
-                  🎯 DEMO MODE: Anchored In Front (1.9m) — Aim & Tap Action
+                  📍 AIM AT FLOOR OR DESK &amp; TAP &quot;PLACE {objectName.toUpperCase()} HERE&quot;
                 </span>
               </>
             ) : inView ? (
               <>
                 <Target size={16} />
                 <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>
-                  🎯 TARGET IN SIGHT ({distanceMeters}m) — Aim Reticle & Perform Action
+                  🎯 TARGET ANCHORED ({distanceMeters}m) — Aim Reticle &amp; Perform Action
                 </span>
               </>
             ) : turnDirection === 'right' ? (
@@ -490,8 +542,8 @@ export default function VirtualARHUD({
         )}
       </div>
 
-      {/* ── Off-Screen Perimeter Directional Indicators (Only in Realistic Mode) ── */}
-      {!allDone && !demoMode && !inView && (
+      {/* ── Off-Screen Perimeter Directional Indicators (Only when placed & not in view) ── */}
+      {!allDone && isPlaced && !inView && (
         <>
           {turnDirection === 'left' && (
             <div
@@ -564,30 +616,64 @@ export default function VirtualARHUD({
         <div
           style={{
             marginBottom: 8,
-            background: (demoMode || inView) ? 'rgba(16, 185, 129, 0.90)' : 'rgba(20, 24, 33, 0.85)',
+            background: !isPlaced
+              ? 'rgba(234, 88, 12, 0.92)'
+              : inView
+              ? 'rgba(16, 185, 129, 0.90)'
+              : 'rgba(20, 24, 33, 0.85)',
             backdropFilter: 'blur(6px)',
-            border: `1.5px solid ${(demoMode || inView) ? '#10B981' : hazardMarker.color}`,
+            border: `1.5px solid ${!isPlaced ? '#F97316' : inView ? '#10B981' : hazardMarker.color}`,
             borderRadius: '16px',
-            padding: '3px 10px',
-            fontSize: '0.64rem',
+            padding: '4px 12px',
+            fontSize: '0.66rem',
             fontWeight: 800,
             color: '#FFFFFF',
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            boxShadow: `0 0 16px ${(demoMode || inView) ? '#10B98188' : hazardMarker.color + '44'}`,
+            boxShadow: `0 0 16px ${!isPlaced ? 'rgba(249, 115, 22, 0.5)' : inView ? 'rgba(16, 185, 129, 0.5)' : hazardMarker.color + '44'}`,
             whiteSpace: 'nowrap',
           }}
         >
-          <Target size={12} color={(demoMode || inView) ? '#FFFFFF' : hazardMarker.color} />
-          <span>{demoMode ? '🎯 OBJECT ANCHORED IN FRONT' : inView ? '🎯 OBJECT ANCHORED IN VIEW' : 'SCAN ROOM FOR MARKER'}</span>
+          <Target size={12} color="#FFFFFF" />
+          <span>
+            {!isPlaced
+              ? (lang === 'hi'
+                  ? `🎯 निशाना लगाएं और "${objectName} यहाँ स्थापित करें" दबाएं`
+                  : lang === 'sat'
+                  ? `🎯 ᱚᱛ ᱨᱮ ᱩᱫᱩᱜ ᱢᱮ ᱟᱨ ᱫᱚᱦᱚᱭ ᱢᱮ: ${objectName}`
+                  : `🎯 AIM CAMERA & TAP "PLACE ${objectName.toUpperCase()} HERE"`)
+              : inView
+              ? `✓ ${objectName.toUpperCase()} ANCHORED (${distanceMeters}m)`
+              : `SCAN ROOM FOR ${objectName.toUpperCase()}`}
+          </span>
         </div>
+
+        {/* Tracking Engine Chip */}
+        {!isPlaced && (
+          <div
+            style={{
+              marginBottom: 6,
+              background: 'rgba(0, 0, 0, 0.65)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              borderRadius: '10px',
+              padding: '2px 8px',
+              fontSize: '0.58rem',
+              color: '#D1D5DB',
+              letterSpacing: '0.04em',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+            }}
+          >
+            {xrTrackingType === 'webxr' ? '⚡ WEBXR SURFACE HIT-TEST' : '📱 GYRO WORLD-LOCKED AR'}
+          </div>
+        )}
 
         {/* Precision Industrial Reticle */}
         <div
           style={{
-            width: 72,
-            height: 72,
+            width: 76,
+            height: 76,
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
@@ -595,10 +681,23 @@ export default function VirtualARHUD({
           }}
         >
           {/* Outer Corner Brackets */}
-          <div style={{ position: 'absolute', top: 0, left: 0, width: 14, height: 14, borderTop: `2px solid ${inView ? '#10B981' : hazardMarker.color}`, borderLeft: `2px solid ${inView ? '#10B981' : hazardMarker.color}` }} />
-          <div style={{ position: 'absolute', top: 0, right: 0, width: 14, height: 14, borderTop: `2px solid ${inView ? '#10B981' : hazardMarker.color}`, borderRight: `2px solid ${inView ? '#10B981' : hazardMarker.color}` }} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, width: 14, height: 14, borderBottom: `2px solid ${inView ? '#10B981' : hazardMarker.color}`, borderLeft: `2px solid ${inView ? '#10B981' : hazardMarker.color}` }} />
-          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 14, height: 14, borderBottom: `2px solid ${inView ? '#10B981' : hazardMarker.color}`, borderRight: `2px solid ${inView ? '#10B981' : hazardMarker.color}` }} />
+          <div style={{ position: 'absolute', top: 0, left: 0, width: 15, height: 15, borderTop: `2.5px solid ${!isPlaced ? '#F97316' : inView ? '#10B981' : hazardMarker.color}`, borderLeft: `2.5px solid ${!isPlaced ? '#F97316' : inView ? '#10B981' : hazardMarker.color}` }} />
+          <div style={{ position: 'absolute', top: 0, right: 0, width: 15, height: 15, borderTop: `2.5px solid ${!isPlaced ? '#F97316' : inView ? '#10B981' : hazardMarker.color}`, borderRight: `2.5px solid ${!isPlaced ? '#F97316' : inView ? '#10B981' : hazardMarker.color}` }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, width: 15, height: 15, borderBottom: `2.5px solid ${!isPlaced ? '#F97316' : inView ? '#10B981' : hazardMarker.color}`, borderLeft: `2.5px solid ${!isPlaced ? '#F97316' : inView ? '#10B981' : hazardMarker.color}` }} />
+          <div style={{ position: 'absolute', bottom: 0, right: 0, width: 15, height: 15, borderBottom: `2.5px solid ${!isPlaced ? '#F97316' : inView ? '#10B981' : hazardMarker.color}`, borderRight: `2.5px solid ${!isPlaced ? '#F97316' : inView ? '#10B981' : hazardMarker.color}` }} />
+
+          {/* Pulse Target Circle when aiming */}
+          {!isPlaced && (
+            <div
+              style={{
+                position: 'absolute',
+                width: 38,
+                height: 38,
+                borderRadius: '50%',
+                border: '1.5px dashed rgba(249, 115, 22, 0.75)',
+              }}
+            />
+          )}
 
           {/* Center Crosshair Dot */}
           <div
@@ -606,8 +705,8 @@ export default function VirtualARHUD({
               width: 8,
               height: 8,
               borderRadius: '50%',
-              background: inView ? '#10B981' : '#FFFFFF',
-              boxShadow: inView ? '0 0 10px #10B981' : '0 0 8px rgba(255,255,255,0.9)',
+              background: !isPlaced ? '#F97316' : inView ? '#10B981' : '#FFFFFF',
+              boxShadow: !isPlaced ? '0 0 10px #F97316' : inView ? '0 0 10px #10B981' : '0 0 8px rgba(255,255,255,0.9)',
             }}
           />
         </div>
@@ -707,87 +806,167 @@ export default function VirtualARHUD({
               </p>
             </div>
 
-            {/* Primary Action / Decision Buttons */}
-            {activeStep?.is_decision_step ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-                <div style={{ fontSize: '0.70rem', fontWeight: 800, color: 'var(--color-brand)', textAlign: 'center', letterSpacing: '0.04em' }}>
-                  SAFETY DECISION POINT · EVALUATE HAZARD SEVERITY
-                </div>
-                <div style={{ display: 'flex', gap: 8, width: '100%' }}>
-                  <button
-                    type="button"
-                    onClick={() => onDecisionChoice && onDecisionChoice('small_safe')}
-                    style={{
-                      flex: 1,
-                      background: 'linear-gradient(135deg, #10B981, #059669)',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '12px',
-                      padding: '11px 10px',
-                      fontSize: '0.80rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
-                    }}
-                  >
-                    <span>🔥 Small &amp; Safe</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onDecisionChoice && onDecisionChoice('not_safe')}
-                    style={{
-                      flex: 1,
-                      background: 'linear-gradient(135deg, #EF4444, #DC2626)',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '12px',
-                      padding: '11px 10px',
-                      fontSize: '0.80rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
-                    }}
-                  >
-                    <span>⚠️ Not Safe / Spreading</span>
-                  </button>
+            {/* Primary Action / Decision Buttons OR Place Object Button */}
+            {!isPlaced ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
+                <button
+                  type="button"
+                  onClick={onPlaceObject}
+                  style={{
+                    background: 'linear-gradient(135deg, #F97316 0%, #EA580C 100%)',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '13px',
+                    padding: '13px 18px',
+                    fontSize: '0.92rem',
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    boxShadow: '0 6px 20px rgba(234, 88, 12, 0.55)',
+                    letterSpacing: '0.02em',
+                  }}
+                  onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.98)')}
+                  onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+                >
+                  <MapPin size={20} />
+                  <span>
+                    {lang === 'hi'
+                      ? `${objectName} यहाँ स्थापित करें`
+                      : lang === 'sat'
+                      ? `${objectName} ᱱᱚᱸᱰᱮ ᱫᱚᱦᱚᱭ ᱢᱮ`
+                      : `Place ${objectName} Here`}
+                  </span>
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: '0.70rem', color: '#9CA3AF' }}>
+                  <Target size={12} color="#F97316" />
+                  <span>
+                    {lang === 'hi'
+                      ? 'कैमरा को किसी भी जगह पर करें, फिर स्थापित करने के लिए ऊपर टैप करें'
+                      : lang === 'sat'
+                      ? 'ᱠᱮᱢᱮᱨᱟ ᱚᱛ ᱥᱮᱫ ᱩᱫᱩᱜ ᱢᱮ, ᱟᱨ ᱪᱮᱛᱟᱱ ᱨᱮ ᱞᱤᱱ ᱢᱮ'
+                      : 'Point camera at any spot on floor/desk, then tap above to anchor'}
+                  </span>
                 </div>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => onStepClick(currentStep)}
-                style={{
-                  background: 'var(--color-brand)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: '12px',
-                  padding: '12px 18px',
-                  fontSize: '0.88rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  boxShadow: '0 4px 16px rgba(224, 90, 0, 0.45)',
-                  transition: 'transform 0.1s ease, filter 0.15s ease',
-                }}
-                onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.98)')}
-                onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
-              >
-                <CheckCircle2 size={18} />
-                <span>Perform Action: {stepLabel}</span>
-                <ArrowRight size={16} />
-              </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                {/* Placed status row + Reset Placement button */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 2px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.72rem', color: '#10B981', fontWeight: 700 }}>
+                    <CheckCircle2 size={13} color="#10B981" />
+                    <span>{objectName} Anchored</span>
+                  </div>
+                  {onResetPlacement && (
+                    <button
+                      type="button"
+                      onClick={onResetPlacement}
+                      title="Reposition object in space"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        border: '1px solid rgba(255, 255, 255, 0.20)',
+                        borderRadius: '8px',
+                        padding: '3px 8px',
+                        color: '#D1D5DB',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                      }}
+                    >
+                      <RotateCcw size={11} />
+                      <span>{lang === 'hi' ? 'पुनः स्थापित करें' : lang === 'sat' ? 'ᱫᱚᱦᱲᱟ ᱫᱚᱦᱚᱭ ᱢᱮ' : 'Reset Placement'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Primary Action / Decision Buttons */}
+                {activeStep?.is_decision_step ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                    <div style={{ fontSize: '0.70rem', fontWeight: 800, color: 'var(--color-brand)', textAlign: 'center', letterSpacing: '0.04em' }}>
+                      SAFETY DECISION POINT · EVALUATE HAZARD SEVERITY
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                      <button
+                        type="button"
+                        onClick={() => onDecisionChoice && onDecisionChoice('small_safe')}
+                        style={{
+                          flex: 1,
+                          background: 'linear-gradient(135deg, #10B981, #059669)',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '11px 10px',
+                          fontSize: '0.80rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                        }}
+                      >
+                        <span>🔥 Small &amp; Safe</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onDecisionChoice && onDecisionChoice('not_safe')}
+                        style={{
+                          flex: 1,
+                          background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+                          color: '#FFFFFF',
+                          border: 'none',
+                          borderRadius: '12px',
+                          padding: '11px 10px',
+                          fontSize: '0.80rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
+                        }}
+                      >
+                        <span>⚠️ Not Safe / Spreading</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onStepClick(currentStep)}
+                    style={{
+                      background: 'var(--color-brand)',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '12px',
+                      padding: '12px 18px',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      boxShadow: '0 4px 16px rgba(224, 90, 0, 0.45)',
+                      transition: 'transform 0.1s ease, filter 0.15s ease',
+                    }}
+                    onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.98)')}
+                    onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}
+                  >
+                    <CheckCircle2 size={18} />
+                    <span>Perform Action: {stepLabel}</span>
+                    <ArrowRight size={16} />
+                  </button>
+                )}
+              </div>
             )}
           </>
         )}

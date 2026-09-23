@@ -1451,6 +1451,10 @@ export default function Scenario() {
   const [showControlsHelp, setShowControlsHelp] = useState(true)
   const [spatialDirectionCue, setSpatialDirectionCue] = useState(null)
   const [demoMode, setDemoMode]           = useState(true) // Presentation / Demo Mode default ON
+  const [placedSteps, setPlacedSteps]     = useState({})
+  const placedStepsRef                    = useRef({})
+  placedStepsRef.current                  = placedSteps
+  const [xrTrackingType, setXrTrackingType] = useState('orientation') // 'webxr' | 'orientation'
 
   // ── Step Countdown Timer & Consequence System ─────────────────────────────
   const getStepDuration = (idx) => (idx <= 1 ? 20 : 15)
@@ -1489,7 +1493,51 @@ export default function Scenario() {
     initTimestamp: 0,
     anchoredStep: -1,
     anchoredMode: null,
+    placedPositions: {},
+    placedRotations: {},
   })
+
+  // Auto-detect WebXR Hit-Test capability
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'xr' in navigator && navigator.xr?.isSessionSupported) {
+      navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+        setXrTrackingType(supported ? 'webxr' : 'orientation')
+      }).catch(() => {
+        setXrTrackingType('orientation')
+      })
+    } else {
+      setXrTrackingType('orientation')
+    }
+  }, [])
+
+  // ── Tap-to-Place AR Placement Mechanics ────────────────────────────────────
+  const handlePlaceCurrentStep = useCallback(() => {
+    const t = threeRef.current
+    const activeIdx = currentStepRef.current
+    const activeNode = t.stepNodes[activeIdx]
+    if (activeNode) {
+      t.placedPositions[activeIdx] = activeNode.group.position.clone()
+      t.placedRotations[activeIdx] = activeNode.group.quaternion.clone()
+    }
+    setPlacedSteps(prev => ({ ...prev, [activeIdx]: true }))
+    placedStepsRef.current[activeIdx] = true
+    setIsTimerRunning(true)
+    setStepStartTime(Date.now())
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(60) } catch {}
+    }
+  }, [])
+
+  const handleResetPlacement = useCallback(() => {
+    const t = threeRef.current
+    const activeIdx = currentStepRef.current
+    if (t.placedPositions) delete t.placedPositions[activeIdx]
+    if (t.placedRotations) delete t.placedRotations[activeIdx]
+    setPlacedSteps(prev => ({ ...prev, [activeIdx]: false }))
+    placedStepsRef.current[activeIdx] = false
+    setTimerSeconds(getStepDuration(activeIdx))
+    setIsTimerRunning(false)
+  }, [])
 
   // Fetch scenario details
   const { data: scenario, isLoading } = useQuery({
@@ -1593,6 +1641,7 @@ export default function Scenario() {
   // ── Step Countdown Timer Ticking Loop ─────────────────────────────────────
   useEffect(() => {
     if (!isTimerRunning || consequenceFailure) return
+    if (arMode && !placedSteps[currentStep]) return
 
     const interval = setInterval(() => {
       setTimerSeconds(prev => {
@@ -1610,7 +1659,7 @@ export default function Scenario() {
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [isTimerRunning, currentStep, consequenceFailure])
+  }, [isTimerRunning, currentStep, consequenceFailure, arMode, placedSteps])
 
   // ── Consequence: Step Timeout Trigger ────────────────────────────────────
   const handleStepTimeout = useCallback(() => {
@@ -1800,22 +1849,25 @@ export default function Scenario() {
       setIsTimerRunning(false)
       await finishSession(newLogs)
     } else {
-      setCurrentStep(stepIndex + 1)
-      setTimerSeconds(getStepDuration(stepIndex + 1))
-      setIsTimerRunning(true)
+      const nextIdx = stepIndex + 1
+      setCurrentStep(nextIdx)
+      setTimerSeconds(getStepDuration(nextIdx))
+      setPlacedSteps(prev => ({ ...prev, [nextIdx]: false }))
+      placedStepsRef.current[nextIdx] = false
+      setIsTimerRunning(!arMode)
       setFireEscalated(false)
       fireEscalatedRef.current = false
       setConsequenceFailure(null)
       setStepStartTime(Date.now())
 
       // Auto-aim camera toward the next step
-      const nextStep = steps[stepIndex + 1]
+      const nextStep = steps[nextIdx]
       if (nextStep && threeRef.current.controls) {
         const [tx, ty, tz] = nextStep.position || [0, 1, 0]
         smoothLookAt(tx, ty, tz)
       }
     }
-  }, [currentStep, stepStartTime, scenario, stepLogs, sessionId, user, isOnline, lang, getStepText])
+  }, [currentStep, stepStartTime, scenario, stepLogs, sessionId, user, isOnline, lang, getStepText, arMode])
 
   // Smoothly tween OrbitControls target to look at position
   function smoothLookAt(targetX, targetY, targetZ) {
@@ -2404,9 +2456,17 @@ export default function Scenario() {
 
       if (hits.length > 0) {
         if (consequenceFailureRef.current) return
-        const activeStepObj = scenario?.steps?.[currentStepRef.current]
+        const activeIdx = currentStepRef.current
+
+        // If unplaced in AR mode, tapping the object places it immediately
+        if (arModeRef.current && !placedStepsRef.current[activeIdx]) {
+          handlePlaceCurrentStep()
+          return
+        }
+
+        const activeStepObj = scenario?.steps?.[activeIdx]
         if (activeStepObj?.is_decision_step) return
-        handleStepClick(currentStepRef.current)
+        handleStepClick(activeIdx)
       }
     }
 
@@ -2524,42 +2584,31 @@ export default function Scenario() {
 
         const activeIdx = currentStepRef.current
         const activeNode = t.stepNodes[activeIdx]
+        const isPlaced = !arModeRef.current || !!placedStepsRef.current[activeIdx]
 
-        // ── Presentation Demo Mode Anchoring ──
-        if (demoModeRef.current) {
-          const isStabilizing = (performance.now() - t.initTimestamp < 1500)
-          if (t.anchoredStep !== activeIdx || t.anchoredMode !== true || isStabilizing) {
+        // ── Tap-to-Place World Anchoring & Reticle Preview ──
+        if (activeNode) {
+          if (isPlaced && t.placedPositions && t.placedPositions[activeIdx]) {
+            // Object locked at placed 3D world coordinates
+            activeNode.group.position.copy(t.placedPositions[activeIdx])
+            if (t.placedRotations && t.placedRotations[activeIdx]) {
+              activeNode.group.quaternion.copy(t.placedRotations[activeIdx])
+            }
+            activeNode.group.visible = true
+          } else {
+            // Preview mode: object floats along camera forward ray at 1.85m
             const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
-            const forwardH = new THREE.Vector3(camForward.x, 0, camForward.z).normalize()
-            if (forwardH.lengthSq() < 0.001) forwardH.set(0, 0, -1)
+            const forwardDist = 1.85
+            const previewPos = new THREE.Vector3()
+              .copy(camera.position)
+              .addScaledVector(camForward, forwardDist)
 
-            if (activeNode) {
-              const anchorDist = 1.7
-              const anchorPos = new THREE.Vector3()
-                .copy(camera.position)
-                .addScaledVector(forwardH, anchorDist)
-              anchorPos.y = camera.position.y - 0.22
+            // Keep object at comfortable elevation relative to camera height
+            previewPos.y = Math.max(camera.position.y - 0.75, previewPos.y)
 
-              activeNode.group.position.copy(anchorPos)
-              activeNode.group.lookAt(camera.position.x, anchorPos.y, camera.position.z)
-              activeNode.group.visible = true
-            }
-            if (!isStabilizing) {
-              t.anchoredStep = activeIdx
-              t.anchoredMode = true
-            }
-          }
-        } else {
-          // Realistic Multi-Location Mode: restore fixed room coordinates
-          if (t.anchoredMode !== false) {
-            t.stepNodes.forEach((node) => {
-              if (node.initialPos) {
-                node.group.position.set(...node.initialPos)
-                node.group.quaternion.set(0, 0, 0, 1)
-              }
-            })
-            t.anchoredMode = false
-            t.anchoredStep = activeIdx
+            activeNode.group.position.copy(previewPos)
+            activeNode.group.lookAt(camera.position.x, previewPos.y, camera.position.z)
+            activeNode.group.visible = true
           }
         }
 
@@ -2587,7 +2636,7 @@ export default function Scenario() {
           const crossY = camForward.z * toTarget.x - camForward.x * toTarget.z
 
           let turnDirection = 'in-front'
-          if (angleDeg <= 25) {
+          if (!isPlaced || angleDeg <= 25) {
             turnDirection = 'in-front'
           } else if (angleDeg >= 135) {
             turnDirection = 'behind'
@@ -2601,13 +2650,14 @@ export default function Scenario() {
           if (!t.lastCueUpdate || now - t.lastCueUpdate > 100) {
             t.lastCueUpdate = now
             setSpatialDirectionCue({
-              inView: angleDeg <= 25,
+              inView: !isPlaced || angleDeg <= 25,
               turnDirection,
               angleDeg,
               distanceMeters: dist.toFixed(1),
               stationName: steps[activeIdx]?.label || '',
               stepIndex: activeIdx,
-              isDemoMode: demoModeRef.current,
+              isDemoMode: false,
+              isPlaced,
             })
           }
         }
@@ -2780,6 +2830,10 @@ export default function Scenario() {
             onRetryStep={handleRetryStep}
             positiveSuccess={positiveSuccess}
             onDecisionChoice={handleDecisionChoice}
+            isPlaced={!arMode || !!placedSteps[currentStep]}
+            onPlaceObject={handlePlaceCurrentStep}
+            onResetPlacement={handleResetPlacement}
+            xrTrackingType={xrTrackingType}
           />
         </>
       )}
