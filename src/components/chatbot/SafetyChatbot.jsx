@@ -100,6 +100,9 @@ function getActiveModuleFromPath(pathname) {
 export default function SafetyChatbot() {
   const { lang: globalLang } = useLang()
   const location = useLocation()
+  const isScenarioPage = location?.pathname?.includes('/scenario')
+  if (isScenarioPage) return null
+
   const activeModule = getActiveModuleFromPath(location?.pathname)
 
   const [open, setOpen] = useState(false)

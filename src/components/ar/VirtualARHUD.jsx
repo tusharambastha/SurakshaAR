@@ -805,7 +805,12 @@ export default function VirtualARHUD({
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
                 <button
                   type="button"
-                  onClick={isSurfaceDetected ? onPlaceObject : undefined}
+                  data-testid="ar-place-object-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (isSurfaceDetected && onPlaceObject) onPlaceObject()
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
                   disabled={!isSurfaceDetected}
                   style={{
                     background: isSurfaceDetected
@@ -825,6 +830,8 @@ export default function VirtualARHUD({
                     boxShadow: isSurfaceDetected ? '0 4px 16px rgba(234, 88, 12, 0.5)' : 'none',
                     letterSpacing: '0.02em',
                     transition: 'all 0.2s ease',
+                    touchAction: 'manipulation',
+                    pointerEvents: 'auto',
                   }}
                   onMouseDown={e => { if (isSurfaceDetected) e.currentTarget.style.transform = 'scale(0.98)' }}
                   onMouseUp={e => { if (isSurfaceDetected) e.currentTarget.style.transform = 'scale(1)' }}
@@ -1047,14 +1054,18 @@ export default function VirtualARHUD({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => onStepClick(currentStep)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onStepClick(currentStep)
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
                     style={{
                       background: 'var(--color-brand)',
                       color: '#FFFFFF',
                       border: 'none',
                       borderRadius: '11px',
-                      padding: '11px 16px',
-                      fontSize: '0.84rem',
+                      padding: '12px 16px',
+                      fontSize: '0.86rem',
                       fontWeight: 700,
                       cursor: 'pointer',
                       display: 'flex',
@@ -1064,6 +1075,8 @@ export default function VirtualARHUD({
                       boxShadow: '0 4px 16px rgba(224, 90, 0, 0.45)',
                       transition: 'transform 0.1s ease, filter 0.15s ease',
                       marginTop: 2,
+                      touchAction: 'manipulation',
+                      pointerEvents: 'auto',
                     }}
                     onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.98)')}
                     onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}

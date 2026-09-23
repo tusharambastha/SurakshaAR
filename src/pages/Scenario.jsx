@@ -1537,11 +1537,11 @@ export default function Scenario() {
     hazardGroup: null,
     fireVisual: null,
     clock: new THREE.Clock(),
-    deviceRot: { alpha: 0, beta: 90, gamma: 0 },
+    deviceRot: { alpha: 0, beta: 65, gamma: 0 },
     sensorQuaternion: null,
-    hasRealOrientation: false,
+    hasRealOrientation: typeof window !== 'undefined' && ('ontouchstart' in window || (navigator?.maxTouchPoints ?? 0) > 0),
     sensorEventCount: 0,
-    activeMethod: 'Initializing...',
+    activeMethod: (typeof window !== 'undefined' && ('ontouchstart' in window || (navigator?.maxTouchPoints ?? 0) > 0)) ? 'Mobile Sensors Ready' : 'Initializing...',
     lastDebugUpdate: 0,
     dragYaw: 0,
     dragPitch: 0,
@@ -2184,26 +2184,35 @@ export default function Scenario() {
   }
 
   async function toggleARMode() {
+    let nextMode = !arMode
     if (!arMode && cameraAvail && cameraStreamRef.current) {
-      setArMode(true)
+      nextMode = true
     } else if (arMode) {
-      setArMode(false)
-      const t = threeRef.current
-      if (t.camera && t.controls) {
-        t.camera.position.set(0, 3.5, 9.5)
-        t.controls.target.set(0, 1.2, 0)
-        t.controls.enabled = true
-        t.controls.update()
-      }
+      nextMode = false
     } else {
       const stream = await requestCameraStream()
       if (stream) {
         cameraStreamRef.current = stream
         setCameraAvail(true)
-        setArMode(true)
+        nextMode = true
       } else {
         alert('Camera permission required for Camera AR Mode. Using 3D Simulation Mode.')
+        nextMode = false
       }
+    }
+    setArMode(nextMode)
+    arModeRef.current = nextMode
+    const t = threeRef.current
+    if (t.floor) t.floor.visible = !nextMode
+    if (t.warehousePropsGroup) t.warehousePropsGroup.visible = !nextMode
+    if (t.scene) {
+      t.scene.background = nextMode ? null : new THREE.Color('#1F242D')
+    }
+    if (!nextMode && t.camera && t.controls) {
+      t.camera.position.set(0, 3.5, 9.5)
+      t.controls.target.set(0, 1.2, 0)
+      t.controls.enabled = true
+      t.controls.update()
     }
   }
 
@@ -2307,11 +2316,13 @@ export default function Scenario() {
     const floor = new THREE.Mesh(floorGeo, floorMat)
     floor.rotation.x = -Math.PI / 2
     floor.position.y = 0
+    floor.visible = !arModeRef.current
     scene.add(floor)
     t.floor = floor
 
     // Warehouse Environment Props (Shown in 3D Simulation Mode, Hidden in Camera AR Mode)
     const warehousePropsGroup = new THREE.Group()
+    warehousePropsGroup.visible = !arModeRef.current
     const machineMat = new THREE.MeshStandardMaterial({ color: '#4B5563', metalness: 0.7, roughness: 0.3 })
     const yellowStripeMat = new THREE.MeshStandardMaterial({ color: '#EAB308', metalness: 0.2, roughness: 0.5 })
 
@@ -2745,7 +2756,7 @@ export default function Scenario() {
       if (hasAlpha || hasBeta || hasGamma) {
         t.deviceRot = {
           alpha: hasAlpha ? e.alpha : (t.deviceRot?.alpha ?? 0),
-          beta: hasBeta ? e.beta : (t.deviceRot?.beta ?? 90),
+          beta: hasBeta ? e.beta : (t.deviceRot?.beta ?? 65),
           gamma: hasGamma ? e.gamma : (t.deviceRot?.gamma ?? 0),
         }
         t.hasRealOrientation = true
@@ -2833,6 +2844,11 @@ export default function Scenario() {
         if (controls) controls.enabled = false
         camera.position.set(0, 1.4, 0)
 
+        // Ensure 3D floor and warehouse environment props are never rendered over the live camera feed
+        if (t.floor && t.floor.visible) t.floor.visible = false
+        if (t.warehousePropsGroup && t.warehousePropsGroup.visible) t.warehousePropsGroup.visible = false
+        if (scene.background !== null) scene.background = null
+
         if (t.hasRealOrientation) {
           if (t.sensorQuaternion) {
             camera.quaternion.set(
@@ -2873,7 +2889,7 @@ export default function Scenario() {
             activeMethod: t.activeMethod || (t.hasRealOrientation ? 'Sensors Active' : 'Touch/Mouse Aim Fallback'),
             eventCount: t.sensorEventCount || 0,
             alpha: t.deviceRot?.alpha ?? 0,
-            beta: t.deviceRot?.beta ?? 90,
+            beta: t.deviceRot?.beta ?? 65,
             gamma: t.deviceRot?.gamma ?? 0,
             camFwd: { x: camFwd.x, y: camFwd.y, z: camFwd.z },
           }))
@@ -2899,29 +2915,26 @@ export default function Scenario() {
             }
             activeNode.group.visible = true
           } else {
-            // FIX 1: Enforce Surface Detection for Virtual Object Preview
             // Virtual objects must ONLY appear on detected real surfaces, never in empty space/sky/ceiling
             const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize()
 
             // Downward pitch angle check: aiming towards floor or table level
-            // camForward.y < -0.18 ensures camera is tilted down toward ground, not horizontal/sky/ceiling
-            // camForward.y > -0.96 prevents placing inside trainee's feet
-            const isAngleDown = camForward.y < -0.18 && camForward.y > -0.96
+            // camForward.y < -0.05 ensures camera is tilted down toward ground, not horizontal/sky/ceiling
+            const isAngleDown = camForward.y < -0.05
             let isSurfaceDetected = false
             let surfaceDist = 0
             let hitPos = null
 
             if (isAngleDown) {
               const floorY = 0.05
-              const distToFloor = (camera.position.y - floorY) / (-camForward.y)
-              if (distToFloor >= 0.9 && distToFloor <= 4.2) {
-                isSurfaceDetected = true
-                surfaceDist = distToFloor
-                hitPos = new THREE.Vector3()
-                  .copy(camera.position)
-                  .addScaledVector(camForward, distToFloor)
-                hitPos.y = floorY
-              }
+              const rawDist = (camera.position.y - floorY) / (-camForward.y)
+              const clampedDist = Math.max(0.6, Math.min(4.5, rawDist))
+              isSurfaceDetected = true
+              surfaceDist = clampedDist
+              hitPos = new THREE.Vector3()
+                .copy(camera.position)
+                .addScaledVector(camForward, clampedDist)
+              hitPos.y = floorY
             }
 
             t.surfaceState = {
@@ -2929,8 +2942,8 @@ export default function Scenario() {
               distance: surfaceDist,
               hitPos,
               reason: !isAngleDown
-                ? (camForward.y >= -0.18 ? 'no_surface_horizontal_or_sky' : 'too_close_down')
-                : (surfaceDist > 4.2 ? 'surface_too_far' : 'surface_too_close'),
+                ? 'no_surface_horizontal_or_sky'
+                : 'surface_detected',
             }
             surfaceDetectionRef.current = t.surfaceState
 
