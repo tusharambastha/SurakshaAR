@@ -38,6 +38,7 @@ import { calculateScore } from '../lib/scoring'
 import { queueOfflineAction } from '../lib/indexeddb'
 import { speak } from '../lib/voice'
 import VirtualARHUD from '../components/ar/VirtualARHUD'
+import { competencyTracker } from '../lib/competencyTracker'
 
 // ─── Floating Canvas Text Sprite Helper ────────────────────────────────────────
 function createStepBadgeSprite(stepNumber, label, color = '#E05A00') {
@@ -2063,10 +2064,26 @@ export default function Scenario() {
         await queueOfflineAction('complete_session', sessionData)
         setSessionId(sId)
       }
+      competencyTracker.startSession({
+        sessionId: sId,
+        scenarioId: id,
+        scenarioTitle: scenario?.title || 'Fire & Explosion Response',
+        hazardType: scenario?.hazard_type || 'fire',
+      })
+
       setStepStartTime(Date.now())
     }
     createSession()
-  }, [user, id, isOnline])
+  }, [user, id, isOnline, scenario])
+
+  // Track each step presentation for reaction timing
+  useEffect(() => {
+    if (scenario?.steps?.[currentStep]) {
+      const stepObj = scenario.steps[currentStep]
+      const label = getStepText(stepObj, 'label') || `Step ${currentStep + 1}`
+      competencyTracker.startStep(currentStep, label)
+    }
+  }, [currentStep, scenario, getStepText])
 
   // ── Synchronous Timer Cancellation Helper ─────────────────────────────────
   const stopTimer = useCallback(() => {
@@ -2121,6 +2138,16 @@ export default function Scenario() {
     stepSessionLogsRef.current = [...stepSessionLogsRef.current, sessionEntry]
     window.__surakshaStepSessionData = stepSessionLogsRef.current
 
+    // Innovation Layer: Measure real response time & verify sequence
+    competencyTracker.recordAction({
+      stepIndex,
+      stepLabel,
+      expectedSequenceIndex: currentStep,
+      isPpeStep: step?.is_ppe_step ?? false,
+      arTrackingMode: xrTrackingType,
+      surfaceDetected: !!surfaceDetectionRef.current?.detected,
+    })
+
     const newLogs = [...stepLogs, log]
     setStepLogs(newLogs)
     setCompletedSteps(prev => [...prev, stepIndex])
@@ -2134,6 +2161,8 @@ export default function Scenario() {
     const steps = scenario?.steps ?? []
     if (stepIndex === steps.length - 1) {
       setIsTimerRunning(false)
+      const report = competencyTracker.getSummaryReport()
+      window.__surakshaLatestCompetencyReport = report
       await finishSession(newLogs)
     } else {
       const nextIdx = stepIndex + 1
@@ -2188,6 +2217,14 @@ export default function Scenario() {
     }
     stepSessionLogsRef.current = [...stepSessionLogsRef.current, sessionEntry]
     window.__surakshaStepSessionData = stepSessionLogsRef.current
+
+    // Innovation layer: record timeout as a competency mistake for gap analysis
+    competencyTracker.recordMistake({
+      stepIndex: currentStep,
+      stepLabel,
+      mistakeType: 'timeout',
+      details: `Exceeded ${getStepDuration(currentStep)}s time limit on step ${currentStep + 1}`,
+    })
 
     const timeoutExplanations = {
       0: {
@@ -2578,6 +2615,69 @@ export default function Scenario() {
     }
   }
 
+  // ─── Native WebXR ARCore Session Launcher ────────────────────────────────────
+  // Launches an immersive-ar session using the WebXR Device API. Requires Chrome
+  // on Android with ARCore installed. Falls back gracefully if unsupported.
+  const launchWebXRSession = useCallback(async () => {
+    if (!webXrSupported) {
+      console.warn('[SurakshaAR] WebXR immersive-ar not supported on this device.')
+      return
+    }
+    const t = threeRef.current
+    if (!t.renderer) {
+      console.warn('[SurakshaAR] Renderer not ready for WebXR session.')
+      return
+    }
+
+    // Find the overlay root (the full-screen scenario container)
+    const overlayRoot = document.getElementById('suraksha-scenario-root') || document.body
+
+    try {
+      const session = await navigator.xr.requestSession('immersive-ar', {
+        requiredFeatures: ['hit-test'],
+        optionalFeatures: ['dom-overlay', 'anchors', 'plane-detection', 'local-floor'],
+        domOverlay: { root: overlayRoot },
+      })
+
+      // Wire the session into Three.js renderer
+      await t.renderer.xr.setSession(session)
+      t.xrSession = session
+
+      // Prefer local-floor (gives real ground plane Y), fallback to local
+      let referenceSpace
+      try {
+        referenceSpace = await session.requestReferenceSpace('local-floor')
+      } catch (_e) {
+        referenceSpace = await session.requestReferenceSpace('local')
+      }
+      t.xrReferenceSpace = referenceSpace
+
+      // Set up hit-test source from viewer space (camera forward ray)
+      const viewerSpace = await session.requestReferenceSpace('viewer')
+      const hitTestSource = await session.requestHitTestSource({ space: viewerSpace })
+      t.xrHitTestSource = hitTestSource
+
+      // Signal HUD that native WebXR is active
+      setXrTrackingType('webxr')
+      setArMode(true) // Enter AR display mode
+      arModeRef.current = true
+
+      console.log('[SurakshaAR] ✅ WebXR immersive-ar session started with hit-test source.')
+
+      // Cleanup when session ends (user presses Back, session is lost, etc.)
+      session.addEventListener('end', () => {
+        console.log('[SurakshaAR] WebXR session ended — restoring gyro/sensor fallback.')
+        t.xrHitTestSource = null
+        t.xrReferenceSpace = null
+        t.xrSession = null
+        setXrTrackingType(webXrSupported ? 'webxr_supported_gyro' : 'orientation')
+      })
+    } catch (err) {
+      console.error('[SurakshaAR] WebXR session request failed:', err)
+      // Non-fatal: user stays in gyro/sensor AR or 3D sim mode
+    }
+  }, [webXrSupported])
+
   // ─── Three.js Scene Mounting (ONE TIME ONLY) ────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current
@@ -2599,7 +2699,13 @@ export default function Scenario() {
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.0 // Calibrated exposure eliminates blown-out plastic specular
     renderer.outputColorSpace = THREE.SRGBColorSpace
+    // Enable WebXR so renderer.xr.setSession() can be called for native ARCore AR
+    renderer.xr.enabled = true
     t.renderer = renderer
+    // WebXR session state (set by launchWebXRSession)
+    t.xrSession = null
+    t.xrHitTestSource = null
+    t.xrReferenceSpace = null
 
     // 2. Scene
     const scene = new THREE.Scene()
@@ -3194,9 +3300,35 @@ export default function Scenario() {
       window.addEventListener('deviceorientationabsolute', onDeviceRot, { passive: true })
     }
 
-    // 11. Animation Loop
-    function renderLoop() {
-      t.animId = requestAnimationFrame(renderLoop)
+    // 11. Animation Loop — uses setAnimationLoop for WebXR compatibility.
+    // When a WebXR session is active, 'frame' is an XRFrame; otherwise null.
+    renderer.setAnimationLoop((timestamp, frame) => {
+      // ── WebXR Native Hit-Test (primary surface detection path) ──
+      if (frame && t.xrHitTestSource && t.xrReferenceSpace) {
+        const hits = frame.getHitTestResults(t.xrHitTestSource)
+        if (hits.length > 0) {
+          try {
+            const pose = hits[0].getPose(t.xrReferenceSpace)
+            if (pose) {
+              const m = pose.transform.matrix
+              const hitPos = new THREE.Vector3(m[12], m[13], m[14])
+              t.surfaceState = {
+                detected: true,
+                distance: hitPos.distanceTo(camera.position),
+                hitPos,
+                reason: 'webxr_hit',
+              }
+              surfaceDetectionRef.current = t.surfaceState
+            }
+          } catch (_e) {
+            // Pose may not be available every frame — silently skip
+          }
+        } else {
+          t.surfaceState = { detected: false, distance: 0, hitPos: null, reason: 'webxr_searching' }
+          surfaceDetectionRef.current = t.surfaceState
+        }
+      }
+
       const elapsed = t.clock.getElapsedTime()
 
       // Animate hazard & consequence growth
@@ -3458,12 +3590,12 @@ export default function Scenario() {
       }
 
       renderer.render(scene, camera)
-    }
-    renderLoop()
+    }) // end renderer.setAnimationLoop
 
     // 12. Cleanup on unmount
     return () => {
-      if (t.animId) cancelAnimationFrame(t.animId)
+      renderer.setAnimationLoop(null) // Stops WebXR & rAF loop
+      if (t.xrSession) { try { t.xrSession.end() } catch (_e) {} }
       canvas.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('pointermove', onPointerMove)
       window.removeEventListener('pointerup', onPointerUp)
@@ -3567,7 +3699,7 @@ export default function Scenario() {
   const activeStep = steps[currentStep]
 
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#1F242D', position: 'relative', overflow: 'hidden' }}>
+    <div id="suraksha-scenario-root" style={{ width: '100vw', height: '100vh', background: '#1F242D', position: 'relative', overflow: 'hidden' }}>
 
       {/* Loading Overlay — Keeps Canvas permanently mounted so WebGL never suffers race conditions */}
       {(isLoading || !cameraChecked) && (
@@ -3915,6 +4047,30 @@ export default function Scenario() {
                 {arMode ? <Monitor size={14} /> : <Camera size={14} />}
                 {arMode ? 'Switch to 3D' : 'Switch to AR'}
               </button>
+
+              {/* Native ARCore button — only shown on ARCore-capable Android devices */}
+              {webXrSupported && !arMode && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    launchWebXRSession()
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  title="Launch Native ARCore (real surface plane detection)"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(14,124,123,0.85), rgba(6,78,59,0.85))',
+                    border: '1.5px solid #0E7C7B',
+                    color: 'white', borderRadius: 20, padding: '8px 14px',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    touchAction: 'manipulation', pointerEvents: 'auto',
+                    boxShadow: '0 0 12px rgba(14,124,123,0.5)',
+                  }}
+                >
+                  📡 Native ARCore
+                </button>
+              )}
 
               <button
                 type="button"
