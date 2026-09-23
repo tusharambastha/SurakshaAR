@@ -1623,6 +1623,8 @@ export default function Scenario() {
       t.placedPositions[activeIdx] = placedPos.clone()
       activeNode.group.position.copy(placedPos)
       activeNode.group.lookAt(camera.position.x, placedPos.y, camera.position.z)
+      activeNode.group.rotation.x = 0
+      activeNode.group.rotation.z = 0
       t.placedRotations[activeIdx] = activeNode.group.quaternion.clone()
       activeNode.group.visible = true
 
@@ -2713,42 +2715,11 @@ export default function Scenario() {
     window.addEventListener('resize', onResize)
 
     // 10. Device Orientation & Sensor Handlers (Android 10+, Chrome & iOS)
-    const _zee = new THREE.Vector3(0, 0, 1)
-    const _euler = new THREE.Euler()
-    const _q0 = new THREE.Quaternion()
-    const _q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)) // -PI/2 around X axis
-
-    let relativeSensor = null
-    if (typeof window !== 'undefined' && 'RelativeOrientationSensor' in window) {
-      try {
-        relativeSensor = new window.RelativeOrientationSensor({ frequency: 60 })
-        relativeSensor.addEventListener('reading', () => {
-          if (relativeSensor.quaternion) {
-            t.sensorQuaternion = relativeSensor.quaternion
-            t.hasRealOrientation = true
-            t.sensorEventCount = (t.sensorEventCount || 0) + 1
-            t.activeMethod = 'RelativeOrientationSensor (60Hz)'
-          }
-        })
-        relativeSensor.addEventListener('error', (event) => {
-          console.log('[SurakshaAR] RelativeOrientationSensor:', event.error?.name)
-        })
-        relativeSensor.start()
-      } catch (err) {
-        console.log('[SurakshaAR] RelativeOrientationSensor init:', err?.message)
-      }
-    }
-
     function onDeviceRot(e) {
-      // Don't overwrite if RelativeOrientationSensor is providing 60Hz precision
-      if (t.activeMethod?.includes('RelativeOrientationSensor') && t.sensorQuaternion) {
-        return
-      }
-
       // Android / iOS device orientation handler
-      // CRITICAL FIX: Do NOT check e.alpha !== null && e.beta !== null!
-      // On many Android devices, alpha is null if compass is uncalibrated,
-      // but beta & gamma are valid accelerometer readings.
+      // e.alpha: compass/yaw (0 to 360)
+      // e.beta: front-to-back pitch (-180 to 180), upright portrait is ~90°
+      // e.gamma: left-to-right roll (-90 to 90)
       const hasAlpha = e.alpha !== null && e.alpha !== undefined
       const hasBeta = e.beta !== null && e.beta !== undefined
       const hasGamma = e.gamma !== null && e.gamma !== undefined
@@ -2762,8 +2733,8 @@ export default function Scenario() {
         t.hasRealOrientation = true
         t.sensorEventCount = (t.sensorEventCount || 0) + 1
         t.activeMethod = e.type === 'deviceorientationabsolute'
-          ? 'DeviceOrientationAbsolute (Sensors Active)'
-          : 'DeviceOrientation (Sensors Active)'
+          ? 'DeviceOrientationAbsolute (Active)'
+          : 'DeviceOrientation (Active)'
       }
     }
     window.addEventListener('deviceorientation', onDeviceRot, { passive: true })
@@ -2850,40 +2821,29 @@ export default function Scenario() {
         if (scene.background !== null) scene.background = null
 
         if (t.hasRealOrientation) {
-          if (t.sensorQuaternion) {
-            camera.quaternion.set(
-              t.sensorQuaternion[0],
-              t.sensorQuaternion[1],
-              t.sensorQuaternion[2],
-              t.sensorQuaternion[3]
-            )
-            camera.quaternion.multiply(_q1)
-            const screenAngle = (window.screen?.orientation?.angle || window.orientation || 0)
-            camera.quaternion.multiply(_q0.setFromAxisAngle(_zee, -THREE.MathUtils.degToRad(screenAngle)))
-          } else {
-            const { alpha, beta, gamma } = t.deviceRot
-            const screenAngle = (window.screen?.orientation?.angle || window.orientation || 0)
-            const alphaRad = THREE.MathUtils.degToRad(alpha) + t.dragYaw
-            const betaRad = THREE.MathUtils.degToRad(beta) + t.dragPitch
-            const gammaRad = THREE.MathUtils.degToRad(gamma)
-            const orientRad = THREE.MathUtils.degToRad(screenAngle)
+          const { alpha, beta } = t.deviceRot
+          // beta: 90° = phone held vertical/upright in portrait.
+          // Tilting forward to look at desk/floor: beta drops towards 0°.
+          // Tilting backward to look up at ceiling: beta goes above 90°.
+          const pitchAngle = THREE.MathUtils.degToRad((beta ?? 65) - 90) + t.dragPitch
+          const yawAngle = THREE.MathUtils.degToRad(alpha ?? 0) + t.dragYaw
 
-            _euler.set(betaRad, alphaRad, -gammaRad, 'YXZ')
-            camera.quaternion.setFromEuler(_euler)
-            camera.quaternion.multiply(_q1)
-            camera.quaternion.multiply(_q0.setFromAxisAngle(_zee, -orientRad))
-          }
+          // Clamp pitch: -83° (straight down at feet) to +35° (slight upward gaze)
+          const clampedPitch = Math.max(-1.45, Math.min(0.60, pitchAngle))
+
+          // Set rotation with ZERO roll (Z = 0) so virtual scene horizon NEVER tilts sideways!
+          camera.rotation.set(clampedPitch, yawAngle, 0, 'YXZ')
         } else {
           // Dynamic camera orientation from drag aim (desktop webcam / laptop / gyro-less)
-          _euler.set(t.dragPitch, t.dragYaw, 0, 'YXZ')
-          camera.quaternion.setFromEuler(_euler)
+          const clampedPitch = Math.max(-1.45, Math.min(0.60, t.dragPitch))
+          camera.rotation.set(clampedPitch, t.dragYaw, 0, 'YXZ')
         }
 
         // Live Sensor Debug HUD & Surface Detection throttled state update (~6 updates/sec)
         const now = performance.now()
         if (!t.lastDebugUpdate || now - t.lastDebugUpdate > 160) {
           t.lastDebugUpdate = now
-          const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+          const camFwd = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation)
           setSensorDebug(prev => ({
             ...prev,
             activeMethod: t.activeMethod || (t.hasRealOrientation ? 'Sensors Active' : 'Touch/Mouse Aim Fallback'),
@@ -2913,44 +2873,59 @@ export default function Scenario() {
             if (t.placedRotations && t.placedRotations[activeIdx]) {
               activeNode.group.quaternion.copy(t.placedRotations[activeIdx])
             }
+            // Enforce vertical upright posture
+            activeNode.group.rotation.x = 0
+            activeNode.group.rotation.z = 0
             activeNode.group.visible = true
           } else {
-            // Virtual objects must ONLY appear on detected real surfaces, never in empty space/sky/ceiling
-            const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).normalize()
+            // Live surface detection for virtual object preview
+            const camForward = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation).normalize()
 
-            // Downward pitch angle check: aiming towards floor or table level
-            // camForward.y < -0.05 ensures camera is tilted down toward ground, not horizontal/sky/ceiling
-            const isAngleDown = camForward.y < -0.05
+            // As long as camera is aimed forward or downward (not straight up at ceiling)
+            const isLookingAtEnvironment = camForward.y < 0.35
             let isSurfaceDetected = false
             let surfaceDist = 0
             let hitPos = null
 
-            if (isAngleDown) {
-              const floorY = 0.05
-              const rawDist = (camera.position.y - floorY) / (-camForward.y)
-              const clampedDist = Math.max(0.6, Math.min(4.5, rawDist))
+            if (isLookingAtEnvironment) {
               isSurfaceDetected = true
-              surfaceDist = clampedDist
-              hitPos = new THREE.Vector3()
-                .copy(camera.position)
-                .addScaledVector(camForward, clampedDist)
-              hitPos.y = floorY
+
+              if (camForward.y < -0.12) {
+                // Downward ray toward floor or desk: calculate geometric intersection with ground plane
+                const floorY = 0.05
+                const rawDist = (camera.position.y - floorY) / (-camForward.y)
+                // Clamp to ergonomic training distance: 1.0m to 2.4m in front of trainee
+                surfaceDist = Math.max(1.0, Math.min(2.4, rawDist))
+                hitPos = new THREE.Vector3()
+                  .copy(camera.position)
+                  .addScaledVector(camForward, surfaceDist)
+                hitPos.y = floorY
+              } else {
+                // Aiming horizontal or slightly down (at a desk or vertical surface/equipment in front)
+                surfaceDist = 1.6
+                hitPos = new THREE.Vector3()
+                  .copy(camera.position)
+                  .addScaledVector(camForward, surfaceDist)
+                hitPos.y = 0.25 // comfortable desk/stand height
+              }
             }
 
             t.surfaceState = {
               detected: isSurfaceDetected,
               distance: surfaceDist,
               hitPos,
-              reason: !isAngleDown
-                ? 'no_surface_horizontal_or_sky'
-                : 'surface_detected',
+              reason: isSurfaceDetected ? 'surface_detected' : 'aim_down_at_floor_or_desk',
             }
             surfaceDetectionRef.current = t.surfaceState
 
             if (isSurfaceDetected && hitPos) {
-              // Surface detected: object sits neatly on the detected ground plane
+              // Surface detected: object sits neatly right at target
               activeNode.group.position.copy(hitPos)
+              // Make object face the trainee horizontally around vertical Y axis
               activeNode.group.lookAt(camera.position.x, hitPos.y, camera.position.z)
+              // ENFORCE: Object is 100% upright, ZERO tilt/roll
+              activeNode.group.rotation.x = 0
+              activeNode.group.rotation.z = 0
               activeNode.group.visible = true
             } else {
               // NO SURFACE DETECTED: Hide virtual object completely! No floating in mid-air
@@ -2967,7 +2942,7 @@ export default function Scenario() {
           const camWorldPos = new THREE.Vector3()
           camera.getWorldPosition(camWorldPos)
 
-          const camForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+          const camForward = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation)
           camForward.y = 0
           camForward.normalize()
 
@@ -3035,9 +3010,6 @@ export default function Scenario() {
       window.removeEventListener('deviceorientation', onDeviceRot)
       if ('ondeviceorientationabsolute' in window) {
         window.removeEventListener('deviceorientationabsolute', onDeviceRot)
-      }
-      if (relativeSensor) {
-        try { relativeSensor.stop() } catch {}
       }
       fireAudioRef.current.stop()
       controls.dispose()

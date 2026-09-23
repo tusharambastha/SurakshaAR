@@ -695,8 +695,8 @@ export default function VirtualARHUD({
                 ? '⚡ WebXR Surface Plane Lock'
                 : '⚡ WebXR Hit-Test Searching...'
               : isSurfaceDetected
-              ? '📍 Approximate Placement (Floor Plane)'
-              : '📍 Approximate Placement (Searching Flat Surface...)'}
+              ? '📍 Surface Ready (Tap Place Below)'
+              : '📍 Point at Floor or Desk...'}
           </div>
         )}
 
