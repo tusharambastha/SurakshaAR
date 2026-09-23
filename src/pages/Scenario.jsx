@@ -586,29 +586,29 @@ function createFireSourceProp() {
     smokeParticles.push(particle)
   }
 
-  // 5. White-Hot Central Flame Core & Inner Flame Body
-  const coreMat = new THREE.MeshStandardMaterial({
-    color: '#FFFDF5',
-    emissive: '#FFEDD5',
-    emissiveIntensity: 4.8,
-    roughness: 0.1,
-    side: THREE.DoubleSide,
+  // 5. White-Hot Central Flame Core & Inner Flame Body (Volumetric Particle Sprites)
+  const coreMat = new THREE.SpriteMaterial({
+    map: flameTex,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
   })
-  const flameCore = new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.34, 16), coreMat)
-  flameCore.position.set(0, 0.32, 0)
+  const flameCore = new THREE.Sprite(coreMat)
+  flameCore.position.set(0, 0.28, 0)
+  flameCore.scale.set(0.38, 0.52, 1)
   propGroup.add(flameCore)
 
-  const innerFlameMat = new THREE.MeshStandardMaterial({
-    color: '#F97316',
-    emissive: '#EA580C',
-    emissiveIntensity: 3.5,
-    roughness: 0.2,
+  const innerFlameMat = new THREE.SpriteMaterial({
+    map: flameTex,
+    blending: THREE.AdditiveBlending,
     transparent: true,
-    opacity: 0.9,
-    side: THREE.DoubleSide,
+    opacity: 0.82,
+    depthWrite: false,
   })
-  const innerFlame = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.48, 16), innerFlameMat)
-  innerFlame.position.set(0, 0.36, 0)
+  const innerFlame = new THREE.Sprite(innerFlameMat)
+  innerFlame.position.set(0, 0.34, 0)
+  innerFlame.scale.set(0.48, 0.65, 1)
   propGroup.add(innerFlame)
 
   // 6. Dynamic Flickering PointLight (Synchronized to Fire)
@@ -620,17 +620,17 @@ function createFireSourceProp() {
   function updateFire(elapsed, isEscalated) {
     const scaleMult = isEscalated ? 2.25 : 1.0
 
-    // Animate Inner Flame Meshes
+    // Animate Inner Flame Sprites
     const coreBreath = (1.0 + Math.sin(elapsed * 9.0) * 0.08) * scaleMult
     flameCore.scale.set(
-      coreBreath * (1.0 + Math.sin(elapsed * 17.0) * 0.10),
-      coreBreath * (1.0 + Math.cos(elapsed * 14.0) * 0.12),
-      coreBreath * (1.0 + Math.cos(elapsed * 19.0) * 0.10)
+      0.38 * coreBreath * (1.0 + Math.sin(elapsed * 17.0) * 0.10),
+      0.52 * coreBreath * (1.0 + Math.cos(elapsed * 14.0) * 0.12),
+      1
     )
     innerFlame.scale.set(
-      coreBreath * (1.0 + Math.cos(elapsed * 15.0) * 0.10),
-      coreBreath * (1.0 + Math.sin(elapsed * 12.0) * 0.14),
-      coreBreath * (1.0 + Math.sin(elapsed * 18.0) * 0.10)
+      0.48 * coreBreath * (1.0 + Math.cos(elapsed * 15.0) * 0.10),
+      0.65 * coreBreath * (1.0 + Math.sin(elapsed * 12.0) * 0.14),
+      1
     )
 
     // Animate Flame Billboard Particles
@@ -1654,6 +1654,7 @@ export default function Scenario() {
     const activeIdx = currentStepRef.current
     if (t.placedPositions) delete t.placedPositions[activeIdx]
     if (t.placedRotations) delete t.placedRotations[activeIdx]
+    t.initialAlpha = null
     setPlacedSteps(prev => ({ ...prev, [activeIdx]: false }))
     placedStepsRef.current[activeIdx] = false
     setTimerSeconds(getStepDuration(activeIdx))
@@ -2205,6 +2206,11 @@ export default function Scenario() {
     setArMode(nextMode)
     arModeRef.current = nextMode
     const t = threeRef.current
+    if (nextMode) {
+      t.initialAlpha = null
+      t.dragYaw = 0
+      t.dragPitch = 0
+    }
     if (t.floor) t.floor.visible = !nextMode
     if (t.warehousePropsGroup) t.warehousePropsGroup.visible = !nextMode
     if (t.scene) {
@@ -2272,6 +2278,14 @@ export default function Scenario() {
     controls.target.set(0, 1.2, 0)
     controls.update()
     t.controls = controls
+
+    // W3C Device Orientation Math Helpers
+    t.zee = new THREE.Vector3(0, 0, 1)
+    t.q0 = new THREE.Quaternion()
+    t.q1 = new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)) // -PI/2 around X
+    t.deviceEuler = new THREE.Euler()
+    t.deviceQuat = new THREE.Quaternion()
+    t.initialAlpha = null
 
     // 5. Lighting — Bright, high-contrast, industrial visibility
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334455, 1.4)
@@ -2418,8 +2432,6 @@ export default function Scenario() {
       hazardGroup.position.set(3, 1.2, 2.3)
       const fLight = new THREE.PointLight('#F97316', 4.0, 9)
       hazardGroup.add(fLight)
-
-      t.flameMeshes = []
       t.flameLight = fLight
     }
     scene.add(hazardGroup)
@@ -2513,7 +2525,7 @@ export default function Scenario() {
     const steps = scenario.steps || []
     steps.forEach((step, idx) => {
       const rawPos = step.position || [0, 1, 0]
-      const pos = (isFireScenario && idx === 0) ? [3, 0.35, 2.3] : rawPos
+      const pos = (isFireScenario && idx === 0) ? [3, 0.75, 2.3] : rawPos
       const group = new THREE.Group()
       group.position.set(pos[0], pos[1], pos[2])
 
@@ -2563,7 +2575,7 @@ export default function Scenario() {
         roughness: 0.2,
       })
       const orbMesh = new THREE.Mesh(orbGeo, orbMat)
-      orbMesh.position.y = isFireStep ? 0.92 : 0.48
+      orbMesh.position.y = isFireStep ? 0.55 : 0.28
       orbMesh.userData = { stepIndex: idx }
       group.add(orbMesh)
 
@@ -2577,24 +2589,24 @@ export default function Scenario() {
       })
       const ringMesh = new THREE.Mesh(ringGeo, ringMat)
       ringMesh.rotation.x = -Math.PI / 2
-      ringMesh.position.y = isFireStep ? -0.01 : -0.16
+      ringMesh.position.y = -0.02
       group.add(ringMesh)
 
-      // Vertical beacon light beam (Compact 0.7m, elevated above prop)
-      const beamGeo = new THREE.CylinderGeometry(0.015, 0.05, 0.7, 12)
+      // Vertical beacon light beam (Compact 0.45m, elevated above prop)
+      const beamGeo = new THREE.CylinderGeometry(0.015, 0.05, 0.45, 12)
       const beamMat = new THREE.MeshBasicMaterial({
         color: step.color || '#E05A00',
         transparent: true,
         opacity: 0.3,
       })
       const beamMesh = new THREE.Mesh(beamGeo, beamMat)
-      beamMesh.position.y = isFireStep ? 1.35 : 0.85
+      beamMesh.position.y = isFireStep ? 0.85 : 0.50
       group.add(beamMesh)
 
       // Floating billboard sprite label (Proportionate: 0.72m wide x 0.14m tall)
-      // Elevated above the 3D model so equipment is 100% visible and unblocked
+      // Positioned right above the 3D model inside the central reticle
       const badgeSprite = createStepBadgeSprite(idx + 1, step.label, step.color || '#E05A00')
-      badgeSprite.position.set(0, isFireStep ? 1.05 : 0.68, 0)
+      badgeSprite.position.set(0, isFireStep ? 0.62 : 0.38, 0)
       badgeSprite.scale.set(0.72, 0.14, 1)
       group.add(badgeSprite)
 
@@ -2748,10 +2760,6 @@ export default function Scenario() {
       if (t.hazardGroup && !t.flameExtinguished) {
         const hMult = fireEscalatedRef.current ? 2.2 : 1.0
         t.hazardGroup.scale.setScalar((1 + Math.sin(elapsed * 8) * 0.08) * hMult)
-        if (t.flameMeshes && t.flameMeshes.length >= 2 && t.flameMeshes[0] && t.flameMeshes[1]) {
-          t.flameMeshes[0].scale.set((1 + Math.sin(elapsed * 14) * 0.12) * hMult, (1 + Math.cos(elapsed * 12) * 0.15) * hMult, (1 + Math.sin(elapsed * 11) * 0.12) * hMult)
-          t.flameMeshes[1].scale.set((1 + Math.cos(elapsed * 16) * 0.10) * hMult, (1 + Math.sin(elapsed * 15) * 0.18) * hMult, (1 + Math.cos(elapsed * 13) * 0.10) * hMult)
-        }
         if (t.flameLight) {
           t.flameLight.intensity = (fireEscalatedRef.current ? 9.5 : 4.0) + Math.sin(elapsed * 12) * 1.5
           t.flameLight.distance = fireEscalatedRef.current ? 12 : 7
@@ -2818,21 +2826,37 @@ export default function Scenario() {
         if (scene.background !== null) scene.background = null
 
         if (t.hasRealOrientation) {
-          const { alpha, beta } = t.deviceRot
-          // beta: 90° = phone held vertical/upright in portrait.
-          // Tilting forward to look at desk/floor: beta drops towards 0°.
-          // Tilting backward to look up at ceiling: beta goes above 90°.
-          const pitchAngle = THREE.MathUtils.degToRad((beta ?? 65) - 90) + t.dragPitch
-          const yawAngle = THREE.MathUtils.degToRad(alpha ?? 0) + t.dragYaw
+          const { alpha, beta, gamma } = t.deviceRot
+          if (t.initialAlpha === null || t.initialAlpha === undefined) {
+            t.initialAlpha = alpha ?? 0
+          }
+          // Calibrate relative heading to trainee's starting forward gaze
+          const relAlpha = (alpha ?? 0) - (t.initialAlpha ?? 0)
 
-          // Clamp pitch: -83° (straight down at feet) to +35° (slight upward gaze)
-          const clampedPitch = Math.max(-1.45, Math.min(0.60, pitchAngle))
+          const alphaRad = THREE.MathUtils.degToRad(relAlpha)
+          const betaRad = THREE.MathUtils.degToRad(beta ?? 65)
+          const gammaRad = THREE.MathUtils.degToRad(gamma ?? 0)
+          const screenOrientRad = THREE.MathUtils.degToRad(window.screen?.orientation?.angle ?? (window.orientation ?? 0))
 
-          // Set rotation with ZERO roll (Z = 0) so virtual scene horizon NEVER tilts sideways!
-          camera.rotation.set(clampedPitch, yawAngle, 0, 'YXZ')
+          // Full W3C 3-axis DeviceOrientation quaternion transformation
+          t.deviceEuler.set(betaRad, alphaRad, -gammaRad, 'YXZ')
+          t.deviceQuat.setFromEuler(t.deviceEuler)
+          t.deviceQuat.multiply(t.q1)
+          t.deviceQuat.multiply(t.q0.setFromAxisAngle(t.zee, -screenOrientRad))
+
+          // Extract camera forward vector
+          const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(t.deviceQuat)
+          const pitch = Math.asin(Math.max(-0.99, Math.min(0.99, camFwd.y))) + t.dragPitch
+          const yaw = Math.atan2(-camFwd.x, -camFwd.z) + t.dragYaw
+
+          // Clamp pitch: -83° (straight down at floor) to +45° (comfortable upward gaze)
+          const clampedPitch = Math.max(-1.45, Math.min(0.78, pitch))
+
+          // ZERO ROLL (Z = 0): Scene horizon remains rock-solid level, eliminating all sideways tilt!
+          camera.rotation.set(clampedPitch, yaw, 0, 'YXZ')
         } else {
           // Dynamic camera orientation from drag aim (desktop webcam / laptop / gyro-less)
-          const clampedPitch = Math.max(-1.45, Math.min(0.60, t.dragPitch))
+          const clampedPitch = Math.max(-1.45, Math.min(0.78, t.dragPitch))
           camera.rotation.set(clampedPitch, t.dragYaw, 0, 'YXZ')
         }
 
@@ -2878,8 +2902,8 @@ export default function Scenario() {
             // Live surface detection for virtual object preview
             const camForward = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation).normalize()
 
-            // As long as camera is aimed forward or downward (not straight up at ceiling)
-            const isLookingAtEnvironment = camForward.y < 0.35
+            // Plausible surface aiming: from looking straight down at floor (-Y) up to eye level/desk (+Y up to 0.45)
+            const isLookingAtEnvironment = camForward.y < 0.45
             let isSurfaceDetected = false
             let surfaceDist = 0
             let hitPos = null
@@ -2887,14 +2911,13 @@ export default function Scenario() {
             if (isLookingAtEnvironment) {
               isSurfaceDetected = true
 
-              if (camForward.y < -0.12) {
+              if (camForward.y < -0.08) {
                 // Downward angle towards floor or desk: calculate distance
                 const rawDist = (camera.position.y - 0.05) / (-camForward.y)
-                // Clamp to ergonomic training distance: 1.1m to 2.2m in front of trainee
-                surfaceDist = Math.max(1.1, Math.min(2.2, rawDist))
+                surfaceDist = Math.max(1.0, Math.min(2.5, rawDist))
               } else {
                 // Aiming horizontal or slightly down (at a desk or equipment in front)
-                surfaceDist = 1.6
+                surfaceDist = 1.5
               }
 
               // Anchor object along the central camera reticle ray
@@ -3083,13 +3106,8 @@ export default function Scenario() {
         ud.fireLight.intensity = isExtinguished ? 0 : 4.5
       }
     }
-    if (t.flameMeshes) {
-      t.flameMeshes.forEach(mesh => {
-        mesh.visible = !isExtinguished
-      })
-      if (t.flameLight) {
-        t.flameLight.intensity = isExtinguished ? 0 : 4.0
-      }
+    if (t.flameLight) {
+      t.flameLight.intensity = isExtinguished ? 0 : 4.0
     }
 
     // Ambient Fire Crackling Audio (Web Audio API)
@@ -3314,7 +3332,7 @@ export default function Scenario() {
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '16px 20px',
             background: 'linear-gradient(to bottom, rgba(15,18,22,0.95), transparent)',
-            pointerEvents: 'all',
+            pointerEvents: 'auto',
           }}>
             {/* Mode Badge & Timer */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -3432,7 +3450,7 @@ export default function Scenario() {
           <div style={{
             background: 'linear-gradient(to top, rgba(12,14,18,0.96) 80%, transparent)',
             padding: '24px 20px 20px',
-            pointerEvents: 'all',
+            pointerEvents: 'auto',
             maxWidth: 680,
             margin: '0 auto',
             width: '100%',

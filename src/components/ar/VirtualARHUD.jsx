@@ -3,7 +3,7 @@ import {
   Volume2, CheckCircle2, AlertTriangle, Flame, Wind, Zap, Shield, Target,
   ArrowRight, Monitor, X, Printer, Compass, ChevronLeft, ChevronRight,
   RotateCcw, MapPin, Bell, DoorOpen, Navigation, Cog, Lock, Activity,
-  Menu, Sliders, ChevronDown, ChevronUp, Info
+  Sliders, ChevronDown, ChevronUp, Info
 } from 'lucide-react'
 import { speak } from '../../lib/voice'
 
@@ -182,19 +182,21 @@ export default function VirtualARHUD({
       }}
     >
       {/* ── MINIMAL TOP BAR: Only Essential Corner Anchors (100% Uncluttered View) ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pointerEvents: 'all', zIndex: 30 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pointerEvents: 'auto', zIndex: 30 }}>
         {/* Top-Left: Minimal Station & Object Chip */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 7,
+            gap: 6,
             background: 'rgba(15, 20, 30, 0.88)',
             backdropFilter: 'blur(8px)',
             border: '1px solid rgba(255, 255, 255, 0.16)',
             borderRadius: '20px',
-            padding: '5px 12px',
+            padding: '5px 10px',
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.35)',
+            maxWidth: '46%',
+            overflow: 'hidden',
           }}
         >
           <span
@@ -204,9 +206,18 @@ export default function VirtualARHUD({
               borderRadius: '50%',
               background: '#10B981',
               boxShadow: '0 0 8px #10B981',
+              flexShrink: 0,
             }}
           />
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#FFFFFF', letterSpacing: '0.02em' }}>
+          <span style={{
+            fontSize: '0.70rem',
+            fontWeight: 800,
+            color: '#FFFFFF',
+            letterSpacing: '0.02em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
             STATION {currentStep + 1}/{steps.length} · {objectName.toUpperCase()}
           </span>
         </div>
@@ -536,7 +547,7 @@ export default function VirtualARHUD({
           borderRadius: '18px',
           padding: '10px 14px',
           boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6)',
-          pointerEvents: 'all',
+          pointerEvents: 'auto',
           display: 'flex',
           flexDirection: 'column',
           gap: 8,
@@ -960,7 +971,7 @@ export default function VirtualARHUD({
             justifyContent: 'center',
             zIndex: 9999,
             padding: 20,
-            pointerEvents: 'all',
+            pointerEvents: 'auto',
           }}
         >
           <div
