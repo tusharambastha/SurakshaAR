@@ -2104,18 +2104,29 @@ export default function Scenario() {
 
   // Smooth animated 360-degree rotation step
   function animateOrbitRotate(angleX, angleY) {
-    const controls = threeRef.current.controls
-    if (!controls) return
+    const t = threeRef.current
+    const camera = t.camera
+    const controls = t.controls
+    if (!camera || !controls) return
+    const target = controls.target ? controls.target.clone() : new THREE.Vector3(0, 1.2, 0)
     const startTime = performance.now()
-    const duration = 380
+    const duration = 280
     let lastP = 0
     function stepAnim(now) {
       const p = Math.min((now - startTime) / duration, 1)
       const ease = p * (2 - p)
       const delta = ease - lastP
       lastP = ease
-      if (angleX !== 0) controls.rotateLeft(angleX * delta)
-      if (angleY !== 0) controls.rotateUp(angleY * delta)
+      const offset = camera.position.clone().sub(target)
+      if (angleX !== 0) {
+        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleX * delta)
+      }
+      if (angleY !== 0) {
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion)
+        offset.applyAxisAngle(right, angleY * delta)
+      }
+      camera.position.copy(target).add(offset)
+      camera.lookAt(target)
       controls.update()
       if (p < 1) requestAnimationFrame(stepAnim)
     }
@@ -2124,19 +2135,23 @@ export default function Scenario() {
 
   // Smooth animated zoom
   function animateZoom(factor) {
-    const camera = threeRef.current.camera
-    const controls = threeRef.current.controls
+    const t = threeRef.current
+    const camera = t.camera
+    const controls = t.controls
     if (!camera || !controls) return
+    const target = controls.target ? controls.target.clone() : new THREE.Vector3(0, 1.2, 0)
     const startTime = performance.now()
-    const duration = 280
+    const duration = 250
     let lastP = 0
     function stepZoom(now) {
       const p = Math.min((now - startTime) / duration, 1)
       const ease = p * (2 - p)
       const delta = ease - lastP
       lastP = ease
-      if (factor > 1) controls.dollyIn(1 + 0.25 * delta)
-      else controls.dollyOut(1 + 0.25 * delta)
+      const offset = camera.position.clone().sub(target)
+      const scale = factor > 1 ? (1 - 0.20 * delta) : (1 + 0.20 * delta)
+      offset.multiplyScalar(scale)
+      camera.position.copy(target).add(offset)
       controls.update()
       if (p < 1) requestAnimationFrame(stepZoom)
     }
@@ -2676,7 +2691,6 @@ export default function Scenario() {
     let hasDragged = false
 
     function onPointerDown(e) {
-      if (!arModeRef.current) return
       isPointerDown = true
       hasDragged = false
       startX = e.clientX ?? e.touches?.[0]?.clientX ?? 0
@@ -2684,25 +2698,26 @@ export default function Scenario() {
     }
 
     function onPointerMove(e) {
-      if (!arModeRef.current || !isPointerDown) return
+      if (!isPointerDown) return
       const currentX = e.clientX ?? e.touches?.[0]?.clientX ?? 0
       const currentY = e.clientY ?? e.touches?.[0]?.clientY ?? 0
       const dx = currentX - startX
       const dy = currentY - startY
 
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
         hasDragged = true
         startX = currentX
         startY = currentY
-        // Horizontal drag pans camera yaw left/right
-        t.dragYaw -= dx * 0.005
-        // Vertical drag tilts camera pitch up/down
-        t.dragPitch = Math.max(-1.1, Math.min(1.1, t.dragPitch - dy * 0.005))
+        if (arModeRef.current) {
+          // Horizontal drag pans camera yaw left/right in AR mode
+          t.dragYaw -= dx * 0.005
+          // Vertical drag tilts camera pitch up/down in AR mode
+          t.dragPitch = Math.max(-1.1, Math.min(1.1, t.dragPitch - dy * 0.005))
+        }
       }
     }
 
     function onPointerUp(e) {
-      if (!arModeRef.current) return
       isPointerDown = false
       if (!hasDragged) {
         handlePointerInteract(e)
@@ -3199,24 +3214,35 @@ export default function Scenario() {
       {!arMode && (
         <div style={{
           position: 'absolute', right: 16, top: '40%', transform: 'translateY(-50%)',
-          display: 'flex', flexDirection: 'column', gap: 8, zIndex: 12,
+          display: 'flex', flexDirection: 'column', gap: 8, zIndex: 25, pointerEvents: 'auto',
         }}>
           {/* Action Button Row: Locate + 360 Auto-Rotate */}
           <div style={{ display: 'flex', gap: 6 }}>
             <button
-              onClick={handleFocusTarget}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleFocusTarget()
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
               title="Focus Active Target"
               style={{
                 width: 44, height: 44, borderRadius: 12, background: 'var(--color-brand)',
                 border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)', cursor: 'pointer',
+                touchAction: 'manipulation', pointerEvents: 'auto',
               }}
             >
               <Target size={22} />
             </button>
 
             <button
-              onClick={toggleAutoRotate}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleAutoRotate()
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
               title={autoRotate ? "Stop 360° Rotation" : "Auto-Rotate 360°"}
               style={{
                 width: 44, height: 44, borderRadius: 12,
@@ -3225,6 +3251,7 @@ export default function Scenario() {
                 color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 boxShadow: autoRotate ? '0 0 16px rgba(16, 185, 129, 0.7)' : '0 4px 12px rgba(0,0,0,0.3)',
                 cursor: 'pointer', transition: 'all 0.2s',
+                touchAction: 'manipulation', pointerEvents: 'auto',
               }}
             >
               <RotateCw size={17} style={{ animation: autoRotate ? 'spin 3s linear infinite' : 'none' }} />
@@ -3239,45 +3266,70 @@ export default function Scenario() {
             alignItems: 'center', gap: 4, border: '1px solid rgba(255,255,255,0.15)',
           }}>
             <button
-              onClick={() => handleManualRotate(0, 0.4)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleManualRotate(0, 0.4)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
               title="Tilt Up"
-              style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', pointerEvents: 'auto' }}
             >
               <ArrowUp size={18} />
             </button>
             <div style={{ display: 'flex', gap: 4 }}>
               <button
-                onClick={() => handleManualRotate(0.75, 0)}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleManualRotate(0.75, 0)
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
                 title="Rotate 360° Left"
-                style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', pointerEvents: 'auto' }}
               >
                 <ArrowLeft size={18} />
               </button>
               <button
-                onClick={toggleAutoRotate}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleAutoRotate()
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
                 title="Toggle 360° Orbit"
                 style={{
                   width: 36, height: 36, borderRadius: 8,
                   background: autoRotate ? 'var(--color-brand)' : 'rgba(255,255,255,0.12)',
                   border: 'none', color: 'white', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 10, fontWeight: 800,
+                  fontSize: 10, fontWeight: 800, touchAction: 'manipulation', pointerEvents: 'auto',
                 }}
               >
                 360°
               </button>
               <button
-                onClick={() => handleManualRotate(-0.75, 0)}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleManualRotate(-0.75, 0)
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
                 title="Rotate 360° Right"
-                style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', pointerEvents: 'auto' }}
               >
                 <ArrowRight size={18} />
               </button>
             </div>
             <button
-              onClick={() => handleManualRotate(0, -0.4)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleManualRotate(0, -0.4)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
               title="Tilt Down"
-              style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', pointerEvents: 'auto' }}
             >
               <ArrowDown size={18} />
             </button>
@@ -3290,16 +3342,26 @@ export default function Scenario() {
             alignItems: 'center', gap: 4, border: '1px solid rgba(255,255,255,0.15)',
           }}>
             <button
-              onClick={() => handleManualZoom(1.3)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleManualZoom(1.3)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
               title="Zoom In"
-              style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', pointerEvents: 'auto' }}
             >
               <ZoomIn size={18} />
             </button>
             <button
-              onClick={() => handleManualZoom(0.7)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleManualZoom(0.7)
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
               title="Zoom Out"
-              style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 36, height: 36, background: 'rgba(255,255,255,0.06)', borderRadius: 8, border: 'none', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', touchAction: 'manipulation', pointerEvents: 'auto' }}
             >
               <ZoomOut size={18} />
             </button>
@@ -3408,12 +3470,18 @@ export default function Scenario() {
               )}
 
               <button
-                onClick={toggleARMode}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  toggleARMode()
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
                 style={{
                   background: 'rgba(28,32,40,0.9)', border: '1px solid rgba(255,255,255,0.25)',
                   color: 'white', borderRadius: 20, padding: '8px 16px',
                   fontSize: 12, fontWeight: 600, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: 6,
+                  touchAction: 'manipulation', pointerEvents: 'auto',
                 }}
               >
                 {arMode ? <Monitor size={14} /> : <Camera size={14} />}
@@ -3421,12 +3489,18 @@ export default function Scenario() {
               </button>
 
               <button
-                onClick={() => navigate('/dashboard')}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigate('/dashboard')
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
                 style={{
                   background: 'rgba(220,38,38,0.2)', border: '1px solid #DC2626',
                   color: 'white', borderRadius: 20, padding: '8px 14px',
                   fontSize: 12, fontWeight: 600, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: 6,
+                  touchAction: 'manipulation', pointerEvents: 'auto',
                 }}
               >
                 <X size={14} /> {T('exitTraining')}
@@ -3560,7 +3634,12 @@ export default function Scenario() {
                       </button>
 
                       <button
-                        onClick={handleFocusTarget}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleFocusTarget()
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
                         title="Center view on this target"
                         style={{
                           background: 'rgba(255,255,255,0.12)',
@@ -3575,6 +3654,8 @@ export default function Scenario() {
                           gap: 6,
                           fontSize: 13,
                           fontWeight: 600,
+                          touchAction: 'manipulation',
+                          pointerEvents: 'auto',
                         }}
                       >
                         <Target size={18} />
@@ -3585,7 +3666,12 @@ export default function Scenario() {
                 ) : (
                   <div style={{ display: 'flex', gap: 10 }}>
                     <button
-                      onClick={() => handleStepClick(currentStep)}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleStepClick(currentStep)
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
                       style={{
                         flex: 1,
                         background: 'var(--color-brand)',
@@ -3601,6 +3687,8 @@ export default function Scenario() {
                         justifyContent: 'center',
                         gap: 8,
                         boxShadow: '0 4px 14px rgba(224,90,0,0.4)',
+                        touchAction: 'manipulation',
+                        pointerEvents: 'auto',
                       }}
                     >
                       <CheckCircle size={20} />
@@ -3608,7 +3696,12 @@ export default function Scenario() {
                     </button>
 
                     <button
-                      onClick={handleFocusTarget}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleFocusTarget()
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
                       title="Center view on this target"
                       style={{
                         background: 'rgba(255,255,255,0.12)',
@@ -3623,6 +3716,8 @@ export default function Scenario() {
                         gap: 6,
                         fontSize: 13,
                         fontWeight: 600,
+                        touchAction: 'manipulation',
+                        pointerEvents: 'auto',
                       }}
                     >
                       <Target size={18} />
