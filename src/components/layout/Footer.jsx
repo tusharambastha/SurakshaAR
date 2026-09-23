@@ -1,10 +1,10 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useLang } from '../../contexts/LanguageContext'
-import { Shield, Mail, Instagram, ArrowUpRight, Globe } from 'lucide-react'
+import { Shield, Mail, Instagram, ArrowUpRight } from 'lucide-react'
 
 export function Footer() {
-  const { lang, setLang, SUPPORTED_LANGUAGES } = useLang()
+  const { lang } = useLang()
 
   const footerTexts = {
     en: {
@@ -250,7 +250,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Connect & Language Selector */}
+          {/* Connect */}
           <div style={{ minWidth: 200, flex: '1 1 200px' }}>
             <h4
               style={{
@@ -264,7 +264,7 @@ export function Footer() {
             >
               {t.connect}
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {/* Instagram link */}
               <a
                 href="https://www.instagram.com/surakshaaar/"
@@ -306,45 +306,6 @@ export function Footer() {
                 <span>surakshaar.in@gmail.com</span>
               </a>
             </div>
-
-            {/* Quick Language Switcher */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.74rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>
-                <Globe size={13} />
-                <span>{t.language}</span>
-              </div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                {SUPPORTED_LANGUAGES.map((l) => {
-                  const isActive = lang === l.code
-                  return (
-                    <button
-                      key={l.code}
-                      type="button"
-                      onClick={() => setLang(l.code)}
-                      style={{
-                        padding: '4px 8px',
-                        background: isActive ? 'var(--color-brand)' : 'var(--color-surface-alt)',
-                        color: isActive ? '#FFFFFF' : 'var(--color-text-secondary)',
-                        border: '1px solid',
-                        borderColor: isActive ? 'var(--color-brand)' : 'var(--color-border)',
-                        borderRadius: 'var(--radius-sm, 6px)',
-                        fontSize: '0.74rem',
-                        fontWeight: isActive ? 700 : 500,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      <span>{l.flag}</span>
-                      <span>{l.nativeLabel}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-
           </div>
         </div>
 
