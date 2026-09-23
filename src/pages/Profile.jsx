@@ -76,19 +76,13 @@ export default function Profile() {
 
   async function handleResetGmailPhoto() {
     try {
-      const email = (user?.email || profile?.email || '').trim().toLowerCase()
-      const isGmail = email.endsWith('@gmail.com') || email.endsWith('@googlemail.com')
-      const defaultGmailAvatar = isGmail
-        ? `https://unavatar.io/google/${encodeURIComponent(email)}?fallback=false`
-        : `https://unavatar.io/${encodeURIComponent(email)}?fallback=false`
-
       if (!isSupabaseConfigured) {
-        await mockUpdateProfile(user.id, { avatar_url: defaultGmailAvatar })
+        await mockUpdateProfile(user.id, { avatar_url: null })
       } else {
-        await supabase.from('profiles').update({ avatar_url: defaultGmailAvatar }).eq('id', user.id)
+        await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id)
       }
       await refreshProfile()
-      setSaveMsg('Reset to default Gmail / Account photo!')
+      setSaveMsg('Reset to default avatar!')
       setTimeout(() => setSaveMsg(''), 3000)
     } catch {
       setSaveMsg('Failed to reset photo.')
@@ -204,7 +198,7 @@ export default function Profile() {
                   >
                     <Camera size={12} color="var(--color-brand)" /> Change Photo
                   </button>
-                  {profile?.avatar_url && !profile.avatar_url.includes('unavatar.io') && (
+                  {profile?.avatar_url && (
                     <button
                       type="button"
                       onClick={handleResetGmailPhoto}
@@ -215,7 +209,7 @@ export default function Profile() {
                         cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
                       }}
                     >
-                      <RefreshCw size={11} /> Reset to Gmail Photo
+                      <RefreshCw size={11} /> Reset Photo
                     </button>
                   )}
                 </div>

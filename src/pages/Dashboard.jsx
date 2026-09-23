@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Trophy, Clock, Star, TrendingUp, ChevronRight, AlertTriangle, Flame, Wind, Cog, Lock, PlayCircle, ShieldCheck, Zap } from 'lucide-react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { mockGetScenarios, mockGetSessions } from '../lib/mockDb'
@@ -11,7 +11,6 @@ import { Navbar } from '../components/layout/Navbar'
 import { Footer } from '../components/layout/Footer'
 import { scoreRating } from '../lib/scoring'
 import VideoTutorialModal from '../components/ui/VideoTutorialModal'
-import { UserAvatar } from '../components/ui/UserAvatar'
 
 const HAZARD_ICONS = {
   gas_leak: Wind,
@@ -91,16 +90,11 @@ export default function Dashboard() {
       <Navbar />
       <main style={{ paddingTop: 'calc(var(--navbar-height) + 24px)', paddingBottom: 48 }}>
         <div className="page-container">
-          <div style={{ marginBottom: 28, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-            <div>
-              <h1 style={{ fontSize: 'var(--text-2xl)', marginBottom: 4 }}>{getGreeting(firstName, T)}</h1>
-              <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', margin: 0 }}>
-                Continue your safety training. Stay prepared, stay safe.
-              </p>
-            </div>
-            <Link to="/profile" title="View & Edit Profile" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-              <UserAvatar user={user} profile={profile} size={48} style={{ border: '2.5px solid var(--color-brand)', boxShadow: '0 4px 12px rgba(224,90,0,0.18)', cursor: 'pointer' }} />
-            </Link>
+          <div style={{ marginBottom: 28 }}>
+            <h1 style={{ fontSize: 'var(--text-2xl)', marginBottom: 4 }}>{getGreeting(firstName, T)}</h1>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+              Continue your safety training. Stay prepared, stay safe.
+            </p>
           </div>
 
           {/* Stats */}

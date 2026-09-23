@@ -17,7 +17,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { SUPPORTED_LANGUAGES } from '../lib/i18n'
 import { supabase, isSupabaseConfigured, friendlyAuthError } from '../lib/supabase'
-import { mockSignUp } from '../lib/mockDb'
+import { mockSignUp, mockSignIn } from '../lib/mockDb'
+import GoogleAccountModal from '../components/auth/GoogleAccountModal'
 import { Navbar } from '../components/layout/Navbar'
 import {
   validateEmail,
@@ -41,6 +42,7 @@ export default function Signup() {
   const [prefLang, setPrefLang]   = useState('en')
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState('')
+  const [showGoogleModal, setShowGoogleModal] = useState(false)
 
   // ── Email Validation & Real OTP State ─────────────────────────────
   const [isEmailVerified, setIsEmailVerified]           = useState(false)
@@ -170,9 +172,9 @@ export default function Signup() {
 
   async function handleGoogleConnect() {
     setError('')
-    setLoading(true)
-    try {
-      if (isSupabaseConfigured) {
+    if (isSupabaseConfigured) {
+      setLoading(true)
+      try {
         const { error: err } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
@@ -180,36 +182,34 @@ export default function Signup() {
           },
         })
         if (err) setError(friendlyAuthError(err))
-      } else {
-        const inputGmail = window.prompt(
-          'Enter your Gmail address to connect your Google profile photo:',
-          email && email.includes('@') ? email : ''
-        )
-        if (!inputGmail || !inputGmail.trim()) {
-          setLoading(false)
-          return
-        }
-        const cleanGmail = inputGmail.trim().toLowerCase()
-        const defaultName = cleanGmail.split('@')[0].replace(/[._]/g, ' ')
-        const capName = defaultName.charAt(0).toUpperCase() + defaultName.slice(1)
-        const isGmail = cleanGmail.endsWith('@gmail.com') || cleanGmail.endsWith('@googlemail.com')
-        const gmailAvatar = isGmail
-          ? `https://unavatar.io/google/${encodeURIComponent(cleanGmail)}?fallback=false`
-          : `https://unavatar.io/${encodeURIComponent(cleanGmail)}?fallback=false`
-
-        const { error: err } = await mockSignUp({
-          email: cleanGmail,
-          password: 'GoogleUser@123',
-          fullName: fullName.trim() || capName,
-          language: prefLang,
-          avatarUrl: gmailAvatar,
-        })
-        if (err && err.message.includes('already')) {
-          await mockSignIn({ email: cleanGmail, password: 'GoogleUser@123' })
-        }
-        await refreshProfile()
-        navigate('/dashboard', { replace: true })
+      } catch {
+        setError('Google Sign-in failed. Please try again.')
+      } finally {
+        setLoading(false)
       }
+    } else {
+      setShowGoogleModal(true)
+    }
+  }
+
+  async function handleSelectGoogleAccount({ name, email: accEmail }) {
+    setShowGoogleModal(false)
+    setLoading(true)
+    setError('')
+    try {
+      const cleanEmail = accEmail.trim().toLowerCase()
+      const { error: err } = await mockSignUp({
+        email: cleanEmail,
+        password: 'GoogleUser@123',
+        fullName: name,
+        language: prefLang,
+        avatarUrl: null,
+      })
+      if (err && err.message.includes('already')) {
+        await mockSignIn({ email: cleanEmail, password: 'GoogleUser@123' })
+      }
+      await refreshProfile()
+      navigate('/dashboard', { replace: true })
     } catch {
       setError('Google Sign-in failed. Please try again.')
     } finally {
@@ -257,10 +257,6 @@ export default function Signup() {
     }
 
     const cleanEmail = email.trim().toLowerCase()
-    const isGmail = cleanEmail.endsWith('@gmail.com') || cleanEmail.endsWith('@googlemail.com')
-    const defaultGmailAvatar = isGmail
-      ? `https://unavatar.io/google/${encodeURIComponent(cleanEmail)}?fallback=false`
-      : `https://unavatar.io/${encodeURIComponent(cleanEmail)}?fallback=false`
 
     setLoading(true)
     try {
@@ -270,7 +266,7 @@ export default function Signup() {
           password,
           fullName: fullName.trim(),
           language: prefLang,
-          avatarUrl: defaultGmailAvatar,
+          avatarUrl: null,
         })
         if (err) { setError(err.message); return }
         await refreshProfile()
@@ -282,7 +278,6 @@ export default function Signup() {
           options: {
             data: {
               full_name: fullName.trim(),
-              avatar_url: defaultGmailAvatar,
             }
           },
         })
@@ -293,7 +288,7 @@ export default function Signup() {
             full_name: fullName.trim(),
             preferred_language: prefLang,
             role: 'trainee',
-            avatar_url: defaultGmailAvatar,
+            avatar_url: null,
           })
         }
         navigate('/dashboard', { replace: true })
@@ -845,6 +840,12 @@ export default function Signup() {
           </div>
         </div>
       </main>
+
+      <GoogleAccountModal
+        isOpen={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        onSelectAccount={handleSelectGoogleAccount}
+      />
     </div>
   )
 }

@@ -4,7 +4,8 @@ import { Eye, EyeOff, Shield, LogIn, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { supabase, isSupabaseConfigured, friendlyAuthError } from '../lib/supabase'
-import { mockSignIn } from '../lib/mockDb'
+import { mockSignIn, mockSignUp } from '../lib/mockDb'
+import GoogleAccountModal from '../components/auth/GoogleAccountModal'
 import { Navbar } from '../components/layout/Navbar'
 
 export default function Login() {
@@ -16,12 +17,13 @@ export default function Login() {
   const [showPw, setShowPw]     = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
+  const [showGoogleModal, setShowGoogleModal] = useState(false)
 
   async function handleGoogleSignIn() {
     setError('')
-    setLoading(true)
-    try {
-      if (isSupabaseConfigured) {
+    if (isSupabaseConfigured) {
+      setLoading(true)
+      try {
         const { error: err } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
@@ -29,36 +31,34 @@ export default function Login() {
           },
         })
         if (err) setError(friendlyAuthError(err))
-      } else {
-        const inputGmail = window.prompt(
-          'Enter your Gmail address to sign in and load your Google profile photo:',
-          email && email.includes('@') ? email : ''
-        )
-        if (!inputGmail || !inputGmail.trim()) {
-          setLoading(false)
-          return
-        }
-        const cleanGmail = inputGmail.trim().toLowerCase()
-        const defaultName = cleanGmail.split('@')[0].replace(/[._]/g, ' ')
-        const capName = defaultName.charAt(0).toUpperCase() + defaultName.slice(1)
-        const isGmail = cleanGmail.endsWith('@gmail.com') || cleanGmail.endsWith('@googlemail.com')
-        const gmailAvatar = isGmail
-          ? `https://unavatar.io/google/${encodeURIComponent(cleanGmail)}?fallback=false`
-          : `https://unavatar.io/${encodeURIComponent(cleanGmail)}?fallback=false`
-
-        const { error: err } = await mockSignUp({
-          email: cleanGmail,
-          password: 'GoogleUser@123',
-          fullName: capName,
-          language: 'en',
-          avatarUrl: gmailAvatar,
-        })
-        if (err && err.message.includes('already')) {
-          await mockSignIn({ email: cleanGmail, password: 'GoogleUser@123' })
-        }
-        await refreshProfile()
-        navigate('/dashboard', { replace: true })
+      } catch {
+        setError('Google Sign-in failed. Please try again.')
+      } finally {
+        setLoading(false)
       }
+    } else {
+      setShowGoogleModal(true)
+    }
+  }
+
+  async function handleSelectGoogleAccount({ name, email: accEmail }) {
+    setShowGoogleModal(false)
+    setLoading(true)
+    setError('')
+    try {
+      const cleanEmail = accEmail.trim().toLowerCase()
+      const { error: err } = await mockSignUp({
+        email: cleanEmail,
+        password: 'GoogleUser@123',
+        fullName: name,
+        language: 'en',
+        avatarUrl: null,
+      })
+      if (err && err.message.includes('already')) {
+        await mockSignIn({ email: cleanEmail, password: 'GoogleUser@123' })
+      }
+      await refreshProfile()
+      navigate('/dashboard', { replace: true })
     } catch {
       setError('Google Sign-in failed. Please try again.')
     } finally {
@@ -283,6 +283,12 @@ export default function Login() {
           )}
         </div>
       </main>
+
+      <GoogleAccountModal
+        isOpen={showGoogleModal}
+        onClose={() => setShowGoogleModal(false)}
+        onSelectAccount={handleSelectGoogleAccount}
+      />
     </div>
   )
 }

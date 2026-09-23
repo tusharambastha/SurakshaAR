@@ -920,10 +920,7 @@ export async function mockSignUp({ email, password, fullName, employeeId, depart
     return { data: null, error: { message: 'Email already registered.' } }
   }
   const userId = uuid()
-  const isGmail = cleanEmail.endsWith('@gmail.com') || cleanEmail.endsWith('@googlemail.com')
-  const defaultGmailAvatar = isGmail
-    ? `https://unavatar.io/google/${encodeURIComponent(cleanEmail)}?fallback=false`
-    : `https://unavatar.io/${encodeURIComponent(cleanEmail)}?fallback=false`
+  const validAvatar = avatarUrl && typeof avatarUrl === 'string' && !avatarUrl.includes('unavatar.io') ? avatarUrl : null
 
   const profile = {
     id: userId,
@@ -933,7 +930,7 @@ export async function mockSignUp({ email, password, fullName, employeeId, depart
     department: department || '',
     preferred_language: language || 'en',
     role: 'trainee',
-    avatar_url: avatarUrl || defaultGmailAvatar,
+    avatar_url: validAvatar,
     created_at: new Date().toISOString(),
     _password: password,
   }
@@ -1002,10 +999,6 @@ export async function mockSignIn({ email, password }) {
       const newId = uuid()
       const namePart = cleanEmail.split('@')[0].replace(/[._]/g, ' ')
       const capName = namePart.charAt(0).toUpperCase() + namePart.slice(1)
-      const isGmail = cleanEmail.endsWith('@gmail.com') || cleanEmail.endsWith('@googlemail.com')
-      const defaultGmailAvatar = isGmail
-        ? `https://unavatar.io/google/${encodeURIComponent(cleanEmail)}?fallback=false`
-        : `https://unavatar.io/${encodeURIComponent(cleanEmail)}?fallback=false`
       const newProfile = {
         id: newId,
         email: cleanEmail,
@@ -1014,7 +1007,7 @@ export async function mockSignIn({ email, password }) {
         department: 'Industrial Safety',
         role: 'trainee',
         preferred_language: 'en',
-        avatar_url: defaultGmailAvatar,
+        avatar_url: null,
         created_at: new Date().toISOString(),
         _password: password,
       }
@@ -1065,6 +1058,11 @@ export function mockGetAuthSession() {
 export function mockGetProfile(userId) {
   const profiles = load(PROFILES_KEY, {})
   const profile = profiles[userId] || null
+  if (profile && profile.avatar_url && typeof profile.avatar_url === 'string' && profile.avatar_url.includes('unavatar.io')) {
+    profile.avatar_url = null
+    profiles[userId] = profile
+    save(PROFILES_KEY, profiles)
+  }
   return { data: profile, error: profile ? null : { message: 'Profile not found.' } }
 }
 
