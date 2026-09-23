@@ -12,9 +12,11 @@ import {
   PlayCircle, Settings, Globe, Moon, Sun, LogOut, Check,
   ChevronRight, WifiOff, ShieldCheck, CheckCircle2, AlertTriangle, Info,
   User, Phone, HelpCircle, Mail, LifeBuoy, MessageSquare, ChevronDown,
+  ShieldAlert, ChevronUp, Lightbulb,
 } from 'lucide-react'
 import VideoTutorialModal from '../ui/VideoTutorialModal'
 import { UserAvatar } from '../ui/UserAvatar'
+import { MODULE_SAFETY_TIPS } from '../../data/moduleSafetyTips'
 
 export function Navbar() {
   const { user, profile, signOut } = useAuth()
@@ -28,6 +30,8 @@ export function Navbar() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileDropOpen, setProfileDropOpen] = useState(false)
+  const [safetyTipsOpen, setSafetyTipsOpen] = useState(false)
+  const [expandedTips, setExpandedTips] = useState(() => ({ [MODULE_SAFETY_TIPS[0].id]: true }))
   const [showVideoTutorial, setShowVideoTutorial] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
   const [showAboutModal, setShowAboutModal] = useState(false)
@@ -46,6 +50,23 @@ export function Navbar() {
 
   const notifRef = useRef(null)
   const profileDropRef = useRef(null)
+  const safetyTipsRef = useRef(null)
+
+  function toggleTipModule(id) {
+    setExpandedTips(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  const allTipsExpanded = MODULE_SAFETY_TIPS.every(m => expandedTips[m.id])
+
+  function toggleAllTips() {
+    if (allTipsExpanded) {
+      setExpandedTips({})
+    } else {
+      const all = {}
+      MODULE_SAFETY_TIPS.forEach(m => { all[m.id] = true })
+      setExpandedTips(all)
+    }
+  }
 
   const isAdmin = profile?.role === 'admin'
   const firstName = profile?.full_name?.split(' ')[0] ?? 'Trainee'
@@ -113,11 +134,12 @@ export function Navbar() {
     } catch {}
   }
 
-  // Close drawer on path change
+  // Close drawer and popovers on path change
   useEffect(() => {
     setDrawerOpen(false)
     setNotifOpen(false)
     setProfileDropOpen(false)
+    setSafetyTipsOpen(false)
   }, [location.pathname])
 
   // Close on Escape
@@ -127,6 +149,7 @@ export function Navbar() {
         setDrawerOpen(false)
         setNotifOpen(false)
         setProfileDropOpen(false)
+        setSafetyTipsOpen(false)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -158,6 +181,19 @@ export function Navbar() {
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [profileDropOpen])
+
+  // Close safety tips popover on click outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (safetyTipsRef.current && !safetyTipsRef.current.contains(e.target)) {
+        setSafetyTipsOpen(false)
+      }
+    }
+    if (safetyTipsOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [safetyTipsOpen])
 
   // Lock body scroll when drawer is open on mobile
   useEffect(() => {
@@ -293,11 +329,314 @@ export function Navbar() {
               </div>
             )}
 
+            {/* 🛡️ Safety Tips Icon & Dropdown Panel (Immediate LEFT of Notification Bell) */}
+            <div style={{ position: 'relative' }} ref={safetyTipsRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSafetyTipsOpen(o => !o)
+                  setNotifOpen(false)
+                  setProfileDropOpen(false)
+                }}
+                title="Safety Tips"
+                aria-label="Safety Tips"
+                aria-expanded={safetyTipsOpen}
+                style={{
+                  width: 38,
+                  height: 38,
+                  boxSizing: 'border-box',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: safetyTipsOpen ? 'var(--color-brand-50)' : 'var(--color-surface-alt)',
+                  border: safetyTipsOpen ? '1.5px solid var(--color-brand)' : '1.5px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  color: safetyTipsOpen ? 'var(--color-brand)' : 'var(--color-text-secondary)',
+                  padding: 0,
+                  flexShrink: 0,
+                  position: 'relative',
+                  transition: 'all var(--transition-fast)',
+                }}
+              >
+                <ShieldCheck size={19} color={safetyTipsOpen ? 'var(--color-brand)' : 'var(--color-brand)'} />
+              </button>
+
+              {/* Safety Tips Dropdown Panel */}
+              {safetyTipsOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 'clamp(-60px, -10vw, -10px)',
+                    width: 'clamp(310px, 90vw, 390px)',
+                    maxWidth: 'calc(100vw - 24px)',
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border-strong, var(--color-border))',
+                    borderRadius: 'var(--radius-lg, 14px)',
+                    boxShadow: 'var(--shadow-xl)',
+                    zIndex: 350,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    animation: 'slideDownFade 0.15s ease-out',
+                  }}
+                >
+                  {/* Panel Header */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      background: 'var(--color-surface-alt)',
+                      borderBottom: '1px solid var(--color-border)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <ShieldCheck size={18} color="var(--color-brand)" />
+                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 800, color: 'var(--color-text-primary)' }}>
+                        Safety Tips
+                      </span>
+                      <span
+                        className="badge badge-brand"
+                        style={{ fontSize: '0.65rem', padding: '2px 6px' }}
+                      >
+                        {MODULE_SAFETY_TIPS.length} Modules
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={toggleAllTips}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--color-brand)',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        {allTipsExpanded ? 'Collapse All' : 'Expand All'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSafetyTipsOpen(false)}
+                        aria-label="Close safety tips"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: 'var(--color-text-muted)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: 2,
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Subtitle / Tip Banner */}
+                  <div
+                    style={{
+                      padding: '8px 16px',
+                      background: 'var(--color-brand-50, #FFF3EB)',
+                      borderBottom: '1px solid var(--color-brand-100, #FFE6D5)',
+                      fontSize: '0.74rem',
+                      color: 'var(--color-brand-dark, #B84800)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <Lightbulb size={13} style={{ flexShrink: 0 }} />
+                    <span>Essential field precautions for each training scenario</span>
+                  </div>
+
+                  {/* Scrollable Accordion List */}
+                  <div
+                    style={{
+                      maxHeight: 'clamp(320px, 60vh, 440px)',
+                      overflowY: 'auto',
+                      padding: '8px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    {MODULE_SAFETY_TIPS.map((mod) => {
+                      const isExpanded = !!expandedTips[mod.id]
+                      return (
+                        <div
+                          key={mod.id}
+                          style={{
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-md, 10px)',
+                            overflow: 'hidden',
+                            background: 'var(--color-surface)',
+                            transition: 'border-color 0.2s',
+                          }}
+                        >
+                          {/* Module Header / Accordion trigger */}
+                          <button
+                            type="button"
+                            onClick={() => toggleTipModule(mod.id)}
+                            aria-expanded={isExpanded}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 12px',
+                              background: isExpanded ? 'var(--color-surface-alt)' : 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              gap: 10,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                              <span style={{ fontSize: '1rem', flexShrink: 0 }}>{mod.icon}</span>
+                              <div style={{ minWidth: 0 }}>
+                                <div
+                                  style={{
+                                    fontSize: '0.82rem',
+                                    fontWeight: 700,
+                                    color: 'var(--color-text-primary)',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}
+                                >
+                                  {mod.title}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                              <span
+                                style={{
+                                  fontSize: '0.65rem',
+                                  fontWeight: 700,
+                                  padding: '2px 6px',
+                                  borderRadius: 4,
+                                  background: mod.bgColor,
+                                  color: mod.color,
+                                  border: `1px solid ${mod.color}30`,
+                                }}
+                              >
+                                {mod.badge}
+                              </span>
+                              {isExpanded ? (
+                                <ChevronUp size={15} color="var(--color-text-muted)" />
+                              ) : (
+                                <ChevronDown size={15} color="var(--color-text-muted)" />
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Collapsible Tips List */}
+                          {isExpanded && (
+                            <div
+                              style={{
+                                padding: '8px 14px 12px',
+                                borderTop: '1px solid var(--color-border)',
+                                background: 'var(--color-surface)',
+                              }}
+                            >
+                              <ul
+                                style={{
+                                  listStyle: 'none',
+                                  margin: 0,
+                                  padding: 0,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 8,
+                                }}
+                              >
+                                {mod.tips.map((tip, tIdx) => (
+                                  <li
+                                    key={tIdx}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'flex-start',
+                                      gap: 8,
+                                      fontSize: '0.78rem',
+                                      color: 'var(--color-text-secondary)',
+                                      lineHeight: 1.45,
+                                    }}
+                                  >
+                                    <Check
+                                      size={13}
+                                      color="var(--color-success, #2E8B57)"
+                                      style={{ flexShrink: 0, marginTop: 2 }}
+                                    />
+                                    <span>{tip}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Footer link to modules */}
+                  <div
+                    style={{
+                      padding: '10px 16px',
+                      borderTop: '1px solid var(--color-border)',
+                      background: 'var(--color-surface-alt)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted)' }}>
+                      Review before AR drills
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSafetyTipsOpen(false)
+                        navigate('/dashboard')
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-brand)',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        padding: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <span>Explore Modules</span>
+                      <ChevronRight size={13} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Notification Bell */}
             <div style={{ position: 'relative' }} ref={notifRef}>
               <button
                 type="button"
-                onClick={() => setNotifOpen(o => !o)}
+                onClick={() => {
+                  setNotifOpen(o => !o)
+                  setSafetyTipsOpen(false)
+                  setProfileDropOpen(false)
+                }}
                 aria-label="View notifications"
                 aria-expanded={notifOpen}
                 style={{
@@ -491,7 +830,11 @@ export function Navbar() {
               <div style={{ position: 'relative' }} ref={profileDropRef}>
                 <button
                   type="button"
-                  onClick={() => setProfileDropOpen(o => !o)}
+                  onClick={() => {
+                    setProfileDropOpen(o => !o)
+                    setSafetyTipsOpen(false)
+                    setNotifOpen(false)
+                  }}
                   title="Profile & Account"
                   style={{
                     display: 'inline-flex',
@@ -778,6 +1121,25 @@ export function Navbar() {
                 {userCerts.length}
               </span>
             )}
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* 🛡️ Safety Tips */}
+          <button
+            type="button"
+            onClick={() => {
+              setDrawerOpen(false)
+              setSafetyTipsOpen(true)
+            }}
+            style={navItemStyle(false)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <ShieldCheck size={18} color="var(--color-brand)" />
+              <span>Safety Tips</span>
+            </div>
+            <span className="badge badge-brand" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+              5 Modules
+            </span>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
 

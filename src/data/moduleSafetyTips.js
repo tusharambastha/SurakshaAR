@@ -1,0 +1,92 @@
+/**
+ * SurakshaAR — Official Module Safety Tips Data
+ * Linked directly to the 5 core industrial safety training modules in the platform.
+ */
+
+export const MODULE_SAFETY_TIPS = [
+  {
+    id: 'a1b2c3d4-0001-0001-0001-000000000001',
+    title: 'Fire & Explosion Response',
+    hazard_type: 'fire',
+    icon: '🔥',
+    badge: 'Fire Safety',
+    color: '#DC2626',
+    bgColor: '#FEF2F2',
+    tips: [
+      'Sound the emergency alarm immediately upon detecting smoke or flame.',
+      'Remember P.A.S.S.: Pull the pin, Aim at fire base, Squeeze lever, Sweep side-to-side.',
+      'Select the correct extinguisher: CO₂ for electrical fires, Dry Powder for flammable liquids.',
+      'Never allow the fire to get between you and your exit pathway.',
+      'Evacuate immediately if the fire spreads beyond the size of a small wastebasket.',
+      'Assemble at the designated outdoor Muster Point for supervisor head count.',
+    ],
+  },
+  {
+    id: 'a1b2c3d4-0002-0002-0002-000000000002',
+    title: 'Gas Leak & Confined Space Protocol',
+    hazard_type: 'gas_leak',
+    icon: '💨',
+    badge: 'Mining & Gas',
+    color: '#0284C7',
+    bgColor: '#F0F9FF',
+    tips: [
+      'Never operate light switches, mobile phones, or open flames near suspected gas leaks.',
+      'Always use the Buddy System: never enter a confined space or tunnel alone.',
+      'Don certified SCBA (Self-Contained Breathing Apparatus) before entering toxic atmospheres.',
+      'Continuously monitor 4-gas levels: Oxygen (min 19.5%), Methane, CO, and H₂S.',
+      'Evacuate immediately in the crosswind/upwind direction from the gas plume.',
+      'Await official "All-Clear" gas-free clearance before re-entering the area.',
+    ],
+  },
+  {
+    id: 'a1b2c3d4-0003-0003-0003-000000000003',
+    title: 'Heavy Industrial Machinery & Nip-Point Guarding',
+    hazard_type: 'machinery',
+    icon: '⚙️',
+    badge: 'Machinery',
+    color: '#D97706',
+    bgColor: '#FFFBEB',
+    tips: [
+      'Never reach into or bypass physical interlocks on rotating rollers and drive belts.',
+      'Apply 6-step Lockout/Tagout (LOTO): Notify, Shut down, Isolate, Lock, Verify zero energy.',
+      'Test zero-energy state mechanically and electrically before starting maintenance.',
+      'Keep loose clothing, neckties, jewelry, and long hair completely tied back.',
+      'Verify Emergency Stop (E-Stop) pushbuttons are unobstructed and accessible at all times.',
+      'Ensure machine safety guards are replaced and securely fastened before re-energizing.',
+    ],
+  },
+  {
+    id: 'a1b2c3d4-0004-0004-0004-000000000004',
+    title: 'PPE & Industrial Hazard Baseline',
+    hazard_type: 'ppe',
+    icon: '🦺',
+    badge: 'PPE Baseline',
+    color: '#059669',
+    bgColor: '#ECFDF5',
+    tips: [
+      'Inspect all PPE for cracks, tears, and expiry before entering the active worksite.',
+      'Wear certified industrial safety helmet (IS 2925) with chin strap secured.',
+      'Use impact-resistant goggles and ear protection in designated high-decibel zones.',
+      'Wear puncture-resistant, steel-toe boots (IS 15298) with anti-slip soles.',
+      'Don high-visibility Class 2 reflective vests around mobile plant equipment.',
+      'Replace damaged or chemically contaminated PPE immediately.',
+    ],
+  },
+  {
+    id: 'a1b2c3d4-0005-0005-0005-000000000005',
+    title: 'High-Voltage Electrical Substation Safety',
+    hazard_type: 'electrical',
+    icon: '⚡',
+    badge: 'High Voltage',
+    color: '#7C3AED',
+    bgColor: '#F5F3FF',
+    tips: [
+      'Strictly respect arc-flash boundaries and high-voltage warning perimeters.',
+      'Wear rated dielectric gloves (tested within 6 months) and arc-rated face shield.',
+      'Always test for absence of voltage with a calibrated detector before touching conductors.',
+      'Apply portable grounding/earthing leads to discharge residual electrical charge.',
+      'Maintain minimum safe approach distance (MAD) per voltage rating specifications.',
+      'Never work alone in high-voltage substations; ensure a qualified standby person is present.',
+    ],
+  },
+]
