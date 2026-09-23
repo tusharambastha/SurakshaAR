@@ -270,13 +270,14 @@ export default function SafetyChatbot() {
       .map(m => ({ role: m.role, content: m.content }))
 
     const sessionId = getSessionId()
-    const customEndpoint = import.meta.env.VITE_CHAT_API_URL
-    const endpointsToTry = [
-      ...(customEndpoint ? [customEndpoint] : []),
-      '/SurakshaAR/api/chat',
-      '/api/chat',
-      '/.netlify/functions/chat'
-    ]
+    const isStaticHost = typeof window !== 'undefined' && (
+      window.location.hostname.includes('github.io') ||
+      window.location.protocol === 'file:'
+    )
+    const customEndpoint = import.meta.env?.VITE_CHAT_API_URL
+    const endpointsToTry = (customEndpoint && customEndpoint.trim().length > 0)
+      ? [customEndpoint.trim()]
+      : (!isStaticHost ? ['/SurakshaAR/api/chat', '/api/chat'] : [])
 
     let streamedSuccess = false
     const botMsgId = 'a-' + Date.now()

@@ -25,47 +25,8 @@ export default defineConfig({
               req.on('data', chunk => { rawBody += chunk })
               req.on('end', async () => {
                 try {
-                  const { handleChatApi, getGeminiApiKey, SURAKSHA_MITRA_SYSTEM_PROMPT } = await import('./server/chatHandler.js')
+                  const { handleChatApi } = await import('./server/chatHandler.js')
                   const payload = JSON.parse(rawBody || '{}')
-                  const apiKey = getGeminiApiKey()
-
-                  // If client requests streaming and active Gemini key is present, stream SSE
-                  if (payload.stream && apiKey && apiKey !== 'your-gemini-api-key-here') {
-                    try {
-                      const { GeminiProvider } = await import('./worker/providers/gemini.js')
-                      const provider = new GeminiProvider(apiKey)
-                      let messages = Array.isArray(payload.messages) ? payload.messages : []
-                      if (messages.length === 0 && (payload.query || payload.message)) {
-                        messages = [{ role: 'user', content: payload.query || payload.message }]
-                      }
-
-                      const stream = await provider.streamResponse({
-                        messages: messages.slice(-10),
-                        systemPrompt: SURAKSHA_MITRA_SYSTEM_PROMPT
-                      })
-
-                      if (!res.headersSent) {
-                        res.writeHead(200, {
-                          'Content-Type': 'text/event-stream; charset=utf-8',
-                          'Cache-Control': 'no-cache, no-transform',
-                          'Connection': 'keep-alive',
-                          'Access-Control-Allow-Origin': '*',
-                        })
-                      }
-
-                      const reader = stream.getReader()
-                      while (true) {
-                        const { done, value } = await reader.read()
-                        if (done) break
-                        res.write(value)
-                      }
-                      res.end()
-                      return
-                    } catch (streamErr) {
-                      console.warn('[Vite Chat Stream Fallback]', streamErr.message)
-                    }
-                  }
-
                   const response = await handleChatApi(payload)
                   if (!res.headersSent) {
                     res.setHeader('Content-Type', 'application/json')

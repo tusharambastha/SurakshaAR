@@ -38,12 +38,7 @@ export function getClientGeminiApiKey() {
   const envKey = import.meta.env?.VITE_GEMINI_API_KEY
   if (envKey && envKey.trim().length > 10) return envKey.trim()
 
-  // Default key decoded safely at runtime
-  try {
-    return atob('QVEuQWI4Uk42SmRtY3k4bGhNYTU4aVY5aWdjSi02blRYdWdmMk03M2ZsR1E0QmhVMzE1UkE=')
-  } catch {
-    return ''
-  }
+  return ''
 }
 
 export function getLanguagePrompt(lang = 'en') {

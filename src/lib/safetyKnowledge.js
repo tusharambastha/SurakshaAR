@@ -17,8 +17,7 @@
  * 2. Boundary-Safe Token Matching & Phonetic Hinglish Expansions
  * 3. Context & Module-Aware Retrieval (Fire, Gas, PPE, Electrical, Machinery, Mining, Platform)
  * 4. Conversational History Resolution for follow-up questions
- * 5. Full Quad-lingual Support (English, Hindi, Hinglish, Santali)
- * 6. Optional External AI / Gemini Integration with graceful local fallback
+ * 6. Standalone Local Knowledge Engine with Optional Backend Proxy
  */
 
 import safetyFaq from '../data/safetyFaq.js'
@@ -103,12 +102,11 @@ export const MODULES = {
   GLOBAL: 'GLOBAL',
 };
 
-// Safe fallback when query has no matching safety knowledge
 export const SAFE_FALLBACK = {
-  en: "I am Suraksha Saathi, your AI Safety & Technical Assistant. For industrial safety topics (Fire, PPE, Gas leaks, Electrical safety, Machinery, Mining & Certificates), I can guide you in detail. For open-ended web questions on any topic with live AI generation like ChatGPT/Gemini, simply configure your free Gemini API key in `.env`!",
-  hi: "मैं सुरक्षा साथी हूँ, आपका AI सुरक्षा और तकनीकी सहायक। औद्योगिक सुरक्षा (आग, PPE, गैस रिसाव, बिजली सुरक्षा, मशीनरी, खनन और प्रमाणपत्र) से जुड़े विषयों पर मैं आपको विस्तार से मार्गदर्शन दे सकता हूँ। ChatGPT/Gemini की तरह किसी भी अन्य विषय पर उत्तर पाने के लिए `.env` में निःशुल्क Gemini API key सक्रिय करें।",
-  hinglish: "Main hoon Suraksha Saathi, aapka AI Safety & Technical Assistant. Industrial safety (Fire, PPE, Gas leak, Electrical LOTO, Machinery, Mining aur Certificate) par aap mujhse detailed guide le sakte hain. Kisi bhi topic par ChatGPT/Gemini jaise open-ended live AI answers ke liye `.env` mein free Gemini API key add karein!",
-  sat: "ᱤᱧ ᱫᱚ ᱥᱩᱨᱠᱷᱟ ᱥᱟᱛᱷᱤ (Suraksha Saathi) ᱠᱟᱹᱱᱟᱹᱧ᱾ ᱠᱟᱹᱨᱜᱟᱲ ᱨᱩᱠᱷᱤᱭᱟᱹ (ᱥᱮᱸᱜᱮᱞ, PPE, ᱜᱮᱥ ᱞᱤᱠ, ᱵᱤᱡᱽᱞᱤ) ᱵᱟᱵᱚᱛ ᱤᱧ ᱠᱩᱞᱤ ᱫᱟᱲᱮᱭᱟᱹᱧᱟ᱾",
+  en: "I am Suraksha Saathi, your AI Safety & Technical Assistant. I am here to guide you on workplace safety standards, PPE guidelines, fire response (PASS rule), gas leak safety, electrical protocols (LOTO), machinery safeguards, and AR training modules. Please feel free to ask any safety or training question!",
+  hi: "मैं सुरक्षा साथी हूँ, आपका AI सुरक्षा और तकनीकी सहायक। मैं कार्यस्थल सुरक्षा, PPE मानकों, अग्नि सुरक्षा (PASS नियम), गैस रिसाव प्रोटोकॉल, विद्युत सुरक्षा (LOTO), मशीनरी सुरक्षा और AR ट्रेनिंग से संबंधित आपके सभी प्रश्नों का उत्तर देने के लिए यहाँ हूँ। कृपया अपना प्रश्न पूछें!",
+  hinglish: "Main hoon Suraksha Saathi, aapka AI Safety & Technical Assistant! Industrial safety, PPE guidelines, fire response, gas leak emergency, electrical safety (LOTO), machine guarding aur AR training modules se jude kisi bhi sawal ke liye main aapki madad kar sakta hoon. Kripya apna sawal poochein!",
+  sat: "ᱤᱧ ᱫᱚ ᱥᱩᱨᱠᱷᱟ ᱥᱟᱛᱷᱤ (Suraksha Saathi) ᱠᱟᱹᱱᱟᱹᱧ᱾ ᱠᱟᱹᱨᱜᱟᱲ ᱨᱩᱠᱷᱤᱭᱟᱹ, PPE, ᱥᱮᱸᱜᱮᱞ, ᱜᱮᱥ ᱞᱤᱠ, ᱵᱤᱡᱽᱞᱤ ᱟᱨ AR ᱴᱨᱮᱱᱤᱝ ᱵᱟᱵᱚᱛ ᱡᱚᱛᱚ ᱞᱮᱠᱟᱱ ᱠᱩᱠᱞᱤ ᱨᱮᱱᱟᱜ ᱛᱮᱞᱟ ᱮᱢ ᱫᱟᱲᱮᱭᱟᱜ-ᱟᱹᱧ᱾ ᱟᱢᱟᱜ ᱠᱩᱠᱞᱤ ᱠᱩᱞᱤᱭ ᱢᱮ᱾",
 };
 
 // ─── CRITICAL HAZARD GUARDRAILS ───────────────────────────────────────────────
@@ -300,9 +298,9 @@ export const KNOWLEDGE_BASE = [
       'koun ho', 'kaun ho', 'kya ho', 'kya karte ho', 'kya kaam hai', 'who is suraksha saathi',
       'about you', 'about suraksha saathi', 'who is this'
     ],
-    answer_en: "🤖 **I am Suraksha Saathi**, your intelligent AI Safety & Engineering Assistant built for the **SurakshaAR** platform.\n\n### What I Can Do:\n1. 🦺 **Workplace & Industrial Safety**: Complete guidelines on PPE standards (IS/OSHA), hazard zones, and inspection.\n2. 🔴 **Fire & Disaster Response**: Extinguisher types (PASS rule), evacuation pathways, and fire classes.\n3. ⚡ **Electrical Safety & LOTO**: High-voltage procedures, arc flash safety, and lock-out/tag-out steps.\n4. 💨 **Gas Leak & Confined Space**: Gas detection thresholds, SCBA equipment, and safety watch protocols.\n5. 📜 **SurakshaAR Platform Navigation**: AR simulations, interactive quiz assessments, scoring, and blockchain certificates.\n6. 🧠 **Any Question (AI-Powered)**: With Gemini + Google Search integration, I can explain scientific concepts, engineering terms, and real-world queries just like ChatGPT/Gemini!",
-    answer_hi: "🤖 **मैं सुरक्षा साथी हूँ**, SurakshaAR प्लेटफ़ॉर्म का बुद्धिमान AI सुरक्षा एवं तकनीकी सहायक।\n\n### मैं आपकी क्या सहायता कर सकता हूँ:\n1. 🦺 **औद्योगिक सुरक्षा**: PPE मानक (IS/OSHA), खतरा क्षेत्र और निरीक्षण नियम।\n2. 🔴 **अग्नि सुरक्षा**: अग्निशामक के प्रकार (PASS नियम), निकासी प्रक्रिया और आग के वर्ग।\n3. ⚡ **विद्युत सुरक्षा और LOTO**: हाई-वोल्टेज प्रोटोकॉल, आर्क फ्लैश और 6-चरणीय तालाबंदी।\n4. 💨 **गैस रिसाव और सीमित स्थान**: गैस सीमाएं, SCBA उपकरण और बडी सिस्टम।\n5. 📜 **SurakshaAR प्लेटफ़ॉर्म**: AR ट्रेनिंग, स्कोरिंग, असेसमेंट और वेरिफाइड सर्टिफिकेट।\n6. 🧠 **कोई भी सवाल**: ChatGPT/Gemini की तरह किसी भी तकनीकी या सामान्य सवाल का विस्तृत उत्तर!",
-    answer_hinglish: "🤖 **Main Suraksha Saathi hoon**, aapka smart AI Safety & Technical Assistant!\n\n### Main aapki in cheezon mein madad kar sakta hoon:\n1. 🦺 **Plant & Industrial Safety**: PPE selection, inspection aur safety standard rules.\n2. 🔴 **Fire & Emergency Response**: PASS formula, cylinder selection aur evacuation roadmap.\n3. ⚡ **Electrical Safety & LOTO**: High-voltage isolations aur 6-step lockout/tagout.\n4. 💨 **Gas Leak & Confined Space**: 4-gas monitoring, SCBA kab pehnein aur buddy system.\n5. 📜 **SurakshaAR Training**: AR mode mein practice, assessment pass karna aur certificate download karna.\n6. 🧠 **Kisi bhi topic par answers**: ChatGPT / Gemini ki tarah kisi bhi scientific, technical ya general sawal ka clear step-by-step answer!",
+    answer_en: "🤖 **I am Suraksha Saathi**, your intelligent AI Safety & Engineering Assistant built for the **SurakshaAR** platform.\n\n### What I Can Do:\n1. 🦺 **Workplace & Industrial Safety**: Complete guidelines on PPE standards (IS/OSHA), hazard zones, and inspection.\n2. 🔴 **Fire & Disaster Response**: Extinguisher types (PASS rule), evacuation pathways, and fire classes.\n3. ⚡ **Electrical Safety & LOTO**: High-voltage procedures, arc flash safety, and lock-out/tag-out steps.\n4. 💨 **Gas Leak & Confined Space**: Gas detection thresholds, SCBA equipment, and safety watch protocols.\n5. 📜 **SurakshaAR Platform Navigation**: AR simulations, interactive quiz assessments, scoring, and blockchain certificates.\n6. 🧠 **Industrial Safety & Engineering Knowledge**: I explain safety concepts, hazard prevention, plant SOPs, emergency response sequences, and AR training steps in clear detail!",
+    answer_hi: "🤖 **मैं सुरक्षा साथी हूँ**, SurakshaAR प्लेटफ़ॉर्म का बुद्धिमान AI सुरक्षा एवं तकनीकी सहायक।\n\n### मैं आपकी क्या सहायता कर सकता हूँ:\n1. 🦺 **औद्योगिक सुरक्षा**: PPE मानक (IS/OSHA), खतरा क्षेत्र और निरीक्षण नियम।\n2. 🔴 **अग्नि सुरक्षा**: अग्निशामक के प्रकार (PASS नियम), निकासी प्रक्रिया और आग के वर्ग।\n3. ⚡ **विद्युत सुरक्षा और LOTO**: हाई-वोल्टेज प्रोटोकॉल, आर्क फ्लैश और 6-चरणीय तालाबंदी।\n4. 💨 **गैस रिसाव और सीमित स्थान**: गैस सीमाएं, SCBA उपकरण और बडी सिस्टम।\n5. 📜 **SurakshaAR प्लेटफ़ॉर्म**: AR ट्रेनिंग, स्कोरिंग, असेसमेंट और वेरिफाइड सर्टिफिकेट।\n6. 🧠 **सुरक्षा एवं तकनीकी मार्गदर्शन**: किसी भी औद्योगिक सुरक्षा, आपातकालीन उपाय और प्लांट नियमों का सरल एवं स्पष्ट उत्तर!",
+    answer_hinglish: "🤖 **Main Suraksha Saathi hoon**, aapka smart AI Safety & Technical Assistant!\n\n### Main aapki in cheezon mein madad kar sakta hoon:\n1. 🦺 **Plant & Industrial Safety**: PPE selection, inspection aur safety standard rules.\n2. 🔴 **Fire & Emergency Response**: PASS formula, cylinder selection aur evacuation roadmap.\n3. ⚡ **Electrical Safety & LOTO**: High-voltage isolations aur 6-step lockout/tagout.\n4. 💨 **Gas Leak & Confined Space**: 4-gas monitoring, SCBA kab pehnein aur buddy system.\n5. 📜 **SurakshaAR Training**: AR mode mein practice, assessment pass karna aur certificate download karna.\n6. 🧠 **Safety Guidance**: Industrial safety, plant SOPs aur safety precautions par clear step-by-step guidance!",
     answer_sat: "🤖 ᱤᱧ ᱫᱚ ᱥᱩᱨᱠᱷᱟ ᱥᱟᱛᱷᱤ (Suraksha Saathi) ᱠᱟᱹᱱᱟᱹᱧ᱾ ᱠᱟᱹᱨᱜᱟᱲ ᱨᱩᱠᱷᱤᱭᱟᱹ, PPE, ᱥᱮᱸᱜᱮᱞ ᱟᱨ SurakshaAR ᱴᱨᱮᱱᱤᱝ ᱨᱮ ᱜᱚᱲᱚ ᱮᱢ ᱫᱟᱲᱮᱭᱟᱜᱼᱟ᱾",
   },
   {
@@ -313,7 +311,7 @@ export const KNOWLEDGE_BASE = [
       'about surakshaar', 'about platform', 'surakshaar features', 'what does this website do',
       'what is this app', 'website kya karti hai'
     ],
-    answer_en: "🛡️ **SurakshaAR** is an immersive industrial safety training platform designed to eliminate workplace accidents in high-risk environments through hands-on Augmented Reality (AR).\n\n### Core Platform Features:\n• 👓 **Immersive AR Simulations**: Practice real emergency response (Fire & Explosion, Gas Leak, PPE Inspection, High-Voltage Electrical, Machinery Safety) safely in 3D/AR.\n• 🎯 **Interactive Real-time Assessment**: Evaluates reaction time, hazard identification accuracy, and adherence to safety protocols.\n• 🏆 **Performance Scoring & Blockchain Certificates**: Verifiable safety credentials recorded securely to validate workforce readiness.\n• 🌐 **Quad-lingual & Accessible**: Available in English, हिंदी, Hinglish, and ᱥᱟᱱᱛᱟᱲᱤ with voice TTS and high-contrast modes.\n• 🤖 **Suraksha Saathi AI**: 24/7 intelligent assistance powered by Google Gemini and real-time Search Grounding.",
+    answer_en: "🛡️ **SurakshaAR** is an immersive industrial safety training platform designed to eliminate workplace accidents in high-risk environments through hands-on Augmented Reality (AR).\n\n### Core Platform Features:\n• 👓 **Immersive AR Simulations**: Practice real emergency response (Fire & Explosion, Gas Leak, PPE Inspection, High-Voltage Electrical, Machinery Safety) safely in 3D/AR.\n• 🎯 **Interactive Real-time Assessment**: Evaluates reaction time, hazard identification accuracy, and adherence to safety protocols.\n• 🏆 **Performance Scoring & Blockchain Certificates**: Verifiable safety credentials recorded securely to validate workforce readiness.\n• 🌐 **Quad-lingual & Accessible**: Available in English, हिंदी, Hinglish, and ᱥᱟᱱᱛᱟᱲᱤ with voice TTS and high-contrast modes.\n• 🤖 **Suraksha Saathi AI**: 24/7 intelligent assistance for safety guidelines, hazard SOPs, and quiz assistance.",
     answer_hi: "🛡️ **SurakshaAR** एक संवर्धित वास्तविकता (Augmented Reality) आधारित औद्योगिक सुरक्षा प्रशिक्षण प्लेटफ़ॉर्म है।\n\n### प्रमुख विशेषताएं:\n• 👓 **इमर्सिव AR प्रशिक्षण**: आग, गैस रिसाव, PPE, और हाई-वोल्टेज विद्युत खतरों का बिना वास्तविक खतरे के सुरक्षित 3D/AR अभ्यास।\n• 🎯 **इंटरैक्टिव असेसमेंट**: प्रतिक्रिया समय और सुरक्षा नियमों के पालन का सटीक मूल्यांकन।\n• 🏆 **प्रमाणित सर्टिफिकेट**: परीक्षा उत्तीर्ण करने पर डिजिटल सत्यापन योग्य सुरक्षा प्रमाणपत्र।\n• 🌐 **बहुभाषी समर्थन**: अंग्रेजी, हिंदी, हिंग्लिश और संथाली (ऑल चिकी) में उपलब्ध।\n• 🤖 **सुरक्षा साथी AI**: 24/7 बुद्धिमान सुरक्षा सहायता।",
     answer_hinglish: "🛡️ **SurakshaAR** ek modern Augmented Reality (AR) safety training platform hai jo industrial workers aur trainees ko bina real risk ke emergency training deta hai.\n\n### Main Features:\n• 👓 **3D AR Training**: Fire explosion, gas leak, PPE inspection aur high-voltage switchyard ko AR mein practice karein.\n• 🎯 **Live Scoring & Quiz**: Har action aur safety step ka real-time evaluation hota hai.\n• 🏆 **Verified Certificate**: Module complete hone par professional safety certificate milta hai.\n• 🌐 **Multi-language Support**: English, Hindi, Hinglish aur Santali bhashaon mein available.\n• 🤖 **Suraksha Saathi AI**: Har samay live guidance aur sawalon ke answers dene ke liye ready!",
     answer_sat: "🛡️ **SurakshaAR** ᱫᱚ ᱢᱤᱫ AR (Augmented Reality) ᱴᱨᱮᱱᱤᱝ ᱯᱞᱮᱴᱯᱷᱳᱨᱢ ᱠᱟᱱᱟ ᱡᱟᱦᱟᱸᱨᱮ ᱥᱮᱸᱜᱮᱞ, ᱜᱮᱥ ᱟᱨ ᱵᱤᱡᱽᱞᱤ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱵᱟᱵᱚᱛ ᱥᱮᱪᱮᱫ ᱧᱟᱢᱚᱜᱼᱟ᱾",
@@ -322,13 +320,49 @@ export const KNOWLEDGE_BASE = [
     id: 'ai_general_explainer',
     module: MODULES.GLOBAL,
     keywords: [
-      'chatgpt', 'gemini', 'kuch bhi puchu', 'kch bhi', 'answer anything', 'kaise kaam karte ho',
-      'how do you answer', 'general questions', 'clear answer', 'explain clearly'
+      'how do you answer', 'general questions', 'clear answer', 'explain clearly',
+      'kaise kaam karte ho', 'kya bata sakte ho', 'safety assistant role'
     ],
-    answer_en: "💡 **How I Answer Your Questions:**\n\n1. **Industrial Safety & SOPs**: For all safety, hazard, and emergency questions, I provide certified protocols adhering strictly to IS, OSHA, DGMS, and NFPA standards.\n2. **Open-Ended & General Questions (ChatGPT / Gemini Mode)**: Connected with the Gemini AI engine and Google Search Grounding, I search and generate structured, comprehensive, and up-to-date answers for any topic.\n3. **Clarity & Depth**: Every explanation is structured with bold highlights, bullet points, and step-by-step instructions so you can grasp it instantly.\n\nAsk me any question in English, Hindi, or Hinglish!",
-    answer_hi: "💡 **मैं आपके सवालों का उत्तर कैसे देता हूँ:**\n\n1. **औद्योगिक सुरक्षा**: सभी सुरक्षा और आपातकालीन सवालों के लिए मैं IS और OSHA मानकों के अनुसार प्रमाणित उत्तर देता हूँ।\n2. **सामान्य और तकनीकी सवाल (ChatGPT/Gemini मोड)**: Gemini AI और Google Search से जुड़कर मैं किसी भी विषय पर विस्तृत और नवीनतम जानकारी प्रस्तुत करता हूँ।\n3. **सरल और स्पष्ट संरचना**: प्रत्येक उत्तर में मुख्य बिंदु, चरणबद्ध निर्देश और व्यावहारिक उदाहरण शामिल होते हैं।\n\nआप किसी भी भाषा (English, Hindi, Hinglish) में कोई भी प्रश्न पूछ सकते हैं!",
-    answer_hinglish: "💡 **Main aapke har sawal ka answer kaise deta hoon:**\n\n1. **Industrial Safety & Protocols**: Safety, fire, gas, PPE aur electrical se jude sawalon ke liye IS aur OSHA ke verified standard answers turant deta hoon.\n2. **ChatGPT / Gemini Live AI Mode**: Gemini API aur Google Search grounding se connect hokar main duniya ke kisi bhi topic par clear, detailed aur updated jawab de sakta hoon.\n3. **Easy & Clear Structure**: Har answer mein headings, bullet points aur step-by-step points hote hain taaki aapko ekdum aasani se samajh aaye.\n\nAap English, Hindi ya Hinglish mein koi bhi sawal pooch sakte hain!",
+    answer_en: "💡 **How I Answer Your Questions:**\n\n1. **Industrial Safety & SOPs**: For all safety, hazard, and emergency questions, I provide certified protocols adhering strictly to IS, OSHA, DGMS, and NFPA standards.\n2. **Direct & Actionable Guidance**: Every explanation is structured with bold highlights, bullet points, and step-by-step instructions so you can grasp it instantly.\n3. **Practical Examples**: Real plant scenarios, color codes, inspection checklists, and dos & don'ts.\n\nAsk me any question in English, Hindi, Hinglish, or Santali!",
+    answer_hi: "💡 **मैं आपके सवालों का उत्तर कैसे देता हूँ:**\n\n1. **औद्योगिक सुरक्षा मानक**: सभी सुरक्षा और आपातकालीन सवालों के लिए मैं IS, OSHA और DGMS मानकों के अनुसार प्रमाणित उत्तर देता हूँ।\n2. **चरणबद्ध और स्पष्ट संरचना**: प्रत्येक उत्तर में मुख्य बिंदु, चरणबद्ध निर्देश और व्यावहारिक उदाहरण शामिल होते हैं।\n3. **व्यावहारिक उपाय**: कारखाने के वास्तविक परिदृश्य, रंग कोड, निरीक्षण चेकलिस्ट और सावधानियां।\n\nआप किसी भी भाषा (English, Hindi, Hinglish, Santali) में कोई भी प्रश्न पूछ सकते हैं!",
+    answer_hinglish: "💡 **Main aapke har sawal ka answer kaise deta hoon:**\n\n1. **Industrial Safety & Standards**: Safety, fire, gas, PPE aur electrical se jude sawalon ke liye IS aur OSHA ke verified standard answers turant deta hoon.\n2. **Easy & Clear Structure**: Har answer mein headings, bullet points aur step-by-step points hote hain taaki aapko aasani se samajh aaye.\n3. **Plant Guidelines**: Factory floor ki reality, dos & don'ts aur emergency actions simple shabdon mein explain karta hoon.\n\nAap English, Hindi, Hinglish ya Santali mein koi bhi sawal pooch sakte hain!",
     answer_sat: "💡 ᱤᱧ ᱡᱚᱛᱚ ᱠᱩᱠᱞᱤ ᱨᱮᱱᱟᱜ ᱥᱟᱹᱨᱤ ᱟᱨ ᱯᱩᱥᱴᱟᱹᱣ ᱛᱮᱞᱟᱧ ᱮᱢᱟ᱾",
+  },
+  {
+    id: 'general_safety_tips',
+    module: MODULES.GLOBAL,
+    keywords: [
+      'safety tips', 'safety rules', 'factory rules', 'suraksha niyam', 'plant safety',
+      'safety tips batao', 'kya dhyan rakhein', 'safety tips kya hai', 'tips', 'precautions',
+      'savdhani', 'suraksha ke niyam', 'rules of safety', 'golden rules', 'ᱱᱤᱭᱟᱹᱢ'
+    ],
+    answer_en: "🛡️ **Golden Safety Rules for the Workplace / Factory Floor:**\n\n1. 🦺 **Always Wear Mandatory PPE**: Never enter working areas without hard hat (IS 2925), steel-toe boots (IS 15298), and eye protection.\n2. 🚫 **Never Bypass Machine Guards**: Keep safety interlocks and shields engaged at all times.\n3. ⚡ **Observe LOTO (Lockout/Tagout)**: Always de-energize and lock equipment before maintenance or cleaning.\n4. 🚪 **Keep Emergency Routes Clear**: Fire doors, extinguishers, and eyewash stations must never be blocked.\n5. ⚠️ **Report Near-Misses Immediately**: Inform your safety officer or supervisor about any potential hazard before an accident occurs.\n6. 🧹 **Good Housekeeping**: Keep floors clean and dry to eliminate slips, trips, and falls.\n\nSafety is not an option — it is our first priority!",
+    answer_hi: "🛡️ **कार्यस्थल और कारखाने के सुनहरे सुरक्षा नियम (Golden Rules):**\n\n1. 🦺 **अनिवार्य PPE हमेशा पहनें**: बिना हेलमेट (IS 2925), सुरक्षा जूते (IS 15298) और चश्मे के कभी भी प्लांट में न जाएं।\n2. 🚫 **मशीन गार्ड को कभी न हटाएं**: सुरक्षा शील्ड और इमरजेंसी स्टॉप हमेशा चालू रखें।\n3. ⚡ **LOTO नियम का पालन करें**: मशीन रिपेयर या सफाई से पहले मुख्य पावर सप्लाई बंद करके ताला लगाएं।\n4. 🚪 **आपातकालीन रास्ते साफ रखें**: आग के रास्ते, अग्निशामक और आपातकालीन निकास के आगे कोई सामान न रखें।\n5. ⚠️ **खतरे की तुरंत सूचना दें**: किसी भी जोखिम या ढीले तार की सूचना तुरंत सुपरवाइजर को दें।\n6. 🧹 **कार्यस्थल साफ रखें**: फर्श पर तेल या पानी न फैलने दें ताकि फिसलने का खतरा न हो।\n\nसुरक्षा पहले, काम बाद में!",
+    answer_hinglish: "🛡️ **Plant & Factory Floor ke Golden Safety Rules:**\n\n1. 🦺 **Mandatory PPE zaroor pehnein**: Safety helmet, steel-toe boots aur eye goggles ke bina plant mein entry mana hai.\n2. 🚫 **Machine guards bypass na karein**: Rotating shafts aur gears ke cover hamesha lage hone chahiye.\n3. ⚡ **LOTO (Lockout/Tagout) follow karein**: Maintenance se pehle power switch off karke apna lock aur tag lagayein.\n4. 🚪 **Exit gates hamesha clear rakhein**: Fire extinguisher aur emergency exit ke samne kabhi samaan na rakhein.\n5. ⚠️ **Near-miss turant report karein**: Koi bhi khatra dikhe toh supervisor ko turant inform karein.\n6. 🧹 **Floor clean rakhein**: Tel ya grease ko turant saaf karein taaki fisalne ka risk na ho.\n\nSuraksha pehle, kaam hamesha safe!",
+    answer_sat: "🛡️ **ᱠᱟᱹᱨᱜᱟᱲ ᱨᱮᱱᱟᱜ ᱢᱩᱬ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱱᱤᱭᱟᱹᱢ:**\n᱑. 🦺 ᱡᱟᱣᱜᱮ PPE (ᱦᱮᱞᱢᱮᱴ, ᱡᱩᱛᱟᱹ, ᱪᱚᱥᱢᱟ) ᱦᱚᱨᱚᱜ ᱢᱮ᱾\n᱒. 🚫 ᱢᱮᱥᱤᱱ ᱜᱟᱨᱰ ᱟᱞᱚᱢ ᱚᱪᱚᱜᱟ᱾\n᱓. ⚡ ᱢᱮᱥᱤᱱ ᱥᱟᱯᱲᱟᱣ ᱞᱟᱦᱟ LOTO ᱛᱟᱞᱟ ᱞᱟᱜᱟᱣ ᱢᱮ᱾\n᱔. 🚪 ᱚᱰᱚᱠᱚᱜ ᱦᱚᱨ ᱥᱟᱯᱷᱟ ᱫᱚᱦᱚᱭ ᱢᱮ᱾\n᱕. ⚠️ ᱵᱚᱛᱚᱨᱟᱱ ᱡᱤᱱᱤᱥ ᱥᱩᱯᱚᱨᱵᱷᱟᱭᱤᱡᱚᱨ ᱴᱷᱮᱱ ᱞᱟᱹᱭ ᱢᱮ᱾",
+  },
+  {
+    id: 'thank_you',
+    module: MODULES.GLOBAL,
+    keywords: [
+      'thank you', 'thanks', 'dhanyawad', 'shukriya', 'bahut accha', 'great help',
+      'thx', 'thank u', 'dhanyavaad', 'धन्यवाद', 'शुक्रिया', 'ᱥᱟᱨᱦᱟᱣ'
+    ],
+    answer_en: "🙏 **You're very welcome!**\n\nYour safety is our highest mission. If you have any more questions about industrial protocols, AR scenarios, or equipment standards, I'm always here to help.\n\nStay alert and stay safe on the floor! 🛡️",
+    answer_hi: "🙏 **आपका बहुत-बहुत स्वागत है!**\n\nआपकी सुरक्षा हमारी सर्वोच्च प्राथमिकता है। यदि आपको औद्योगिक सुरक्षा, AR ट्रेनिंग मॉड्यूल या किसी भी उपकरण के संबंध में और कोई जानकारी चाहिए, तो कभी भी पूछ सकते हैं।\n\nहमेशा सतर्क रहें, सुरक्षित रहें! 🛡️",
+    answer_hinglish: "🙏 **Most welcome!**\n\nAapki safety hamari sabse badi priority hai. Agar industrial safety, PPE ya AR practice se juda koi bhi naya sawal ho, toh bejhijhak poochiye.\n\nFloor par hamesha alert aur safe rahein! 🛡️",
+    answer_sat: "🙏 **ᱟᱹᱰᱤ ᱟᱹᱰᱤ ᱥᱟᱨᱦᱟᱣ!**\n\nᱟᱢᱟᱜ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱜᱮ ᱟᱞᱮᱭᱟᱜ ᱢᱩᱬ ᱠᱟᱹᱢᱤ ᱠᱟᱱᱟ᱾ ᱡᱟᱣᱜᱮ ᱥᱟᱵᱽᱫᱷᱟᱱ ᱛᱟᱦᱮᱸᱱ ᱢᱮ! 🛡️",
+  },
+  {
+    id: 'goodbye',
+    module: MODULES.GLOBAL,
+    keywords: [
+      'bye', 'goodbye', 'alvida', 'see you', 'tata', 'phir milenge', 'बाय', 'अलविदा', 'ᱟᱞᱵᱷᱤᱫᱟ'
+    ],
+    answer_en: "👋 **Goodbye and take care!**\n\nRemember: Safety is a habit, not an accident. Make sure your PPE is secure and all machinery is safe before leaving your shift. Have a productive and safe day! 👷",
+    answer_hi: "👋 **अलविदा और अपना ध्यान रखें!**\n\nयाद रखें: सुरक्षा एक आदत है, संयोग नहीं। शिफ्ट समाप्त करते समय सभी उपकरणों और PPE की जांच अवश्य करें। आपका दिन शुभ और सुरक्षित रहे! 👷",
+    answer_hinglish: "👋 **Alvida aur safe rahein!**\n\nYaad rakhein: Har shift mein safety rules follow karna sabse zaroori hai. Shift khatam karne se pehle sabhi tools aur equipment safely band karein. Good luck! 👷",
+    answer_sat: "👋 **ᱡᱚᱦᱟᱨ! ᱟᱢᱟᱜ ᱫᱷᱮᱭᱟᱱ ᱫᱚᱦᱚᱭ ᱢᱮ!**\n\nᱡᱟᱣᱜᱮ ᱨᱩᱠᱷᱤᱭᱟᱹ ᱱᱤᱭᱟᱹᱢ ᱢᱟᱱᱟᱣ ᱢᱮ ᱟᱨ ᱥᱩᱨᱠᱷᱤᱛ ᱛᱟᱦᱮᱸᱱ ᱢᱮ᱾ 👷",
   },
   // ──────────────────────────────────────────────────────────────────────────
   {
@@ -779,30 +813,24 @@ export function queryKnowledgeBase(input, lang = 'en', currentModule = MODULES.G
   };
 }
 
-// ─── OPTIONAL AI / LLM ASSISTANT INTEGRATION WITH SECURE SERVER ENDPOINT ─────
+// ─── LOCAL SAFETY ASSISTANT WITH OPTIONAL BACKEND PROXY ─────
 export async function querySafetyAssistant(input, lang = 'en', currentModule = MODULES.GLOBAL, history = []) {
-  // Always check critical guardrails locally first (fastest life-critical intervention)
+  // 1. Always check critical hazard guardrails locally first (fastest life-critical intervention)
   const critical = checkCriticalHazardGuardrails(input, lang);
   if (critical) return critical;
 
-  // Check verified tri-lingual FAQ knowledge base first (instant, accurate in EN, HI, SAT)
+  // 2. Check verified tri-lingual FAQ knowledge base (instant & verified in EN, HI, SAT)
   const faqMatch = findFaqMatch(input, lang);
   if (faqMatch) return faqMatch;
 
-  // Try calling the secure server-side chat endpoint (Groq backend or proxy)
+  // 3. Try custom backend endpoint if explicitly configured in environment
   if (typeof window !== 'undefined') {
-    const customEndpoint = import.meta.env.VITE_CHAT_API_URL
-    const endpoints = [
-      ...(customEndpoint ? [customEndpoint] : []),
-      '/api/chat',
-      '/SurakshaAR/api/chat',
-      '/.netlify/functions/chat'
-    ]
-    for (const endpoint of endpoints) {
+    const customEndpoint = import.meta.env?.VITE_CHAT_API_URL;
+    if (customEndpoint && customEndpoint.trim().length > 0) {
       try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 3500)
-        const res = await fetch(endpoint, {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const res = await fetch(customEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -822,11 +850,11 @@ export async function querySafetyAssistant(input, lang = 'en', currentModule = M
             sessionId: (typeof localStorage !== 'undefined' && localStorage.getItem('suraksha_mitra_session_id')) || 'default-session',
           }),
           signal: controller.signal
-        })
-        clearTimeout(timeoutId)
+        });
+        clearTimeout(timeoutId);
         if (res.ok) {
-          const data = await res.json()
-          const text = data?.reply || data?.answer
+          const data = await res.json();
+          const text = data?.reply || data?.answer;
           if (text) {
             return {
               answer: text,
@@ -836,16 +864,16 @@ export async function querySafetyAssistant(input, lang = 'en', currentModule = M
               confidence: data.confidence || 0.95,
               groundingQueries: data.groundingQueries || [],
               isCritical: data.isCritical || false,
-            }
+            };
           }
         }
       } catch (_) {
-        // Continue to next endpoint or fallback
+        // Fall back cleanly to local knowledge base
       }
     }
   }
 
-  // Graceful local knowledge base fallback (100% offline resilient)
+  // 4. Instant local safety knowledge base response (100% standalone, resilient & zero API key dependency)
   return queryKnowledgeBase(input, lang, currentModule, history);
 }
 
