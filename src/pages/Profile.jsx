@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Save, Award, LogOut, AlertCircle, CheckCircle } from 'lucide-react'
+import { Save, Award, LogOut, AlertCircle, CheckCircle, Camera, RefreshCw } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { SUPPORTED_LANGUAGES } from '../lib/i18n'
@@ -9,6 +9,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { mockUpdateProfile, mockGetSessions } from '../lib/mockDb'
 import { scoreRating } from '../lib/scoring'
 import { Navbar } from '../components/layout/Navbar'
+import { UserAvatar } from '../components/ui/UserAvatar'
 
 function fmtDate(str) {
   if (!str) return '—'
@@ -25,6 +26,7 @@ export default function Profile() {
   const [prefLang, setPrefLang]         = useState('en')
   const [saving, setSaving]             = useState(false)
   const [saveMsg, setSaveMsg]           = useState('')
+  const fileInputRef                    = useRef(null)
 
   useEffect(() => {
     if (profile) {
@@ -33,6 +35,58 @@ export default function Profile() {
       setPrefLang(profile.preferred_language ?? 'en')
     }
   }, [profile])
+
+  async function handlePhotoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const img = new Image()
+      img.onload = async () => {
+        try {
+          const canvas = document.createElement('canvas')
+          const maxDim = 256
+          let w = img.width, h = img.height
+          if (w > h) { if (w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim } }
+          else { if (h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim } }
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, w, h)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+
+          if (!isSupabaseConfigured) {
+            await mockUpdateProfile(user.id, { avatar_url: dataUrl })
+          } else {
+            await supabase.from('profiles').update({ avatar_url: dataUrl }).eq('id', user.id)
+          }
+          await refreshProfile()
+          setSaveMsg('Profile photo updated successfully!')
+          setTimeout(() => setSaveMsg(''), 3000)
+        } catch (err) {
+          console.error('[Profile] Photo upload failed:', err)
+          setSaveMsg('Failed to update photo.')
+        }
+      }
+      img.src = ev.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function handleResetGmailPhoto() {
+    try {
+      if (!isSupabaseConfigured) {
+        await mockUpdateProfile(user.id, { avatar_url: null })
+      } else {
+        await supabase.from('profiles').update({ avatar_url: null }).eq('id', user.id)
+      }
+      await refreshProfile()
+      setSaveMsg('Reset to default Gmail / Account photo!')
+      setTimeout(() => setSaveMsg(''), 3000)
+    } catch {
+      setSaveMsg('Failed to reset photo.')
+    }
+  }
 
   const { data: sessions } = useQuery({
     queryKey: ['profile-sessions', user?.id],
@@ -95,19 +149,70 @@ export default function Profile() {
 
           {/* Profile form */}
           <div className="card" style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24, flexWrap: 'wrap' }}>
-              <div style={{
-                width: 52, height: 52, borderRadius: '50%',
-                background: 'var(--color-brand)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '1.3rem', fontWeight: 800, color: 'white', flexShrink: 0,
-              }}>
-                {(profile?.full_name ?? 'T')[0].toUpperCase()}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <UserAvatar user={user} profile={profile} size={64} style={{ border: '2.5px solid var(--color-brand)' }} />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload / Change Photo"
+                  style={{
+                    position: 'absolute', bottom: -4, right: -4,
+                    width: 26, height: 26, borderRadius: '50%',
+                    background: 'var(--color-brand)', color: '#FFFFFF',
+                    border: '2px solid var(--color-surface)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                  }}
+                >
+                  <Camera size={13} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  style={{ display: 'none' }}
+                />
               </div>
+
               <div style={{ minWidth: 0, flex: 1, wordBreak: 'break-word' }}>
-                <div style={{ fontWeight: 700, fontSize: 'var(--text-md)' }}>{profile?.full_name ?? 'Trainee'}</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', wordBreak: 'break-all' }}>{user?.email}</div>
+                <div style={{ fontWeight: 700, fontSize: 'var(--text-md)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>{profile?.full_name ?? 'Trainee'}</span>
+                  <span className="badge badge-brand" style={{ fontSize: '0.65rem' }}>TRAINEE</span>
+                </div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', wordBreak: 'break-all', marginTop: 2 }}>
+                  {user?.email}
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-sm, 6px)', padding: '4px 10px',
+                      fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-text-primary)',
+                      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5,
+                    }}
+                  >
+                    <Camera size={12} color="var(--color-brand)" /> Change Photo
+                  </button>
+                  {profile?.avatar_url && (
+                    <button
+                      type="button"
+                      onClick={handleResetGmailPhoto}
+                      style={{
+                        background: 'transparent', border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-sm, 6px)', padding: '4px 10px',
+                        fontSize: '0.72rem', fontWeight: 500, color: 'var(--color-text-muted)',
+                        cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+                      }}
+                    >
+                      <RefreshCw size={11} /> Reset to Gmail Photo
+                    </button>
+                  )}
+                </div>
               </div>
-              <span className="badge badge-brand" style={{ marginLeft: 'auto', flexShrink: 0 }}>TRAINEE</span>
             </div>
 
             {saveMsg && (

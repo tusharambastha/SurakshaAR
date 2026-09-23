@@ -20,8 +20,8 @@ const HAZARD_ICONS = {
 }
 const SCENARIO_ORDER = [
   'a1b2c3d4-0001-0001-0001-000000000001', // Fire & Explosion Response
-  'a1b2c3d4-0003-0003-0003-000000000003', // Heavy Industrial Machinery & Nip-Point Guarding (WORKS)
   'a1b2c3d4-0002-0002-0002-000000000002', // Gas Leak & Confined Space Protocol
+  'a1b2c3d4-0003-0003-0003-000000000003', // Heavy Industrial Machinery & Nip-Point Guarding (WORKS)
   'a1b2c3d4-0005-0005-0005-000000000005', // High-Voltage Electrical Substation Safety (Coming Soon)
   'a1b2c3d4-0004-0004-0004-000000000004', // PPE & Industrial Hazard Baseline (Coming Soon)
 ]

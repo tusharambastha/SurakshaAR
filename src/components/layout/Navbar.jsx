@@ -14,6 +14,7 @@ import {
   User, Phone, HelpCircle, Mail, LifeBuoy, MessageSquare, ChevronDown,
 } from 'lucide-react'
 import VideoTutorialModal from '../ui/VideoTutorialModal'
+import { UserAvatar } from '../ui/UserAvatar'
 
 export function Navbar() {
   const { user, profile, signOut } = useAuth()
@@ -507,14 +508,7 @@ export function Navbar() {
                     transition: 'all var(--transition-fast)',
                   }}
                 >
-                  <div style={{
-                    width: 26, height: 26, borderRadius: '50%',
-                    background: 'var(--color-brand)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '0.72rem', fontWeight: 800, color: '#FFFFFF', flexShrink: 0,
-                  }}>
-                    {firstName[0]?.toUpperCase()}
-                  </div>
+                  <UserAvatar user={user} profile={profile} size={26} />
                   <span style={{
                     fontSize: 'var(--text-sm)', fontWeight: 600,
                     color: 'var(--color-text-primary)',
@@ -531,7 +525,7 @@ export function Navbar() {
                 {profileDropOpen && (
                   <div style={{
                     position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                    width: 200,
+                    width: 220,
                     background: 'var(--color-surface)',
                     border: '1px solid var(--color-border)',
                     borderRadius: 'var(--radius-lg, 14px)',
@@ -545,12 +539,18 @@ export function Navbar() {
                       padding: '12px 14px',
                       borderBottom: '1px solid var(--color-border)',
                       background: 'var(--color-surface-alt)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
                     }}>
-                      <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {profile?.full_name || 'Trainee Officer'}
-                      </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {user?.email}
+                      <UserAvatar user={user} profile={profile} size={36} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {profile?.full_name || 'Trainee Officer'}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {user?.email}
+                        </div>
                       </div>
                     </div>
 
@@ -690,21 +690,7 @@ export function Navbar() {
             gap: 12,
             background: 'var(--color-surface)',
           }}>
-            <div style={{
-              width: 38,
-              height: 38,
-              borderRadius: '50%',
-              background: 'var(--color-brand)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '1rem',
-              fontWeight: 800,
-              color: '#FFFFFF',
-              flexShrink: 0,
-            }}>
-              {firstName[0]?.toUpperCase()}
-            </div>
+            <UserAvatar user={user} profile={profile} size={40} />
             <div style={{ overflow: 'hidden' }}>
               <div style={{
                 fontSize: 'var(--text-sm)',
@@ -831,9 +817,6 @@ export function Navbar() {
             </div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
-
-          {/* Divider */}
-          <div style={{ height: 1, background: 'var(--color-border)', margin: '6px 0' }} />
 
           {/* ℹ About SurakshaAR */}
           <button type="button" onClick={() => { setDrawerOpen(false); setShowAboutModal(true) }} style={navItemStyle(false)}>
@@ -1131,7 +1114,7 @@ export function Navbar() {
               <div style={{ background: 'var(--color-surface-alt)', borderRadius: 10, padding: '12px 14px', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
                 🏆 Smart India Hackathon 2026 &nbsp;|&nbsp; SIH26041<br />
                 🛡️ Industrial Safety Training via WebXR + AR Foundation<br />
-                🌐 Multilingual: English, Hindi, Marathi
+                🌐 Multilingual: English, Hindi, Santali (ᱥᱟᱱᱛᱟᱲᱤ)
               </div>
             </div>
           ),
@@ -1146,7 +1129,7 @@ export function Navbar() {
                 { q: 'Can I use it offline?', a: 'Yes! Fire Safety, Gas Leak, and Confined Space modules are cached for offline field drills. You will see an OFFLINE badge when not connected.' },
                 { q: 'How do I get my certificate?', a: 'Complete all steps in a training scenario with a passing score. Your certificate is auto-generated and available under My Certificates.' },
                 { q: 'Which devices support native AR?', a: 'Chrome on Android with ARCore installed supports native AR plane detection. Other devices use the sensor/gyro fallback mode.' },
-                { q: 'How do I change the app language?', a: 'Open the navigation drawer (☰) → scroll to the bottom → select your language (English / हिंदी / मराठी).' },
+                { q: 'How do I change the app language?', a: 'Open the navigation drawer (☰) → scroll to the bottom → select your language (English / हिंदी / ᱥᱟᱱᱛᱟᱲᱤ).' },
               ].map(({ q, a }, i) => (
                 <div key={i} style={{ borderBottom: i < 4 ? '1px solid var(--color-border)' : 'none', paddingBottom: i < 4 ? 12 : 0 }}>
                   <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>Q: {q}</div>
