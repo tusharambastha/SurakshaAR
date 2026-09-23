@@ -800,8 +800,8 @@ export default function VirtualARHUD({
 
         {!allDone && activeStep && (
           <>
-            {/* When NOT placed: Render Place Object Action Button + Prompt */}
-            {!isPlaced ? (
+            {/* When NOT placed: Render Place Object Action Button + Prompt (unless it's a decision step!) */}
+            {!isPlaced && !activeStep?.is_decision_step ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%' }}>
                 <button
                   type="button"
@@ -985,7 +985,12 @@ export default function VirtualARHUD({
                     <div style={{ display: 'flex', gap: 8, width: '100%' }}>
                       <button
                         type="button"
-                        onClick={() => onDecisionChoice && onDecisionChoice('small_safe')}
+                        data-testid="ar-decision-small-safe"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (onDecisionChoice) onDecisionChoice('small_safe')
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
                         style={{
                           flex: 1,
                           background: 'linear-gradient(135deg, #10B981, #059669)',
@@ -1001,6 +1006,8 @@ export default function VirtualARHUD({
                           justifyContent: 'center',
                           gap: 5,
                           boxShadow: '0 4px 14px rgba(16, 185, 129, 0.4)',
+                          touchAction: 'manipulation',
+                          pointerEvents: 'auto',
                         }}
                       >
                         <span>🔥 Small &amp; Safe</span>
@@ -1008,7 +1015,12 @@ export default function VirtualARHUD({
 
                       <button
                         type="button"
-                        onClick={() => onDecisionChoice && onDecisionChoice('not_safe')}
+                        data-testid="ar-decision-not-safe"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (onDecisionChoice) onDecisionChoice('not_safe')
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
                         style={{
                           flex: 1,
                           background: 'linear-gradient(135deg, #EF4444, #DC2626)',
@@ -1024,6 +1036,8 @@ export default function VirtualARHUD({
                           justifyContent: 'center',
                           gap: 5,
                           boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
+                          touchAction: 'manipulation',
+                          pointerEvents: 'auto',
                         }}
                       >
                         <span>⚠️ Not Safe / Spreading</span>

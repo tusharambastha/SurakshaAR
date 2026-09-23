@@ -1430,6 +1430,20 @@ function CameraBackground({ streamRef, videoRef }) {
   )
 }
 
+// Robust cross-platform UUID generator with fallback
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID()
+    } catch (_) {}
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 // ─── Main Scenario Page Component ─────────────────────────────────────────────
 export default function Scenario() {
   const { id } = useParams()
@@ -1496,6 +1510,15 @@ export default function Scenario() {
   consequenceFailureRef.current = consequenceFailure
   const stepRetriesRef = useRef({})
   const stepSessionLogsRef = useRef([])
+  const timerIntervalRef = useRef(null)
+  const handleStepClickRef = useRef(null)
+
+  useEffect(() => {
+    window.__setSurakshaFireState = (state) => {
+      console.log('[SurakshaAR] Manually override fire state to:', state)
+      setActualFireState(state)
+    }
+  }, [])
 
   const canvasRef = useRef(null)
   const cameraStreamRef = useRef(null)
@@ -1708,7 +1731,7 @@ export default function Scenario() {
   useEffect(() => {
     if (!user || !id) return
     async function createSession() {
-      const sId = crypto.randomUUID()
+      const sId = generateUUID()
       const sessionData = {
         id: sId,
         user_id: user.id,
@@ -1734,170 +1757,27 @@ export default function Scenario() {
     createSession()
   }, [user, id, isOnline])
 
-  // ── Step Countdown Timer Ticking Loop ─────────────────────────────────────
-  useEffect(() => {
-    if (!isTimerRunning || consequenceFailure) return
-    if (arMode && !placedSteps[currentStep]) return
-
-    const interval = setInterval(() => {
-      setTimerSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          handleStepTimeout()
-          return 0
-        }
-        const next = prev - 1
-        if (next <= 5 && next > 0) {
-          tickAudioRef.current.playTick(next <= 3)
-        }
-        return next
-      })
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [isTimerRunning, currentStep, consequenceFailure, arMode, placedSteps])
-
-  // ── Consequence: Step Timeout Trigger ────────────────────────────────────
-  const handleStepTimeout = useCallback(() => {
+  // ── Synchronous Timer Cancellation Helper ─────────────────────────────────
+  const stopTimer = useCallback(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current)
+      timerIntervalRef.current = null
+    }
     setIsTimerRunning(false)
-    setFireEscalated(true)
-    fireEscalatedRef.current = true
-    fireAudioRef.current.setEscalated(true)
-    if (isFireScenario) {
-      fireAudioRef.current.start()
-    }
+  }, [])
 
-    const currentRetries = (stepRetriesRef.current[currentStep] || 0) + 1
-    stepRetriesRef.current[currentStep] = currentRetries
-
-    const step = scenario?.steps?.[currentStep]
-    const stepLabel = getStepText(step, 'label') || `Step ${currentStep + 1}`
-
-    // Lightweight In-Memory Data Logging
-    const sessionEntry = {
-      stepIndex: currentStep,
-      stepName: stepLabel,
-      timeTakenMs: getStepDuration(currentStep) * 1000,
-      firstTryCorrect: false,
-      retries: currentRetries,
-      failureReason: 'timeout',
-    }
-    stepSessionLogsRef.current = [...stepSessionLogsRef.current, sessionEntry]
-    window.__surakshaStepSessionData = stepSessionLogsRef.current
-
-    const timeoutExplanations = {
-      0: {
-        title: 'Fire Spread — Response Too Slow',
-        explanation: 'Fire spread because response was too slow! In an industrial electrical fire, early containment within the first 20 seconds is critical before thermal runaway sets in and damages adjacent control racks.',
-      },
-      1: {
-        title: 'Delayed Alarm Notification',
-        explanation: 'Delayed alarm activation! Plant personnel were not notified in time, allowing dense smoke to fill the primary evacuation corridor.',
-      },
-      2: {
-        title: 'Delayed Protective PPE Donning',
-        explanation: 'Safety preparation delayed! Every second without protective gear risks severe respiratory burns from toxic hydrogen cyanide and carbon monoxide gas.',
-      },
-      3: {
-        title: 'Delayed Fire Assessment & Action',
-        explanation: 'Fire assessment and suppression took too long! The electrical fire has broken through the cabinet and ignited surrounding pallet stores.',
-      },
-      4: {
-        title: 'Delayed Facility Evacuation',
-        explanation: 'Delayed exit! Dense smoke and heat accumulate rapidly indoors, reducing oxygen levels to life-threatening limits.',
-      },
-      5: {
-        title: 'Delayed Muster Point Assembly',
-        explanation: 'Delayed muster assembly! Emergency crews cannot verify accountability or rescue trapped staff without immediate roll-call.',
-      },
-    }
-
-    const info = timeoutExplanations[currentStep] || {
-      title: 'Action Time Limit Exceeded',
-      explanation: 'Hazard worsened due to delayed response! Industrial emergency protocols require immediate action within the safety window.',
-    }
-
-    setConsequenceFailure({
-      title: info.title,
-      explanation: info.explanation,
-      reason: 'timeout',
-    })
-  }, [currentStep, scenario, isFireScenario, getStepText])
-
-  // ── Consequence / Decision: Decision-Point Choice Handler ─────────────────
-  const handleDecisionChoice = useCallback((choice) => {
-    if (consequenceFailureRef.current) return
-    const step = scenario?.steps?.[currentStep]
-    const timeTaken = Date.now() - stepStartTime
-
-    if (choice === actualFireState) {
-      // Correct assessment choice!
-      handleStepClick(currentStep)
-    } else {
-      // Wrong decision call consequence!
-      setIsTimerRunning(false)
-      setFireEscalated(true)
-      fireEscalatedRef.current = true
-      fireAudioRef.current.setEscalated(true)
-      if (isFireScenario) {
-        fireAudioRef.current.start()
-      }
-
-      const currentRetries = (stepRetriesRef.current[currentStep] || 0) + 1
-      stepRetriesRef.current[currentStep] = currentRetries
-
-      const sessionEntry = {
-        stepIndex: currentStep,
-        stepName: getStepText(step, 'label') || 'Assess Fire',
-        timeTakenMs: timeTaken,
-        firstTryCorrect: false,
-        retries: currentRetries,
-        failureReason: 'wrong_decision_call',
-        choice,
-      }
-      stepSessionLogsRef.current = [...stepSessionLogsRef.current, sessionEntry]
-      window.__surakshaStepSessionData = stepSessionLogsRef.current
-
-      let title = ''
-      let explanation = ''
-      if (choice === 'small_safe' && actualFireState === 'not_safe') {
-        title = 'Dangerous Assessment Error'
-        explanation = 'Wrong call — the fire was spreading rapidly and was NOT small enough to fight directly! Attempting to fight an oversized fire with a handheld extinguisher risks severe thermal burns and asphyxiation. The correct protocol is immediate evacuation!'
-      } else {
-        title = 'Suboptimal Fire Assessment'
-        explanation = 'Wrong call — the fire was in an early incipient stage, contained within the metal cabinet, and safely suppressible with CO₂! Unnecessary abandonment allowed an easily quenchable electrical fault to spread to adjacent industrial machinery.'
-      }
-
-      setConsequenceFailure({
-        title,
-        explanation,
-        reason: 'wrong_decision',
-      })
-    }
-  }, [currentStep, stepStartTime, actualFireState, scenario, isFireScenario, getStepText])
-
-  // ── Consequence: Retry Step Handler ──────────────────────────────────────
-  const handleRetryStep = useCallback(() => {
-    setFireEscalated(false)
-    fireEscalatedRef.current = false
-    fireAudioRef.current.setEscalated(false)
-    if (!isFireScenario || currentStep !== 0) {
-      if (currentStep !== 0) fireAudioRef.current.stop()
-    }
-    setConsequenceFailure(null)
-    setTimerSeconds(getStepDuration(currentStep))
-    setIsTimerRunning(true)
-    setStepStartTime(Date.now())
-  }, [currentStep, isFireScenario])
-
-  // Complete a step handler
+  // ── Step Completion Handler ────────────────────────────────────────────────
   const handleStepClick = useCallback(async (stepIndex) => {
     if (stepIndex !== currentStep) return
     if (consequenceFailureRef.current) return
+
+    // Immediately halt the countdown timer on step completion
+    stopTimer()
+
     const timeTaken = Date.now() - stepStartTime
     const step = scenario?.steps?.[stepIndex]
     const log = {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       session_id: sessionId,
       step_index: stepIndex,
       was_correct: true,
@@ -1963,7 +1843,211 @@ export default function Scenario() {
         smoothLookAt(tx, ty, tz)
       }
     }
-  }, [currentStep, stepStartTime, scenario, stepLogs, sessionId, user, isOnline, lang, getStepText, arMode])
+  }, [currentStep, stepStartTime, scenario, stepLogs, sessionId, user, isOnline, lang, getStepText, arMode, stopTimer])
+
+  handleStepClickRef.current = handleStepClick
+
+  // ── Consequence: Step Timeout Trigger ────────────────────────────────────
+  const handleStepTimeout = useCallback(() => {
+    // If a consequence is already active or handled, prevent timeout from clobbering it
+    if (consequenceFailureRef.current) return
+
+    stopTimer()
+    setFireEscalated(true)
+    fireEscalatedRef.current = true
+    fireAudioRef.current.setEscalated(true)
+    if (isFireScenario) {
+      fireAudioRef.current.start()
+    }
+
+    const currentRetries = (stepRetriesRef.current[currentStep] || 0) + 1
+    stepRetriesRef.current[currentStep] = currentRetries
+
+    const step = scenario?.steps?.[currentStep]
+    const stepLabel = getStepText(step, 'label') || `Step ${currentStep + 1}`
+
+    // Lightweight In-Memory Data Logging
+    const sessionEntry = {
+      stepIndex: currentStep,
+      stepName: stepLabel,
+      timeTakenMs: getStepDuration(currentStep) * 1000,
+      firstTryCorrect: false,
+      retries: currentRetries,
+      failureReason: 'timeout',
+    }
+    stepSessionLogsRef.current = [...stepSessionLogsRef.current, sessionEntry]
+    window.__surakshaStepSessionData = stepSessionLogsRef.current
+
+    const timeoutExplanations = {
+      0: {
+        title: 'Fire Spread — Response Too Slow',
+        explanation: 'Fire spread because response was too slow! In an industrial electrical fire, early containment within the first 20 seconds is critical before thermal runaway sets in and damages adjacent control racks.',
+      },
+      1: {
+        title: 'Delayed Alarm Notification',
+        explanation: 'Delayed alarm activation! Plant personnel were not notified in time, allowing dense smoke to fill the primary evacuation corridor.',
+      },
+      2: {
+        title: 'Delayed Protective PPE Donning',
+        explanation: 'Safety preparation delayed! Every second without protective gear risks severe respiratory burns from toxic hydrogen cyanide and carbon monoxide gas.',
+      },
+      3: {
+        title: 'Delayed Fire Assessment & Action',
+        explanation: 'Fire assessment and suppression took too long! The electrical fire has broken through the cabinet and ignited surrounding pallet stores.',
+      },
+      4: {
+        title: 'Delayed Facility Evacuation',
+        explanation: 'Delayed exit! Dense smoke and heat accumulate rapidly indoors, reducing oxygen levels to life-threatening limits.',
+      },
+      5: {
+        title: 'Delayed Muster Point Assembly',
+        explanation: 'Delayed muster assembly! Emergency crews cannot verify accountability or rescue trapped staff without immediate roll-call.',
+      },
+    }
+
+    const info = timeoutExplanations[currentStep] || {
+      title: 'Action Time Limit Exceeded',
+      explanation: 'Hazard worsened due to delayed response! Industrial emergency protocols require immediate action within the safety window.',
+    }
+
+    setConsequenceFailure({
+      title: info.title,
+      explanation: info.explanation,
+      reason: 'timeout',
+    })
+  }, [currentStep, scenario, isFireScenario, getStepText, stopTimer])
+
+  // ── Consequence / Decision: Decision-Point Choice Handler ─────────────────
+  const handleDecisionChoice = useCallback((choice) => {
+    console.log('[SurakshaAR] handleDecisionChoice tapped:', { choice, actualFireState, currentStep })
+
+    // 1. Immediately cancel the timer interval so timeout consequence cannot fire
+    stopTimer()
+
+    // 2. Ignore click if a consequence modal is already being displayed
+    if (consequenceFailureRef.current) return
+
+    const step = scenario?.steps?.[currentStep]
+    const timeTaken = Date.now() - stepStartTime
+
+    if (choice === actualFireState) {
+      console.log('[SurakshaAR] Decision is CORRECT! Advancing step...')
+      // Correct assessment choice!
+      if (handleStepClickRef.current) {
+        handleStepClickRef.current(currentStep)
+      } else {
+        handleStepClick(currentStep)
+      }
+    } else {
+      console.log('[SurakshaAR] Decision is INCORRECT! Triggering choice consequence...')
+      // Wrong decision call consequence!
+      setFireEscalated(true)
+      fireEscalatedRef.current = true
+      fireAudioRef.current.setEscalated(true)
+      if (isFireScenario) {
+        fireAudioRef.current.start()
+      }
+
+      const currentRetries = (stepRetriesRef.current[currentStep] || 0) + 1
+      stepRetriesRef.current[currentStep] = currentRetries
+
+      const sessionEntry = {
+        stepIndex: currentStep,
+        stepName: getStepText(step, 'label') || 'Assess Fire',
+        timeTakenMs: timeTaken,
+        firstTryCorrect: false,
+        retries: currentRetries,
+        failureReason: 'wrong_decision_call',
+        choice,
+      }
+      stepSessionLogsRef.current = [...stepSessionLogsRef.current, sessionEntry]
+      window.__surakshaStepSessionData = stepSessionLogsRef.current
+
+      let title = ''
+      let explanation = ''
+      if (choice === 'small_safe' && actualFireState === 'not_safe') {
+        title = 'Dangerous Assessment Error'
+        explanation = 'Wrong call — the fire was spreading rapidly and was NOT small enough to fight directly! Attempting to fight an oversized fire with a handheld extinguisher risks severe thermal burns and asphyxiation. The correct protocol is immediate evacuation!'
+      } else {
+        title = 'Suboptimal Fire Assessment'
+        explanation = 'Wrong call — the fire was in an early incipient stage, contained within the metal cabinet, and safely suppressible with CO₂! Unnecessary abandonment allowed an easily quenchable electrical fault to spread to adjacent industrial machinery.'
+      }
+
+      setConsequenceFailure({
+        title,
+        explanation,
+        reason: 'wrong_decision',
+      })
+    }
+  }, [currentStep, stepStartTime, actualFireState, scenario, isFireScenario, getStepText, stopTimer, handleStepClick])
+
+  // Expose decision handler globally for test scripts
+  useEffect(() => {
+    window.__handleDecisionChoice = handleDecisionChoice
+  }, [handleDecisionChoice])
+
+  // ── Consequence: Retry Step Handler ──────────────────────────────────────
+  const handleRetryStep = useCallback(() => {
+    stopTimer()
+    setFireEscalated(false)
+    fireEscalatedRef.current = false
+    fireAudioRef.current.setEscalated(false)
+    if (!isFireScenario || currentStep !== 0) {
+      if (currentStep !== 0) fireAudioRef.current.stop()
+    }
+    setConsequenceFailure(null)
+    setTimerSeconds(getStepDuration(currentStep))
+    setIsTimerRunning(true)
+    setStepStartTime(Date.now())
+  }, [currentStep, isFireScenario, stopTimer])
+
+  // ── Step Countdown Timer Ticking Loop ─────────────────────────────────────
+  useEffect(() => {
+    if (!isTimerRunning || consequenceFailure) {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
+      return
+    }
+
+    // In AR mode, wait until object is placed unless it's a decision step
+    const isDecisionStep = scenario?.steps?.[currentStep]?.is_decision_step
+    if (arMode && !placedSteps[currentStep] && !isDecisionStep) return
+
+    // Clear any previous interval before starting a new one
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current)
+      timerIntervalRef.current = null
+    }
+
+    const interval = setInterval(() => {
+      setTimerSeconds(prev => {
+        if (prev <= 1) {
+          if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current)
+            timerIntervalRef.current = null
+          }
+          handleStepTimeout()
+          return 0
+        }
+        const next = prev - 1
+        if (next <= 5 && next > 0) {
+          tickAudioRef.current.playTick(next <= 3)
+        }
+        return next
+      })
+    }, 1000)
+
+    timerIntervalRef.current = interval
+
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
+    }
+  }, [isTimerRunning, currentStep, consequenceFailure, arMode, placedSteps, handleStepTimeout, scenario])
 
   // Smoothly tween OrbitControls target to look at position
   function smoothLookAt(targetX, targetY, targetZ) {
@@ -3088,7 +3172,7 @@ export default function Scenario() {
             onRetryStep={handleRetryStep}
             positiveSuccess={positiveSuccess}
             onDecisionChoice={handleDecisionChoice}
-            isPlaced={!arMode || !!placedSteps[currentStep]}
+            isPlaced={!arMode || !!placedSteps[currentStep] || !!steps[currentStep]?.is_decision_step}
             onPlaceObject={handlePlaceCurrentStep}
             onResetPlacement={handleResetPlacement}
             xrTrackingType={xrTrackingType}
@@ -3411,7 +3495,13 @@ export default function Scenario() {
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
                       <button
-                        onClick={() => handleDecisionChoice('small_safe')}
+                        type="button"
+                        data-testid="decision-small-safe"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDecisionChoice('small_safe')
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
                         style={{
                           flex: 1,
                           background: 'linear-gradient(135deg, #10B981, #059669)',
@@ -3427,13 +3517,21 @@ export default function Scenario() {
                           justifyContent: 'center',
                           gap: 8,
                           boxShadow: '0 4px 14px rgba(16,185,129,0.35)',
+                          touchAction: 'manipulation',
+                          pointerEvents: 'auto',
                         }}
                       >
                         🔥 Small &amp; Safe (Extinguish)
                       </button>
 
                       <button
-                        onClick={() => handleDecisionChoice('not_safe')}
+                        type="button"
+                        data-testid="decision-not-safe"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDecisionChoice('not_safe')
+                        }}
+                        onPointerDown={(e) => e.stopPropagation()}
                         style={{
                           flex: 1,
                           background: 'linear-gradient(135deg, #EF4444, #DC2626)',
@@ -3449,6 +3547,8 @@ export default function Scenario() {
                           justifyContent: 'center',
                           gap: 8,
                           boxShadow: '0 4px 14px rgba(239,68,68,0.35)',
+                          touchAction: 'manipulation',
+                          pointerEvents: 'auto',
                         }}
                       >
                         ⚠️ Not Safe / Spreading (Evacuate)
