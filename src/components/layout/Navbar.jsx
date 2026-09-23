@@ -11,6 +11,7 @@ import {
   Menu, X, Home, LayoutDashboard, Target, Award, Bell,
   PlayCircle, Settings, Globe, Moon, Sun, LogOut, Check,
   ChevronRight, WifiOff, ShieldCheck, CheckCircle2, AlertTriangle, Info,
+  User, Phone, HelpCircle, Mail, LifeBuoy, MessageSquare, ChevronDown,
 } from 'lucide-react'
 import VideoTutorialModal from '../ui/VideoTutorialModal'
 
@@ -25,8 +26,14 @@ export function Navbar() {
   // State
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [profileDropOpen, setProfileDropOpen] = useState(false)
   const [showVideoTutorial, setShowVideoTutorial] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const [showAboutModal, setShowAboutModal] = useState(false)
+  const [showFAQModal, setShowFAQModal] = useState(false)
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
   const [readNotifs, setReadNotifs] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('sar_read_notifs') ?? '[]')
@@ -37,6 +44,7 @@ export function Navbar() {
   const [userCerts, setUserCerts] = useState([])
 
   const notifRef = useRef(null)
+  const profileDropRef = useRef(null)
 
   const isAdmin = profile?.role === 'admin'
   const firstName = profile?.full_name?.split(' ')[0] ?? 'Trainee'
@@ -108,6 +116,7 @@ export function Navbar() {
   useEffect(() => {
     setDrawerOpen(false)
     setNotifOpen(false)
+    setProfileDropOpen(false)
   }, [location.pathname])
 
   // Close on Escape
@@ -116,6 +125,7 @@ export function Navbar() {
       if (e.key === 'Escape') {
         setDrawerOpen(false)
         setNotifOpen(false)
+        setProfileDropOpen(false)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -134,6 +144,19 @@ export function Navbar() {
     }
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [notifOpen])
+
+  // Close profile dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (profileDropRef.current && !profileDropRef.current.contains(e.target)) {
+        setProfileDropOpen(false)
+      }
+    }
+    if (profileDropOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [profileDropOpen])
 
   // Lock body scroll when drawer is open on mobile
   useEffect(() => {
@@ -464,51 +487,114 @@ export function Navbar() {
 
             {/* Trainee profile or login button */}
             {user ? (
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(true)}
-                title="Open Profile & Menu"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  background: 'var(--color-surface-alt)',
-                  border: '1.5px solid var(--color-border)',
-                  borderRadius: 'var(--radius-md)',
-                  height: 38,
-                  padding: '0 10px',
-                  boxSizing: 'border-box',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-              >
-                <div style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: '50%',
-                  background: 'var(--color-brand)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '0.72rem',
-                  fontWeight: 800,
-                  color: '#FFFFFF',
-                  flexShrink: 0,
-                }}>
-                  {firstName[0]?.toUpperCase()}
-                </div>
-                <span style={{
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: 600,
-                  color: 'var(--color-text-primary)',
-                  maxWidth: 80,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {firstName}
-                </span>
-              </button>
+              <div style={{ position: 'relative' }} ref={profileDropRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileDropOpen(o => !o)}
+                  title="Profile & Account"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: profileDropOpen ? 'var(--color-brand-50)' : 'var(--color-surface-alt)',
+                    border: `1.5px solid ${profileDropOpen ? 'var(--color-brand)' : 'var(--color-border)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    height: 38,
+                    padding: '0 10px',
+                    boxSizing: 'border-box',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    transition: 'all var(--transition-fast)',
+                  }}
+                >
+                  <div style={{
+                    width: 26, height: 26, borderRadius: '50%',
+                    background: 'var(--color-brand)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.72rem', fontWeight: 800, color: '#FFFFFF', flexShrink: 0,
+                  }}>
+                    {firstName[0]?.toUpperCase()}
+                  </div>
+                  <span style={{
+                    fontSize: 'var(--text-sm)', fontWeight: 600,
+                    color: 'var(--color-text-primary)',
+                    maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {firstName}
+                  </span>
+                  <ChevronDown size={13} color="var(--color-text-muted)"
+                    style={{ transform: profileDropOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                  />
+                </button>
+
+                {/* Profile Dropdown */}
+                {profileDropOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                    width: 200,
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-lg, 14px)',
+                    boxShadow: 'var(--shadow-xl)',
+                    zIndex: 400,
+                    overflow: 'hidden',
+                    animation: 'slideDownFade 0.15s ease-out',
+                  }}>
+                    {/* User info */}
+                    <div style={{
+                      padding: '12px 14px',
+                      borderBottom: '1px solid var(--color-border)',
+                      background: 'var(--color-surface-alt)',
+                    }}>
+                      <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {profile?.full_name || 'Trainee Officer'}
+                      </div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {user?.email}
+                      </div>
+                    </div>
+
+                    {/* View Profile */}
+                    <button
+                      type="button"
+                      onClick={() => { setProfileDropOpen(false); navigate('/profile') }}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '11px 14px', background: 'transparent', border: 'none',
+                        cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600,
+                        color: 'var(--color-text-primary)', textAlign: 'left',
+                        transition: 'background var(--transition-fast)',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-alt)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <User size={15} color="var(--color-brand)" />
+                      View Profile
+                    </button>
+
+                    {/* Sign Out */}
+                    <button
+                      type="button"
+                      onClick={() => { setProfileDropOpen(false); handleSignOut() }}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '11px 14px',
+                        background: 'transparent',
+                        border: 'none',
+                        borderTop: '1px solid var(--color-border)',
+                        cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600,
+                        color: 'var(--color-error)', textAlign: 'left',
+                        transition: 'background var(--transition-fast)',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--color-error-bg)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <LogOut size={15} />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <Link to="/login" className="btn btn-primary btn-sm" style={{ height: 38 }}>
                 {T('login')}
@@ -743,6 +829,39 @@ export function Navbar() {
               <PlayCircle size={18} color="#8B5CF6" />
               <span>Tutorial / How It Works</span>
             </div>
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* Divider */}
+          <div style={{ height: 1, background: 'var(--color-border)', margin: '6px 0' }} />
+
+          {/* ℹ About SurakshaAR */}
+          <button type="button" onClick={() => { setDrawerOpen(false); setShowAboutModal(true) }} style={navItemStyle(false)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Info size={18} color="#0284C7" /><span>About SurakshaAR</span></div>
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* ❓ FAQ */}
+          <button type="button" onClick={() => { setDrawerOpen(false); setShowFAQModal(true) }} style={navItemStyle(false)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><HelpCircle size={18} color="#8B5CF6" /><span>FAQ</span></div>
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* 📧 Contact Us */}
+          <button type="button" onClick={() => { setDrawerOpen(false); setShowContactModal(true) }} style={navItemStyle(false)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Mail size={18} color="#059669" /><span>Contact Us</span></div>
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* 🚨 Emergency Numbers */}
+          <button type="button" onClick={() => { setDrawerOpen(false); setShowEmergencyModal(true) }} style={navItemStyle(false)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><Phone size={18} color="#DC2626" /><span>Emergency Numbers</span></div>
+            <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* 🆘 Help & Support */}
+          <button type="button" onClick={() => { setDrawerOpen(false); setShowHelpModal(true) }} style={navItemStyle(false)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><LifeBuoy size={18} color="#F59E0B" /><span>Help &amp; Support</span></div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
           </button>
 
@@ -992,6 +1111,179 @@ export function Navbar() {
           </div>
         </div>
       )}
+
+      {/* ── Helper: reusable modal wrapper ── */}
+      {[
+        {
+          key: 'about', show: showAboutModal, onClose: () => setShowAboutModal(false),
+          icon: <Info size={18} color="#0284C7" />, title: 'About SurakshaAR',
+          body: (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <img src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`} alt="SurakshaAR" style={{ height: 52, objectFit: 'contain' }} />
+              </div>
+              <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
+                <strong>SurakshaAR</strong> is an AI-powered <strong>Augmented Reality Industrial Safety Training Platform</strong> built for SIH 2026 (Problem Statement SIH26041).
+              </p>
+              <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
+                It provides immersive AR-based scenario training for fire hazards, gas leaks, electrical safety, and more — helping industrial workers build real reflexes in a safe, gamified environment.
+              </p>
+              <div style={{ background: 'var(--color-surface-alt)', borderRadius: 10, padding: '12px 14px', fontSize: '0.78rem', color: 'var(--color-text-muted)' }}>
+                🏆 Smart India Hackathon 2026 &nbsp;|&nbsp; SIH26041<br />
+                🛡️ Industrial Safety Training via WebXR + AR Foundation<br />
+                🌐 Multilingual: English, Hindi, Marathi
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: 'faq', show: showFAQModal, onClose: () => setShowFAQModal(false),
+          icon: <HelpCircle size={18} color="#8B5CF6" />, title: 'Frequently Asked Questions',
+          body: (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                { q: 'How do I start a training module?', a: 'Go to Dashboard → select a scenario card → tap "Start Training". The AR simulation will launch automatically.' },
+                { q: 'Can I use it offline?', a: 'Yes! Fire Safety, Gas Leak, and Confined Space modules are cached for offline field drills. You will see an OFFLINE badge when not connected.' },
+                { q: 'How do I get my certificate?', a: 'Complete all steps in a training scenario with a passing score. Your certificate is auto-generated and available under My Certificates.' },
+                { q: 'Which devices support native AR?', a: 'Chrome on Android with ARCore installed supports native AR plane detection. Other devices use the sensor/gyro fallback mode.' },
+                { q: 'How do I change the app language?', a: 'Open the navigation drawer (☰) → scroll to the bottom → select your language (English / हिंदी / मराठी).' },
+              ].map(({ q, a }, i) => (
+                <div key={i} style={{ borderBottom: i < 4 ? '1px solid var(--color-border)' : 'none', paddingBottom: i < 4 ? 12 : 0 }}>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>Q: {q}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>A: {a}</div>
+                </div>
+              ))}
+            </div>
+          ),
+        },
+        {
+          key: 'contact', show: showContactModal, onClose: () => setShowContactModal(false),
+          icon: <Mail size={18} color="#059669" />, title: 'Contact Us',
+          body: (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ background: 'var(--color-surface-alt)', borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>📧 Email Support</div>
+                <a href="mailto:surakshaar.in@gmail.com" style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-brand)', textDecoration: 'none' }}>
+                  surakshaar.in@gmail.com
+                </a>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: 4 }}>Response within 24 hours on working days</div>
+              </div>
+              <div style={{ background: 'var(--color-surface-alt)', borderRadius: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>📋 For Queries About</div>
+                <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: '0.8rem', color: 'var(--color-text-secondary)', lineHeight: 2 }}>
+                  <li>Training module issues or bugs</li>
+                  <li>Certificate download problems</li>
+                  <li>Account or login help</li>
+                  <li>Institutional / bulk enrollment</li>
+                  <li>Partnership & collaboration</li>
+                </ul>
+              </div>
+              <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+                🕐 Support hours: Mon–Sat, 9 AM – 6 PM IST
+              </div>
+            </div>
+          ),
+        },
+        {
+          key: 'emergency', show: showEmergencyModal, onClose: () => setShowEmergencyModal(false),
+          icon: <Phone size={18} color="#DC2626" />, title: '🚨 Emergency Numbers',
+          body: (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                Save these numbers. In a real emergency, call immediately — do not delay.
+              </div>
+              {[
+                { emoji: '🚒', dept: 'Fire Department', number: '101', color: '#DC2626' },
+                { emoji: '🚑', dept: 'Ambulance / Medical', number: '108', color: '#DC2626' },
+                { emoji: '🚓', dept: 'Police', number: '100', color: '#1D4ED8' },
+                { emoji: '📞', dept: 'National Emergency (All)', number: '112', color: '#DC2626' },
+                { emoji: '🌊', dept: 'Disaster Management (NDMA)', number: '1078', color: '#D97706' },
+                { emoji: '☣️', dept: 'Chemical Emergency (Toll-Free)', number: '1800-180-4104', color: '#7C3AED' },
+                { emoji: '⚡', dept: 'Electricity / Power Emergency', number: '1912', color: '#D97706' },
+                { emoji: '🔥', dept: 'Gas / LPG Emergency', number: '1906', color: '#DC2626' },
+                { emoji: '🏭', dept: 'Industrial Safety Helpline', number: '1800-3000-3600', color: '#059669' },
+                { emoji: '🏥', dept: 'Women Helpline', number: '1091', color: '#DB2777' },
+              ].map(({ emoji, dept, number, color }) => (
+                <div key={number} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'var(--color-surface-alt)', borderRadius: 10, padding: '10px 14px',
+                  border: '1px solid var(--color-border)',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>{emoji}</span>
+                    <div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>{dept}</div>
+                    </div>
+                  </div>
+                  <a href={`tel:${number.replace(/-/g, '')}`} style={{ fontSize: '1rem', fontWeight: 800, color, textDecoration: 'none', letterSpacing: '0.03em' }}>
+                    {number}
+                  </a>
+                </div>
+              ))}
+            </div>
+          ),
+        },
+        {
+          key: 'help', show: showHelpModal, onClose: () => setShowHelpModal(false),
+          icon: <LifeBuoy size={18} color="#F59E0B" />, title: 'Help & Support',
+          body: (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {[
+                { icon: '📱', title: 'AR Not Working?', desc: 'Make sure you have a stable internet connection and camera permission is granted. On Android Chrome, tap "📡 Native ARCore" for best results.' },
+                { icon: '🔑', title: 'Login / OTP Issues', desc: 'Check your spam folder. OTP expires in 10 minutes. If not received, tap "Resend OTP". Contact surakshaar.in@gmail.com if issue persists.' },
+                { icon: '📜', title: 'Certificate Not Generated', desc: 'Certificates are generated only after completing all training steps with a minimum passing score. Ensure you are online during completion.' },
+                { icon: '🔊', title: 'No Audio / Voice Guide', desc: 'Check your device volume and make sure your browser is not muted. Some browsers block autoplay — tap the screen to unlock audio.' },
+                { icon: '🌐', title: 'Offline Mode', desc: 'SurakshaAR works offline for cached modules. If a module shows "Unavailable Offline", connect to the internet and reload once to cache it.' },
+              ].map(({ icon, title, desc }) => (
+                <div key={title} style={{ display: 'flex', gap: 12, paddingBottom: 12, borderBottom: '1px solid var(--color-border)' }}>
+                  <span style={{ fontSize: 22, flexShrink: 0 }}>{icon}</span>
+                  <div>
+                    <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 4 }}>{title}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>{desc}</div>
+                  </div>
+                </div>
+              ))}
+              <div style={{ textAlign: 'center', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                Still need help? Email us at{' '}
+                <a href="mailto:surakshaar.in@gmail.com" style={{ color: 'var(--color-brand)', fontWeight: 700 }}>surakshaar.in@gmail.com</a>
+              </div>
+            </div>
+          ),
+        },
+      ].map(({ key, show, onClose, icon, title, body }) => show && (
+        <div key={key} role="dialog" aria-modal="true" style={{
+          position: 'fixed', inset: 0, zIndex: 10000,
+          background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16, boxSizing: 'border-box',
+        }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+          <div style={{
+            background: 'var(--color-surface)', borderRadius: 'var(--radius-lg, 16px)',
+            width: '100%', maxWidth: 460, maxHeight: '85vh',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            boxShadow: 'var(--shadow-xl)', border: '1px solid var(--color-border)',
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '14px 18px', borderBottom: '1px solid var(--color-border)',
+              background: 'var(--color-surface-alt)', flexShrink: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--color-text-primary)' }}>
+                {icon} {title}
+              </div>
+              <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center' }}>
+                <X size={18} />
+              </button>
+            </div>
+            {/* Modal Body */}
+            <div style={{ padding: '18px 18px', overflowY: 'auto', flex: 1 }}>
+              {body}
+            </div>
+          </div>
+        </div>
+      ))}
+
     </>
   )
 }
