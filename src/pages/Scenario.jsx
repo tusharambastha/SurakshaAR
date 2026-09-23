@@ -2210,11 +2210,21 @@ export default function Scenario() {
     if (t.scene) {
       t.scene.background = nextMode ? null : new THREE.Color('#1F242D')
     }
-    if (!nextMode && t.camera && t.controls) {
-      t.camera.position.set(0, 3.5, 9.5)
-      t.controls.target.set(0, 1.2, 0)
-      t.controls.enabled = true
-      t.controls.update()
+    if (!nextMode) {
+      if (t.stepNodes) {
+        t.stepNodes.forEach((node) => {
+          if (node.initialPos) {
+            node.group.position.set(node.initialPos[0], node.initialPos[1], node.initialPos[2])
+            node.group.rotation.set(0, 0, 0)
+          }
+        })
+      }
+      if (t.camera && t.controls) {
+        t.camera.position.set(0, 3.5, 9.5)
+        t.controls.target.set(0, 1.2, 0)
+        t.controls.enabled = true
+        t.controls.update()
+      }
     }
   }
 
@@ -2404,26 +2414,12 @@ export default function Scenario() {
 
       t.machineryEnvRollers = [r1, r2]
     } else {
-      hazardGroup.position.set(3, 1.4, 2.3)
-      // Flame cones and core
-      const flameCore = new THREE.Mesh(
-        new THREE.ConeGeometry(0.45, 1.2, 12),
-        new THREE.MeshStandardMaterial({ color: '#EF4444', emissive: '#DC2626', emissiveIntensity: 2.5 })
-      )
-      flameCore.position.y = 0.5
-      hazardGroup.add(flameCore)
-
-      const flameInner = new THREE.Mesh(
-        new THREE.ConeGeometry(0.3, 0.9, 10),
-        new THREE.MeshStandardMaterial({ color: '#F59E0B', emissive: '#D97706', emissiveIntensity: 3.0 })
-      )
-      flameInner.position.y = 0.45
-      hazardGroup.add(flameInner)
-
+      // Fire Hazard lighting: realistic animated flame particles and embers are provided by createFireSourceProp()
+      hazardGroup.position.set(3, 1.2, 2.3)
       const fLight = new THREE.PointLight('#F97316', 4.0, 9)
       hazardGroup.add(fLight)
 
-      t.flameMeshes = [flameCore, flameInner]
+      t.flameMeshes = []
       t.flameLight = fLight
     }
     scene.add(hazardGroup)
@@ -2516,7 +2512,8 @@ export default function Scenario() {
     const stepNodes = []
     const steps = scenario.steps || []
     steps.forEach((step, idx) => {
-      const pos = step.position || [0, 1, 0]
+      const rawPos = step.position || [0, 1, 0]
+      const pos = (isFireScenario && idx === 0) ? [3, 0.35, 2.3] : rawPos
       const group = new THREE.Group()
       group.position.set(pos[0], pos[1], pos[2])
 
@@ -2891,23 +2888,21 @@ export default function Scenario() {
               isSurfaceDetected = true
 
               if (camForward.y < -0.12) {
-                // Downward ray toward floor or desk: calculate geometric intersection with ground plane
-                const floorY = 0.05
-                const rawDist = (camera.position.y - floorY) / (-camForward.y)
-                // Clamp to ergonomic training distance: 1.0m to 2.4m in front of trainee
-                surfaceDist = Math.max(1.0, Math.min(2.4, rawDist))
-                hitPos = new THREE.Vector3()
-                  .copy(camera.position)
-                  .addScaledVector(camForward, surfaceDist)
-                hitPos.y = floorY
+                // Downward angle towards floor or desk: calculate distance
+                const rawDist = (camera.position.y - 0.05) / (-camForward.y)
+                // Clamp to ergonomic training distance: 1.1m to 2.2m in front of trainee
+                surfaceDist = Math.max(1.1, Math.min(2.2, rawDist))
               } else {
-                // Aiming horizontal or slightly down (at a desk or vertical surface/equipment in front)
+                // Aiming horizontal or slightly down (at a desk or equipment in front)
                 surfaceDist = 1.6
-                hitPos = new THREE.Vector3()
-                  .copy(camera.position)
-                  .addScaledVector(camForward, surfaceDist)
-                hitPos.y = 0.25 // comfortable desk/stand height
               }
+
+              // Anchor object along the central camera reticle ray
+              // This guarantees the object and its badge appear DIRECTLY IN THE RETICLE
+              // and never sink below the bottom panel or under the action buttons!
+              hitPos = new THREE.Vector3()
+                .copy(camera.position)
+                .addScaledVector(camForward, surfaceDist)
             }
 
             t.surfaceState = {
@@ -3323,16 +3318,23 @@ export default function Scenario() {
           }}>
             {/* Mode Badge & Timer */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: arMode ? 'rgba(224,90,0,0.25)' : 'rgba(14,124,123,0.25)',
-                border: `1.5px solid ${arMode ? 'var(--color-brand)' : '#0E7C7B'}`,
-                borderRadius: 20, padding: '6px 14px',
-                color: 'white', fontSize: 12, fontWeight: 700,
-              }}>
+              <button
+                type="button"
+                onClick={toggleARMode}
+                title="Click to Switch Mode"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: arMode ? 'rgba(224,90,0,0.25)' : 'rgba(14,124,123,0.35)',
+                  border: `1.5px solid ${arMode ? 'var(--color-brand)' : '#0E7C7B'}`,
+                  borderRadius: 20, padding: '6px 14px',
+                  color: 'white', fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer',
+                  touchAction: 'manipulation',
+                }}
+              >
                 {arMode ? <Camera size={14} color="var(--color-brand)" /> : <Monitor size={14} color="#0E7C7B" />}
-                {arMode ? '📷 Camera AR Mode' : '🖥️ 3D Simulation Mode'}
-              </div>
+                <span>{arMode ? '📷 Camera AR Mode' : '🖥️ 3D Simulation Mode'}</span>
+              </button>
 
               {/* Countdown Urgency Timer */}
               {!allDone && (

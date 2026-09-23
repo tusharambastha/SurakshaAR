@@ -108,7 +108,6 @@ export default function VirtualARHUD({
   sensorDebug = null,
   surfaceDetection = null,
 }) {
-  const [isPanelOpen, setIsPanelOpen] = useState(false)
   const [showDebugHUD, setShowDebugHUD] = useState(false)
   const [instructionExpanded, setInstructionExpanded] = useState(false)
   const [trackerExpanded, setTrackerExpanded] = useState(false)
@@ -242,42 +241,52 @@ export default function VirtualARHUD({
           </div>
         )}
 
-        {/* Top-Right: Quick Action & Settings Menu Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {/* Settings & Info Flyout Button */}
-          <button
-            type="button"
-            onClick={() => setIsPanelOpen(prev => !prev)}
-            title="Open Mission Controls & Details"
-            aria-label="Settings and Details"
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: '50%',
-              background: isPanelOpen ? 'rgba(234, 88, 12, 0.95)' : 'rgba(20, 24, 34, 0.88)',
-              border: '1.5px solid rgba(255, 255, 255, 0.22)',
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              backdropFilter: 'blur(8px)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-            }}
-          >
-            <Menu size={16} />
-          </button>
+        {/* Top-Right: Direct 3D Sim Mode Toggle & Exit Button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {onToggleMode && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleMode()
+              }}
+              title="Switch to 3D Simulation Mode"
+              style={{
+                background: 'rgba(14, 124, 123, 0.45)',
+                border: '1.5px solid #0E7C7B',
+                color: '#5EEAD4',
+                borderRadius: '20px',
+                padding: '5px 12px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                backdropFilter: 'blur(8px)',
+                boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+                touchAction: 'manipulation',
+                pointerEvents: 'auto',
+              }}
+            >
+              <Monitor size={13} color="#5EEAD4" />
+              <span>3D Sim</span>
+            </button>
+          )}
 
           {/* Exit Button */}
           {onExit && (
             <button
               type="button"
-              onClick={onExit}
+              onClick={(e) => {
+                e.stopPropagation()
+                onExit()
+              }}
               title="Exit Training"
               aria-label="Exit Training"
               style={{
-                width: 34,
-                height: 34,
+                width: 32,
+                height: 32,
                 borderRadius: '50%',
                 background: 'rgba(220, 38, 38, 0.25)',
                 border: '1.5px solid #DC2626',
@@ -286,6 +295,8 @@ export default function VirtualARHUD({
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
+                touchAction: 'manipulation',
+                pointerEvents: 'auto',
               }}
             >
               <X size={15} />
@@ -293,253 +304,6 @@ export default function VirtualARHUD({
           )}
         </div>
       </div>
-
-      {/* ── CONSOLIDATED SECONDARY PANEL (Collapsed by default, opens on tap) ── */}
-      {isPanelOpen && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 58,
-            right: 12,
-            width: 'calc(100vw - 24px)',
-            maxWidth: 340,
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            background: 'rgba(12, 16, 26, 0.96)',
-            backdropFilter: 'blur(16px)',
-            border: '1.5px solid rgba(255, 255, 255, 0.20)',
-            borderRadius: '18px',
-            padding: '14px',
-            boxShadow: '0 16px 40px rgba(0, 0, 0, 0.7)',
-            zIndex: 45,
-            pointerEvents: 'all',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
-          }}
-        >
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.12)', paddingBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Sliders size={15} color="#F97316" />
-              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#FFFFFF', letterSpacing: '0.04em' }}>
-                MISSION &amp; AR CONTROLS
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsPanelOpen(false)}
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                border: 'none',
-                color: '#9CA3AF',
-                borderRadius: '50%',
-                width: 24,
-                height: 24,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <X size={13} />
-            </button>
-          </div>
-
-          {/* Scenario & Hazard Details */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              background: 'rgba(255,255,255,0.05)',
-              border: `1px solid ${hazardMarker.color}55`,
-              borderRadius: '12px',
-              padding: '8px 10px',
-            }}
-          >
-            {hazardMarker.icon}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: hazardMarker.color }}>
-                {hazardMarker.label}
-              </span>
-              <span style={{ fontSize: '0.62rem', color: '#9CA3AF' }}>
-                {hazardMarker.subtext}
-              </span>
-            </div>
-          </div>
-
-          {/* Action Links & Mode Toggles */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-            {onToggleMode && (
-              <button
-                type="button"
-                onClick={onToggleMode}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.16)',
-                  color: '#FFFFFF',
-                  borderRadius: '10px',
-                  padding: '7px 8px',
-                  fontSize: '0.70rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  justifyContent: 'center',
-                }}
-              >
-                <Monitor size={12} color="#38BDF8" />
-                <span>3D Sim Mode</span>
-              </button>
-            )}
-
-            <a
-              href="#/setup-guide"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.16)',
-                color: '#E05A00',
-                borderRadius: '10px',
-                padding: '7px 8px',
-                fontSize: '0.70rem',
-                fontWeight: 700,
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                justifyContent: 'center',
-              }}
-            >
-              <Printer size={12} />
-              <span>Markers Guide</span>
-            </a>
-
-            <button
-              type="button"
-              onClick={() => speak(stepInstruction, lang)}
-              style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(255, 255, 255, 0.16)',
-                color: '#D1D5DB',
-                borderRadius: '10px',
-                padding: '7px 8px',
-                fontSize: '0.70rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                justifyContent: 'center',
-              }}
-            >
-              <Volume2 size={12} />
-              <span>Listen Audio</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowDebugHUD(prev => !prev)}
-              style={{
-                background: showDebugHUD ? 'rgba(234, 88, 12, 0.3)' : 'rgba(255, 255, 255, 0.08)',
-                border: `1px solid ${showDebugHUD ? '#F97316' : 'rgba(255, 255, 255, 0.16)'}`,
-                color: '#FFFFFF',
-                borderRadius: '10px',
-                padding: '7px 8px',
-                fontSize: '0.70rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                justifyContent: 'center',
-              }}
-            >
-              <Activity size={12} color="#F97316" />
-              <span>{showDebugHUD ? 'Debug Readout' : 'Sensor Debug'}</span>
-            </button>
-          </div>
-
-          {/* 6-Station Step Tracker Mini-Map */}
-          <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '8px 10px', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#9CA3AF' }}>STATION SEQUENCE</span>
-              <span style={{ fontSize: '0.64rem', color: '#10B981', fontWeight: 700 }}>
-                {completedSteps.length} of {steps.length} Completed
-              </span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${steps.length || 6}, 1fr)`, gap: 4 }}>
-              {steps.map((s, idx) => {
-                const isCompleted = completedSteps.includes(idx)
-                const isActive = idx === currentStep
-                const Icon = isMachinery ? (MACHINERY_STATION_ICONS[idx] || Target) : (STATION_ICONS[idx] || Target)
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      padding: '4px 2px',
-                      borderRadius: 8,
-                      background: isActive
-                        ? 'rgba(224, 90, 0, 0.3)'
-                        : isCompleted
-                        ? 'rgba(16, 185, 129, 0.18)'
-                        : 'rgba(255, 255, 255, 0.04)',
-                      border: isActive
-                        ? '1.5px solid #E05A00'
-                        : isCompleted
-                        ? '1px solid #10B981'
-                        : '1px solid rgba(255, 255, 255, 0.08)',
-                    }}
-                  >
-                    <Icon size={12} color={isActive ? '#E05A00' : isCompleted ? '#10B981' : '#94A3B8'} />
-                    <span style={{ fontSize: '0.55rem', fontWeight: isActive ? 800 : 600, color: isActive ? '#FFFFFF' : '#9CA3AF', marginTop: 2 }}>
-                      {idx + 1}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Detailed Sensor Debug Readout (Inside panel) */}
-          {sensorDebug && showDebugHUD && (
-            <div style={{ background: 'rgba(0,0,0,0.4)', borderRadius: '10px', padding: '8px 10px', fontSize: '0.64rem', fontFamily: 'monospace', color: '#D1D5DB', display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{ color: '#F97316', fontWeight: 800, marginBottom: 2 }}>LIVE SENSOR METRICS</div>
-              <div>Mode: <span style={{ color: '#38BDF8' }}>{sensorDebug.activeMethod}</span></div>
-              <div>XR Engine: <span style={{ color: sensorDebug.isWebXrSupported ? '#34D399' : '#FBBF24' }}>{sensorDebug.isWebXrSupported ? 'WebXR Ready' : 'Approx Floor Plane'}</span></div>
-              <div>Events: <span style={{ color: sensorDebug.eventCount > 0 ? '#34D399' : '#EF4444' }}>{sensorDebug.eventCount}</span></div>
-              <div>Angles: α:{Number(sensorDebug.alpha ?? 0).toFixed(0)}° β:{Number(sensorDebug.beta ?? 90).toFixed(0)}° γ:{Number(sensorDebug.gamma ?? 0).toFixed(0)}°</div>
-              <div>Cam Fwd: [{Number(sensorDebug.camFwd?.x ?? 0).toFixed(2)}, {Number(sensorDebug.camFwd?.y ?? 0).toFixed(2)}, {Number(sensorDebug.camFwd?.z ?? -1).toFixed(2)}]</div>
-              {sensorDebug.placedCoords && (
-                <div style={{ color: '#10B981', fontWeight: 700 }}>Placed: [{sensorDebug.placedCoords.x}, {sensorDebug.placedCoords.y}, {sensorDebug.placedCoords.z}]</div>
-              )}
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setIsPanelOpen(false)}
-            style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.15)',
-              color: '#FFFFFF',
-              borderRadius: '10px',
-              padding: '8px',
-              fontSize: '0.72rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            Done
-          </button>
-        </div>
-      )}
 
 
 
