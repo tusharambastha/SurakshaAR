@@ -3,6 +3,7 @@ import { Shield, Camera, CheckCircle, ArrowRight } from 'lucide-react'
 import { useLang } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Navbar } from '../components/layout/Navbar'
+import { Footer } from '../components/layout/Footer'
 
 export default function Landing() {
   const { T, lang } = useLang()
@@ -790,23 +791,7 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer style={{
-        background: 'var(--color-surface)',
-        borderTop: '1px solid var(--color-border)',
-        padding: '24px var(--space-4)',
-        textAlign: 'center',
-        fontSize: 'var(--text-xs)',
-        color: 'var(--color-text-muted)',
-      }}>
-        <div className="page-container">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8 }}>
-            <Shield size={14} style={{ color: 'var(--color-brand)' }} />
-            <strong style={{ color: 'var(--color-text-secondary)' }}>SurakshaAR</strong>
-          </div>
-          <p>Built for Smart India Hackathon 2026 · SIH26041 · Jharkhand Industrial Safety</p>
-          <p style={{ marginTop: 4 }}>Targeting mining &amp; manufacturing sectors · Android AR-ready</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }

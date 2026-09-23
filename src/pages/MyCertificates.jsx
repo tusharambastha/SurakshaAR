@@ -6,6 +6,7 @@ import { useLang } from '../contexts/LanguageContext'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { scoreRating } from '../lib/scoring'
 import { Navbar } from '../components/layout/Navbar'
+import { Footer } from '../components/layout/Footer'
 
 function fmtDate(str) {
   if (!str) return '—'
@@ -247,6 +248,8 @@ export default function MyCertificates() {
           </div>
         )}
       </main>
+
+      <Footer />
     </div>
   )
 }

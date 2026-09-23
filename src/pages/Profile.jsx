@@ -9,6 +9,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { mockUpdateProfile, mockGetSessions } from '../lib/mockDb'
 import { scoreRating } from '../lib/scoring'
 import { Navbar } from '../components/layout/Navbar'
+import { Footer } from '../components/layout/Footer'
 import { UserAvatar } from '../components/ui/UserAvatar'
 
 function fmtDate(str) {
@@ -316,6 +317,8 @@ export default function Profile() {
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   )
 }

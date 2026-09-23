@@ -1116,6 +1116,14 @@ export function Navbar() {
                 🛡️ Industrial Safety Training via WebXR + AR Foundation<br />
                 🌐 Multilingual: English, Hindi, Santali (ᱥᱟᱱᱛᱟᱲᱤ)
               </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm btn-full"
+                onClick={() => { setShowAboutModal(false); navigate('/about') }}
+                style={{ marginTop: 4, fontSize: '0.8rem' }}
+              >
+                View Full About Page →
+              </button>
             </div>
           ),
         },
@@ -1164,6 +1172,14 @@ export function Navbar() {
               <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
                 🕐 Support hours: Mon–Sat, 9 AM – 6 PM IST
               </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm btn-full"
+                onClick={() => { setShowContactModal(false); navigate('/contact') }}
+                style={{ marginTop: 4, fontSize: '0.8rem' }}
+              >
+                View Full Contact Page →
+              </button>
             </div>
           ),
         },

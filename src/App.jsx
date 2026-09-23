@@ -25,6 +25,10 @@ import MyCertificates from './pages/MyCertificates'
 import Verify      from './pages/Verify'
 import Profile     from './pages/Profile'
 import SetupGuide  from './pages/SetupGuide'
+import About       from './pages/About'
+import Terms       from './pages/Terms'
+import Privacy     from './pages/Privacy'
+import Contact     from './pages/Contact'
 import CookieConsentBanner from './components/ui/CookieConsentBanner'
 import Admin       from './pages/admin/Admin'
 import AdminTrainees from './pages/admin/AdminTrainees'
@@ -120,6 +124,10 @@ export default function App() {
                     <Route path="/admin-login"  element={<AdminLogin />} />
                     <Route path="/verify/:certNumber" element={<Verify />} />
                     <Route path="/setup-guide"        element={<SetupGuide />} />
+                    <Route path="/about"              element={<About />} />
+                    <Route path="/terms"              element={<Terms />} />
+                    <Route path="/privacy"            element={<Privacy />} />
+                    <Route path="/contact"            element={<Contact />} />
 
                     {/* ── Trainee (protected) ── */}
                     <Route path="/dashboard"             element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

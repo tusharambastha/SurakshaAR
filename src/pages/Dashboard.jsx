@@ -8,6 +8,7 @@ import { getScenarioText } from '../lib/i18n'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { Navbar } from '../components/layout/Navbar'
+import { Footer } from '../components/layout/Footer'
 import { scoreRating } from '../lib/scoring'
 import VideoTutorialModal from '../components/ui/VideoTutorialModal'
 
@@ -263,6 +264,8 @@ export default function Dashboard() {
           />
         </div>
       </main>
+
+      <Footer />
     </div>
   )
 }
