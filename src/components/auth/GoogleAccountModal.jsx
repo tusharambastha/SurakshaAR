@@ -1,25 +1,21 @@
-import React, { useState } from 'react'
-import { X, UserPlus, ArrowLeft, Shield, Check } from 'lucide-react'
+import React, { useState, useRef } from 'react'
+import { X, UserPlus, ArrowLeft, Shield, Check, Camera, Image as ImageIcon } from 'lucide-react'
+import { GOOGLE_AVATAR_PRESETS, getGooglePresetAvatar } from '../../data/googleAvatars'
 
-// Default Google accounts matching the user's Google Account Chooser screen
+// Google accounts matching the user's real Google Account Chooser screen
 const GOOGLE_ACCOUNTS = [
   {
     name: 'Kishan Anand',
     email: 'kishanmgr2022@gmail.com',
+    avatar: GOOGLE_AVATAR_PRESETS['kishanmgr2022@gmail.com'],
     initial: 'K',
     bg: '#00796B',
     signedOut: false,
   },
   {
-    name: 'Tushar Ambastha',
-    email: 'ambasthatusar@gmail.com',
-    initial: 'T',
-    bg: '#D84315',
-    signedOut: false,
-  },
-  {
     name: 'Ruchi Shree mali',
     email: 'ruchishreemali0@gmail.com',
+    avatar: GOOGLE_AVATAR_PRESETS['ruchishreemali0@gmail.com'],
     initial: 'R',
     bg: '#C2185B',
     signedOut: false,
@@ -36,6 +32,14 @@ const GOOGLE_ACCOUNTS = [
     email: 'kishanmgr2004@gmail.com',
     initial: 'K',
     bg: '#00838F',
+    signedOut: false,
+  },
+  {
+    name: 'Tushar Ambastha',
+    email: 'ambasthatusar@gmail.com',
+    avatar: GOOGLE_AVATAR_PRESETS['ambasthatusar@gmail.com'],
+    initial: 'T',
+    bg: '#D84315',
     signedOut: false,
   },
   {
@@ -66,7 +70,9 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
   const [showCustomInput, setShowCustomInput] = useState(false)
   const [customName, setCustomName] = useState('')
   const [customEmail, setCustomEmail] = useState('')
+  const [customAvatar, setCustomAvatar] = useState(null)
   const [customError, setCustomError] = useState('')
+  const fileInputRef = useRef(null)
 
   if (!isOpen) return null
 
@@ -76,10 +82,35 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
 
   function handleConfirmSignIn() {
     if (!selectedAccount) return
+    const finalAvatar = selectedAccount.avatar || getGooglePresetAvatar(selectedAccount.email) || null
     onSelectAccount({
       name: selectedAccount.name,
       email: selectedAccount.email,
+      avatarUrl: finalAvatar,
     })
+  }
+
+  function handleCustomPhotoUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const maxDim = 180
+        let w = img.width, h = img.height
+        if (w > h) { if (w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim } }
+        else { if (h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim } }
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, w, h)
+        setCustomAvatar(canvas.toDataURL('image/jpeg', 0.85))
+      }
+      img.src = ev.target.result
+    }
+    reader.readAsDataURL(file)
   }
 
   function handleCustomSubmit(e) {
@@ -93,10 +124,12 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
     const autoName = customName.trim() || cleanEmail.split('@')[0].replace(/[._]/g, ' ')
     const capName = autoName.charAt(0).toUpperCase() + autoName.slice(1)
     const initial = (capName[0] || 'G').toUpperCase()
+    const preset = getGooglePresetAvatar(cleanEmail)
 
     const newAcc = {
       name: capName,
       email: cleanEmail,
+      avatar: customAvatar || preset || null,
       initial,
       bg: '#E05A00',
       signedOut: false,
@@ -282,6 +315,71 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                       />
                     </div>
 
+                    {/* Optional Photo Upload */}
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, color: '#9AA0A6', marginBottom: 6 }}>
+                        Profile Photo (Optional)
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {customAvatar ? (
+                          <img
+                            src={customAvatar}
+                            alt="Preview"
+                            style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              border: '1.5px solid #8AB4F8',
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 38,
+                              height: 38,
+                              borderRadius: '50%',
+                              background: '#282A2D',
+                              border: '1px dashed #5F6368',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#9AA0A6',
+                            }}
+                          >
+                            <ImageIcon size={18} />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          style={{
+                            background: '#282A2D',
+                            border: '1px solid #3c4043',
+                            borderRadius: 6,
+                            padding: '6px 12px',
+                            color: '#E8EAED',
+                            fontSize: 12,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <Camera size={14} color="#8AB4F8" />
+                          {customAvatar ? 'Change Photo' : 'Upload Photo'}
+                        </button>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCustomPhotoUpload}
+                          style={{ display: 'none' }}
+                        />
+                      </div>
+                    </div>
+
                     {customError && (
                       <div style={{ fontSize: 12, color: '#F28B82' }}>{customError}</div>
                     )}
@@ -324,24 +422,40 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                           onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                            {/* Avatar */}
-                            <div
-                              style={{
-                                width: 34,
-                                height: 34,
-                                borderRadius: '50%',
-                                background: acc.bg,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 700,
-                                fontSize: 14,
-                                color: '#FFFFFF',
-                                flexShrink: 0,
-                              }}
-                            >
-                              {acc.initial}
-                            </div>
+                            {/* Avatar: Real Photo or Brand Initial */}
+                            {acc.avatar ? (
+                              <img
+                                src={acc.avatar}
+                                alt={acc.name}
+                                style={{
+                                  width: 34,
+                                  height: 34,
+                                  borderRadius: '50%',
+                                  objectFit: 'cover',
+                                  flexShrink: 0,
+                                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: 34,
+                                  height: 34,
+                                  borderRadius: '50%',
+                                  background: acc.bg,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 700,
+                                  fontSize: 14,
+                                  color: '#FFFFFF',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {acc.initial}
+                              </div>
+                            )}
+
                             <div style={{ minWidth: 0 }}>
                               <div style={{ fontSize: 14, fontWeight: 500, color: '#E8EAED', lineHeight: 1.2 }}>
                                 {acc.name}
@@ -437,22 +551,36 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                     background: '#202124',
                   }}
                 >
-                  <div
-                    style={{
-                      width: 26,
-                      height: 26,
-                      borderRadius: '50%',
-                      background: selectedAccount.bg,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 700,
-                      fontSize: 12,
-                      color: '#FFFFFF',
-                    }}
-                  >
-                    {selectedAccount.initial}
-                  </div>
+                  {selectedAccount.avatar ? (
+                    <img
+                      src={selectedAccount.avatar}
+                      alt={selectedAccount.name}
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: '50%',
+                        objectFit: 'cover',
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: '50%',
+                        background: selectedAccount.bg,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        color: '#FFFFFF',
+                      }}
+                    >
+                      {selectedAccount.initial}
+                    </div>
+                  )}
                   <span style={{ fontSize: 13, color: '#E8EAED', fontWeight: 500 }}>
                     {selectedAccount.email}
                   </span>

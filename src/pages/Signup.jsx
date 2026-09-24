@@ -17,7 +17,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { SUPPORTED_LANGUAGES } from '../lib/i18n'
 import { supabase, isSupabaseConfigured, friendlyAuthError } from '../lib/supabase'
-import { mockSignUp, mockSignIn } from '../lib/mockDb'
+import { mockSignUp, mockSignIn, mockUpdateProfile } from '../lib/mockDb'
 import GoogleAccountModal from '../components/auth/GoogleAccountModal'
 import { Navbar } from '../components/layout/Navbar'
 import {
@@ -192,21 +192,24 @@ export default function Signup() {
     }
   }
 
-  async function handleSelectGoogleAccount({ name, email: accEmail }) {
+  async function handleSelectGoogleAccount({ name, email: accEmail, avatarUrl }) {
     setShowGoogleModal(false)
     setLoading(true)
     setError('')
     try {
       const cleanEmail = accEmail.trim().toLowerCase()
-      const { error: err } = await mockSignUp({
+      const { data, error: err } = await mockSignUp({
         email: cleanEmail,
         password: 'GoogleUser@123',
         fullName: name,
         language: prefLang,
-        avatarUrl: null,
+        avatarUrl: avatarUrl || null,
       })
       if (err && err.message.includes('already')) {
-        await mockSignIn({ email: cleanEmail, password: 'GoogleUser@123' })
+        const { data: signData } = await mockSignIn({ email: cleanEmail, password: 'GoogleUser@123' })
+        if (signData?.session?.userId && avatarUrl) {
+          await mockUpdateProfile(signData.session.userId, { avatar_url: avatarUrl })
+        }
       }
       await refreshProfile()
       navigate('/dashboard', { replace: true })

@@ -3,6 +3,8 @@
 // Full mock database for SurakshaAR demo mode (no Supabase)
 // ============================================================
 
+import { getGooglePresetAvatar } from '../data/googleAvatars'
+
 // ─── localStorage helpers ────────────────────────────────────
 function load(key, fallback = null) {
   try {
@@ -920,7 +922,10 @@ export async function mockSignUp({ email, password, fullName, employeeId, depart
     return { data: null, error: { message: 'Email already registered.' } }
   }
   const userId = uuid()
-  const validAvatar = avatarUrl && typeof avatarUrl === 'string' && !avatarUrl.includes('unavatar.io') ? avatarUrl : null
+  const presetAvatar = getGooglePresetAvatar(cleanEmail)
+  const validAvatar = (avatarUrl && typeof avatarUrl === 'string' && !avatarUrl.includes('unavatar.io'))
+    ? avatarUrl
+    : (presetAvatar || null)
 
   const profile = {
     id: userId,
@@ -999,6 +1004,7 @@ export async function mockSignIn({ email, password }) {
       const newId = uuid()
       const namePart = cleanEmail.split('@')[0].replace(/[._]/g, ' ')
       const capName = namePart.charAt(0).toUpperCase() + namePart.slice(1)
+      const presetAvatar = getGooglePresetAvatar(cleanEmail)
       const newProfile = {
         id: newId,
         email: cleanEmail,
@@ -1007,7 +1013,7 @@ export async function mockSignIn({ email, password }) {
         department: 'Industrial Safety',
         role: 'trainee',
         preferred_language: 'en',
-        avatar_url: null,
+        avatar_url: presetAvatar || null,
         created_at: new Date().toISOString(),
         _password: password,
       }
@@ -1058,10 +1064,20 @@ export function mockGetAuthSession() {
 export function mockGetProfile(userId) {
   const profiles = load(PROFILES_KEY, {})
   const profile = profiles[userId] || null
-  if (profile && profile.avatar_url && typeof profile.avatar_url === 'string' && profile.avatar_url.includes('unavatar.io')) {
-    profile.avatar_url = null
-    profiles[userId] = profile
-    save(PROFILES_KEY, profiles)
+  if (profile) {
+    if (profile.avatar_url && typeof profile.avatar_url === 'string' && profile.avatar_url.includes('unavatar.io')) {
+      profile.avatar_url = null
+      profiles[userId] = profile
+      save(PROFILES_KEY, profiles)
+    }
+    if (!profile.avatar_url && profile.email) {
+      const preset = getGooglePresetAvatar(profile.email)
+      if (preset) {
+        profile.avatar_url = preset
+        profiles[userId] = profile
+        save(PROFILES_KEY, profiles)
+      }
+    }
   }
   return { data: profile, error: profile ? null : { message: 'Profile not found.' } }
 }

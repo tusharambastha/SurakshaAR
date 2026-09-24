@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react'
+import { getGooglePresetAvatar } from '../../data/googleAvatars'
 
 export function getUserAvatarUrl(user, profile) {
-  // Only return valid image URLs (custom uploaded data:image or http/https URLs, excluding unavatar)
+  // 1. Check custom uploaded or stored avatar_url (excluding broken unavatar URLs)
   const rawUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture
   if (rawUrl && typeof rawUrl === 'string' && !rawUrl.includes('unavatar.io')) {
     return rawUrl
   }
+
+  // 2. Auto-sync real Google profile photo from presets if email matches
+  const email = (user?.email || profile?.email || '').trim().toLowerCase()
+  const preset = getGooglePresetAvatar(email)
+  if (preset) return preset
+
   return null
 }
 
