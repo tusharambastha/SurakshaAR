@@ -276,7 +276,16 @@ export function Navbar() {
   }, [user, location.pathname])
 
   // Build notifications list
+  const userSecurityNotifs = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('suraksha_user_notifications') || '[]')
+    } catch {
+      return []
+    }
+  })()
+
   const notifications = [
+    ...userSecurityNotifs,
     ...(userCerts.map(c => ({
       id: `cert-${c.id}`,
       type: 'cert',
@@ -653,6 +662,7 @@ export function Navbar() {
                             <div style={{ marginTop: 2, flexShrink: 0 }}>
                               {n.type === 'cert' && <Award size={16} color="var(--color-success)" />}
                               {n.type === 'system' && <ShieldCheck size={16} color="var(--color-brand)" />}
+                              {n.type === 'security' && <ShieldCheck size={16} color="#4285F4" />}
                               {n.type === 'advisory' && <AlertTriangle size={16} color="var(--color-warning)" />}
                             </div>
                             <div style={{ flex: 1 }}>
