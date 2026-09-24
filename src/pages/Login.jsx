@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Shield, LogIn, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { supabase, isSupabaseConfigured, friendlyAuthError } from '../lib/supabase'
@@ -113,14 +113,21 @@ export default function Login() {
       }}>
         <div style={{ width: '100%', maxWidth: 420 }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <div style={{
-              width: 64, height: 64, background: 'var(--color-brand)',
-              borderRadius: 16, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', margin: '0 auto 16px',
-            }}>
-              <Shield size={32} color="white" strokeWidth={2} />
-            </div>
-            <h1 style={{ fontSize: 'var(--text-2xl)', marginBottom: 6 }}>Welcome Back</h1>
+            <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <img
+                src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
+                alt="SurakshaAR"
+                style={{
+                  height: 60,
+                  width: 'auto',
+                  maxWidth: 260,
+                  objectFit: 'contain',
+                  display: 'block',
+                  filter: 'drop-shadow(0 4px 16px rgba(224, 90, 0, 0.15))',
+                }}
+              />
+            </Link>
+            <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, marginBottom: 6 }}>Welcome Back</h1>
             <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
               Sign in to continue your safety training
             </p>

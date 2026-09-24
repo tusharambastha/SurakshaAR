@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Eye, EyeOff, Shield, Lock, AlertCircle } from 'lucide-react'
+import { Eye, EyeOff, Lock, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase, isSupabaseConfigured, friendlyAuthError } from '../lib/supabase'
 import { mockSignIn, mockGetProfile } from '../lib/mockDb'
@@ -55,7 +55,11 @@ export default function AdminLogin() {
         borderBottom: '2px solid var(--color-brand)',
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        <Shield size={22} style={{ color: 'var(--color-brand)' }} />
+        <img
+          src={`${import.meta.env.BASE_URL}images/surakshaar-emblem.png`}
+          alt="SurakshaAR"
+          style={{ height: 26, width: 'auto', objectFit: 'contain' }}
+        />
         <span style={{ color: 'white', fontWeight: 800, fontSize: '1.1rem' }}>SurakshaAR</span>
         <span className="badge badge-brand" style={{ marginLeft: 8 }}>ADMIN PORTAL</span>
       </div>

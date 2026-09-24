@@ -312,14 +312,20 @@ export default function Signup() {
       }}>
         <div style={{ width: '100%', maxWidth: 480 }}>
           <div style={{ textAlign: 'center', marginBottom: 24 }}>
-            <div style={{
-              width: 60, height: 60, background: 'var(--color-brand)',
-              borderRadius: 16, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', margin: '0 auto 14px',
-              boxShadow: '0 8px 24px rgba(224, 90, 0, 0.25)',
-            }}>
-              <Shield size={30} color="white" strokeWidth={2.2} />
-            </div>
+            <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+              <img
+                src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
+                alt="SurakshaAR"
+                style={{
+                  height: 58,
+                  width: 'auto',
+                  maxWidth: 260,
+                  objectFit: 'contain',
+                  display: 'block',
+                  filter: 'drop-shadow(0 4px 16px rgba(224, 90, 0, 0.15))',
+                }}
+              />
+            </Link>
             <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, marginBottom: 6 }}>Create Your Account</h1>
             <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
               Join SurakshaAR — India's Immersive Industrial Safety Training Platform

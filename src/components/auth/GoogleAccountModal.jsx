@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { X, UserPlus, ArrowLeft, Shield, Check, Camera, Image as ImageIcon } from 'lucide-react'
+import { X, UserPlus, ArrowLeft, Check, Camera, Image as ImageIcon } from 'lucide-react'
 import { GOOGLE_AVATAR_PRESETS, getGooglePresetAvatar } from '../../data/googleAvatars'
 
 // Google accounts matching the user's real Google Account Chooser screen
@@ -223,21 +223,27 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
               {/* Left Column */}
               <div style={{ flex: '1 1 240px' }}>
                 <div style={{ marginBottom: 18 }}>
-                  {/* SurakshaAR Shield Brand Icon */}
+                  {/* SurakshaAR Brand Emblem Icon */}
                   <div
                     style={{
-                      width: 44,
-                      height: 44,
+                      width: 46,
+                      height: 46,
                       borderRadius: 12,
-                      background: 'linear-gradient(135deg, #FF6B00 0%, #E05A00 100%)',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 107, 0, 0.4)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       marginBottom: 16,
-                      boxShadow: '0 4px 16px rgba(224, 90, 0, 0.35)',
+                      padding: 5,
+                      boxShadow: '0 4px 16px rgba(224, 90, 0, 0.25)',
                     }}
                   >
-                    <Shield size={22} color="#FFFFFF" />
+                    <img
+                      src={`${import.meta.env.BASE_URL}images/surakshaar-emblem.png`}
+                      alt="SurakshaAR"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
                   </div>
                   <h2 style={{ fontSize: 28, fontWeight: 500, margin: '0 0 8px', color: '#FFFFFF', letterSpacing: '-0.3px' }}>
                     Choose an account
@@ -522,18 +528,24 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
               <div style={{ flex: '1 1 240px' }}>
                 <div
                   style={{
-                    width: 44,
-                    height: 44,
+                    width: 46,
+                    height: 46,
                     borderRadius: 12,
-                    background: 'linear-gradient(135deg, #FF6B00 0%, #E05A00 100%)',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    border: '1px solid rgba(255, 107, 0, 0.4)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginBottom: 16,
-                    boxShadow: '0 4px 16px rgba(224, 90, 0, 0.35)',
+                    padding: 5,
+                    boxShadow: '0 4px 16px rgba(224, 90, 0, 0.25)',
                   }}
                 >
-                  <Shield size={22} color="#FFFFFF" />
+                  <img
+                    src={`${import.meta.env.BASE_URL}images/surakshaar-emblem.png`}
+                    alt="SurakshaAR"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
                 </div>
                 <h2 style={{ fontSize: 24, fontWeight: 500, margin: '0 0 16px', color: '#FFFFFF', lineHeight: 1.25 }}>
                   Make sure that you downloaded this app from Google

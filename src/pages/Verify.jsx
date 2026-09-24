@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Shield, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import { getCertificateByNumber } from '../lib/certificate'
 import { verifyCertificate } from '../lib/blockchain'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
@@ -81,9 +81,11 @@ export default function Verify() {
         background: 'white', borderBottom: '1px solid #E3DDD5',
         padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 10,
       }}>
-        <div style={{ width: 36, height: 36, background: '#E05A00', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Shield size={20} color="white" />
-        </div>
+        <img
+          src={`${import.meta.env.BASE_URL}images/surakshaar-emblem.png`}
+          alt="SurakshaAR"
+          style={{ width: 36, height: 36, objectFit: 'contain' }}
+        />
         <div>
           <div style={{ fontWeight: 800, fontSize: '1rem', color: '#1C1C1E' }}>SurakshaAR</div>
           <div style={{ fontSize: '0.72rem', color: '#7A7A7A', fontWeight: 600 }}>Certificate Verification</div>
