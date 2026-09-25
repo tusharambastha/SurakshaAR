@@ -5,28 +5,28 @@ import android.speech.tts.TextToSpeech;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.widget.Toast;
+import androidx.activity.OnBackPressedCallback;
 import com.getcapacitor.BridgeActivity;
 import java.util.Locale;
 
 public class MainActivity extends BridgeActivity {
     private TextToSpeech tts;
     private boolean ttsReady = false;
+    private long backPressedTime = 0;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         // Initialize Android Hardware TextToSpeech
-        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
-            @Override
-            public void onInit(int status) {
-                if (status == TextToSpeech.SUCCESS) {
-                    ttsReady = true;
-                    try {
-                        tts.setLanguage(new Locale("hi", "IN"));
-                        tts.setSpeechRate(0.95f);
-                    } catch (Exception ignored) {}
-                }
+        tts = new TextToSpeech(this, status -> {
+            if (status == TextToSpeech.SUCCESS) {
+                ttsReady = true;
+                try {
+                    tts.setLanguage(new Locale("hi", "IN"));
+                    tts.setSpeechRate(0.95f);
+                } catch (Exception ignored) {}
             }
         });
 
@@ -75,6 +75,31 @@ public class MainActivity extends BridgeActivity {
                     return ttsReady;
                 }
             }, "AndroidTTS");
+
+            // Handle Android Hardware Back Button
+            getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+                @Override
+                public void handleOnBackPressed() {
+                    webView.evaluateJavascript(
+                        "(function() { if (window.__handleAndroidBack && window.__handleAndroidBack()) { return 'handled'; } return 'default'; })()",
+                        result -> runOnUiThread(() -> {
+                            if ("\"handled\"".equals(result)) {
+                                return;
+                            }
+                            if (webView.canGoBack()) {
+                                webView.goBack();
+                            } else {
+                                if (backPressedTime + 2000 > System.currentTimeMillis()) {
+                                    finish();
+                                } else {
+                                    backPressedTime = System.currentTimeMillis();
+                                    Toast.makeText(MainActivity.this, "Press back again to exit SurakshaAR", Toast.LENGTH_SHORT).show();
+                                }
+                            }
+                        })
+                    );
+                }
+            });
         }
     }
 

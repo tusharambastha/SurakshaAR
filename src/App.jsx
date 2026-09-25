@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { Capacitor } from '@capacitor/core'
@@ -9,7 +9,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { AdminRoute } from './components/auth/AdminRoute'
 import OfflineBanner from './components/ui/OfflineBanner'
 import SafetyChatbot from './components/chatbot/SafetyChatbot'
-import React, { Component } from 'react'
+import React, { Component, useEffect } from 'react'
 
 // Pages
 import Landing     from './pages/Landing'
@@ -146,6 +146,78 @@ function RootRoute() {
   return <Navigate to="/landing" replace />
 }
 
+function AndroidBackHandler() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    window.__handleAndroidBack = () => {
+      // 1. If chatbot is expanded, close it first!
+      const chatbotPanel = document.querySelector('.safety-chatbot-panel, [data-testid="chatbot-panel"]')
+      const chatbotCloseBtn = document.querySelector('[data-testid="chatbot-close-btn"], .chatbot-close')
+      if (chatbotPanel && chatbotCloseBtn) {
+        chatbotCloseBtn.click()
+        return true
+      }
+
+      // 2. If any modal or popup is open, close it!
+      const modalClose = document.querySelector('[data-testid="modal-close-btn"], .modal-close, [aria-label="Close modal"]')
+      if (modalClose) {
+        modalClose.click()
+        return true
+      }
+
+      // 3. If navigation drawer is open, close it!
+      const drawerClose = document.querySelector('[data-testid="drawer-close-btn"], .drawer-close')
+      if (drawerClose) {
+        drawerClose.click()
+        return true
+      }
+
+      const path = location.pathname
+
+      // 4. If in AR Scenario task (/scenario/:id), navigate back to /dashboard safely
+      if (path.startsWith('/scenario')) {
+        navigate('/dashboard', { replace: true })
+        return true
+      }
+
+      // 5. If in Tutorial, Assessment, or Results, navigate back to /dashboard
+      if (path.startsWith('/tutorial') || path.startsWith('/assessment') || path.startsWith('/results')) {
+        navigate('/dashboard', { replace: true })
+        return true
+      }
+
+      // 6. If in Profile, My Certificates, About, Safety Tips, etc., return to /dashboard
+      if (['/profile', '/my-certificates', '/about', '/terms', '/privacy', '/contact', '/copyright', '/safety-tips', '/setup-guide'].includes(path)) {
+        navigate('/dashboard', { replace: true })
+        return true
+      }
+
+      // 7. If on Signup or Admin Login, back goes to /login
+      if (path === '/signup' || path === '/admin-login') {
+        navigate('/login', { replace: true })
+        return true
+      }
+
+      // 8. If on Root screens (/dashboard, /login, /landing, /), return false to let native double-tap exit trigger
+      if (path === '/dashboard' || path === '/login' || path === '/landing' || path === '/') {
+        return false
+      }
+
+      // Fallback: try navigating backwards
+      navigate(-1)
+      return true
+    }
+
+    return () => {
+      window.__handleAndroidBack = null
+    }
+  }, [navigate, location])
+
+  return null
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -155,6 +227,7 @@ export default function App() {
             <AuthProvider>
               <OfflineProvider>
                 <HashRouter>
+                  <AndroidBackHandler />
                   <OfflineBanner />
 
                   <Routes>
