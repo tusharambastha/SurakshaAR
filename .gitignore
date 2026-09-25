@@ -34,5 +34,6 @@ bin/
 scratch/
 assemble_demo.py
 .vite/
+*.apk
 
 

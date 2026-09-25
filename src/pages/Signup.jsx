@@ -29,10 +29,16 @@ import {
 import { sendEmailOtp } from '../lib/emailService'
 
 export default function Signup() {
-  const { refreshProfile } = useAuth()
+  const { user, profile, refreshProfile, loading: authLoading } = useAuth()
   const { T } = useLang()
   const navigate = useNavigate()
   const otpInputId = useId()
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(profile?.role === 'admin' ? '/admin' : '/dashboard', { replace: true })
+    }
+  }, [user, profile, authLoading, navigate])
 
   const [fullName, setFullName]   = useState('')
   const [email, setEmail]         = useState('')

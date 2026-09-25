@@ -1038,27 +1038,8 @@ export async function mockSignOut() {
 }
 
 export function mockGetAuthSession() {
-  let session = load(SESSION_KEY, null)
-  if (!session) {
-    const traineeId = 'demo-trainee-0000-0000-0000-000000000001'
-    const profiles = load(PROFILES_KEY, {})
-    if (!profiles[traineeId]) {
-      profiles[traineeId] = {
-        id: traineeId,
-        email: 'trainee@suraksha.demo',
-        full_name: 'Demo Trainee',
-        employee_id: 'TRN-2026',
-        department: 'Industrial Safety & Mining',
-        preferred_language: 'en',
-        role: 'trainee',
-        created_at: new Date('2026-01-01').toISOString(),
-      }
-      save(PROFILES_KEY, profiles)
-    }
-    session = { userId: traineeId, email: 'trainee@suraksha.demo', role: 'trainee' }
-    save(SESSION_KEY, session)
-  }
-  return { data: { session }, error: null }
+  const session = load(SESSION_KEY, null)
+  return { data: { session: session || null }, error: null }
 }
 
 export function mockGetProfile(userId) {

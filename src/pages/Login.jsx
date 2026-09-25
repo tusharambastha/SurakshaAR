@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, LogIn, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -9,9 +9,16 @@ import GoogleAccountModal from '../components/auth/GoogleAccountModal'
 import { Navbar } from '../components/layout/Navbar'
 
 export default function Login() {
-  const { refreshProfile } = useAuth()
+  const { user, profile, refreshProfile, loading: authLoading } = useAuth()
   const { T } = useLang()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate(profile?.role === 'admin' ? '/admin' : '/dashboard', { replace: true })
+    }
+  }, [user, profile, authLoading, navigate])
+
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw]     = useState(false)

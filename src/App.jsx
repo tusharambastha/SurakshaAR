@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { Capacitor } from '@capacitor/core'
 import { LanguageProvider } from './contexts/LanguageContext'
 import { AccessibilityProvider } from './contexts/AccessibilityContext'
 import { OfflineProvider } from './contexts/OfflineContext'
@@ -107,6 +108,44 @@ class ErrorBoundary extends Component {
   }
 }
 
+function RootRoute() {
+  const { user, profile, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--color-bg)', gap: 16,
+      }}>
+        <img
+          src={`${import.meta.env.BASE_URL}logo.png`}
+          alt="Suraksha AR"
+          style={{ width: 72, height: 72, objectFit: 'contain', filter: 'drop-shadow(0 4px 14px rgba(224,90,0,0.18))' }}
+        />
+        <div className="spinner" style={{ borderTopColor: 'var(--color-brand)' }} />
+      </div>
+    )
+  }
+
+  const isNative = Capacitor.isNativePlatform()
+
+  // On Native Mobile App (Capacitor Android APK / iOS):
+  if (isNative) {
+    if (user) {
+      return <Navigate to={profile?.role === 'admin' ? '/admin' : '/dashboard'} replace />
+    }
+    // Brand new user / unregistered / fresh mobile install -> show Login page first
+    return <Navigate to="/login" replace />
+  }
+
+  // On Web Browser:
+  if (user) {
+    return <Navigate to={profile?.role === 'admin' ? '/admin' : '/dashboard'} replace />
+  }
+  return <Navigate to="/landing" replace />
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -151,9 +190,9 @@ export default function App() {
                     <Route path="/admin/certificates"    element={<AdminRoute><AdminCertificates /></AdminRoute>} />
                     <Route path="/admin/leaderboard"     element={<AdminRoute><AdminLeaderboard /></AdminRoute>} />
 
-                    {/* ── Default ── */}
-                    <Route path="/" element={<Navigate to="/landing" replace />} />
-                    <Route path="*" element={<Navigate to="/landing" replace />} />
+                    {/* ── Default / Dynamic Root Route ── */}
+                    <Route path="/" element={<RootRoute />} />
+                    <Route path="*" element={<RootRoute />} />
                   </Routes>
 
                   {/* Safety chatbot persists across all protected pages */}
