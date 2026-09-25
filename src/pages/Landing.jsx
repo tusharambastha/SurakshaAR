@@ -702,12 +702,14 @@ export default function Landing() {
             textAlign: 'center',
           }}>
             {[
-              { time: '00:27', label: 'Dashboard & Modules', icon: '📊' },
-              { time: '00:38', label: 'Safety Assistant', icon: '💬' },
-              { time: '00:51', label: 'AR Tutorial', icon: '📋' },
-              { time: '01:02', label: 'Camera AR Hazard', icon: '🔥' },
-              { time: '01:40', label: 'Assessment Quiz', icon: '📝' },
-              { time: '02:10', label: 'Verified Certificate', icon: '📜' },
+              { time: '00:00', label: 'Registration & OTP', icon: '🔐' },
+              { time: '00:33', label: 'Dashboard & Modules', icon: '📊' },
+              { time: '00:51', label: 'Camera AR Hazard', icon: '🔥' },
+              { time: '01:17', label: '3D Evacuation Sim', icon: '🏢' },
+              { time: '01:39', label: 'Assessment Quiz', icon: '📝' },
+              { time: '02:07', label: 'Safety AI Assistant', icon: '💬' },
+              { time: '02:31', label: 'Verified Certificate', icon: '📜' },
+              { time: '02:49', label: 'Admin Compliance', icon: '🛡️' },
             ].map((ch, idx) => (
               <div
                 key={idx}
