@@ -96,38 +96,24 @@ export default function Landing() {
             Smart India Hackathon 2026 · SIH26041
           </div>
 
-          {/* Hero Logo */}
+          {/* Logo image */}
           <div style={{
-            marginBottom: lang !== 'en' ? 14 : 26,
+            marginBottom: lang !== 'en' ? 12 : 24,
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 12,
+            justifyContent: 'center',
           }}>
             <img
-              src={`${import.meta.env.BASE_URL}logo.png`}
-              alt="Suraksha AR — Immersive Training for a Safer Bharat"
+              src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
+              alt="SurakshaAR — Immersive Training for a Safer Bharat"
               style={{
-                height: 'clamp(110px, 18vw, 160px)',
+                height: 'clamp(90px, 16vw, 150px)',
                 width: 'auto',
                 maxWidth: '92%',
                 objectFit: 'contain',
                 display: 'block',
-                filter: 'drop-shadow(0 8px 24px rgba(224, 90, 0, 0.18))',
+                filter: 'drop-shadow(0 4px 18px rgba(0,0,0,0.08))',
               }}
             />
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: 'clamp(1.75rem, 4.5vw, 2.4rem)',
-              fontWeight: 800,
-              letterSpacing: '-0.02em',
-              color: 'var(--color-text-primary)',
-            }}>
-              <span>Suraksha</span>
-              <span style={{ color: 'var(--color-brand)' }}>AR</span>
-            </div>
           </div>
 
           {/* Regional tagline for non-English users */}

@@ -462,27 +462,14 @@ export function Navbar() {
                 textDecoration: 'none',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 9,
+                gap: 8,
               }}
             >
               <img
-                src={`${import.meta.env.BASE_URL}logo.png`}
-                alt="Suraksha AR"
+                src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
+                alt="SurakshaAR"
                 style={{ height: 38, width: 'auto', objectFit: 'contain', display: 'block' }}
               />
-              <span style={{
-                fontWeight: 800,
-                fontSize: '1.22rem',
-                letterSpacing: '-0.02em',
-                color: 'var(--color-text-primary)',
-                lineHeight: 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3,
-              }}>
-                <span>Suraksha</span>
-                <span style={{ color: 'var(--color-brand)' }}>AR</span>
-              </span>
               {isAdmin && (
                 <span className="badge badge-brand" style={{ fontSize: '0.65rem', marginLeft: 4 }}>ADMIN</span>
               )}
@@ -896,19 +883,10 @@ export function Navbar() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <img
-              src={`${import.meta.env.BASE_URL}logo.png`}
-              alt="Suraksha AR"
+              src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
+              alt="SurakshaAR"
               style={{ height: 36, width: 'auto', objectFit: 'contain' }}
             />
-            <span style={{
-              fontWeight: 800,
-              fontSize: '1.18rem',
-              letterSpacing: '-0.02em',
-              color: 'var(--color-text-primary)',
-              lineHeight: 1,
-            }}>
-              Suraksha <span style={{ color: 'var(--color-brand)' }}>AR</span>
-            </span>
           </div>
           <button
             type="button"
@@ -1327,11 +1305,8 @@ export function Navbar() {
           icon: <Info size={18} color="#0284C7" />, title: drawerT.about,
           body: (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                <img src={`${import.meta.env.BASE_URL}logo.png`} alt="Suraksha AR" style={{ height: 60, width: 'auto', objectFit: 'contain' }} />
-                <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--color-text-primary)' }}>
-                  Suraksha <span style={{ color: 'var(--color-brand)' }}>AR</span>
-                </span>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <img src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`} alt="SurakshaAR" style={{ height: 52, objectFit: 'contain' }} />
               </div>
               <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
                 {lang === 'hi'

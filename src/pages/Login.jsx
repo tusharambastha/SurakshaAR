@@ -113,35 +113,19 @@ export default function Login() {
       }}>
         <div style={{ width: '100%', maxWidth: 420 }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <Link to="/" style={{
-              display: 'inline-flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 16,
-              textDecoration: 'none',
-              gap: 8,
-            }}>
+            <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
               <img
-                src={`${import.meta.env.BASE_URL}logo.png`}
-                alt="Suraksha AR"
+                src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
+                alt="SurakshaAR"
                 style={{
-                  height: 90,
+                  height: 60,
                   width: 'auto',
+                  maxWidth: 260,
                   objectFit: 'contain',
                   display: 'block',
-                  filter: 'drop-shadow(0 6px 20px rgba(224, 90, 0, 0.2))',
+                  filter: 'drop-shadow(0 4px 16px rgba(224, 90, 0, 0.15))',
                 }}
               />
-              <span style={{
-                fontWeight: 800,
-                fontSize: '1.35rem',
-                color: 'var(--color-text-primary)',
-                letterSpacing: '-0.02em',
-                lineHeight: 1,
-              }}>
-                Suraksha <span style={{ color: 'var(--color-brand)' }}>AR</span>
-              </span>
             </Link>
             <h1 style={{ fontSize: 'var(--text-2xl)', fontWeight: 800, marginBottom: 6 }}>Welcome Back</h1>
             <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
