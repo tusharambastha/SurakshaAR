@@ -36,7 +36,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import { mockGetScenario, mockCreateSession, mockUpdateSession, mockInsertFeedbackLog } from '../lib/mockDb'
 import { calculateScore } from '../lib/scoring'
 import { queueOfflineAction } from '../lib/indexeddb'
-import { speak } from '../lib/voice'
+import { speak, stopSpeech } from '../lib/voice'
 import VirtualARHUD from '../components/ar/VirtualARHUD'
 import { competencyTracker } from '../lib/competencyTracker'
 
@@ -2084,6 +2084,32 @@ export default function Scenario() {
       competencyTracker.startStep(currentStep, label)
     }
   }, [currentStep, scenario, getStepText])
+
+  // ── Auto-Voice Narration when Step starts or AR Camera opens ─────────────
+  useEffect(() => {
+    if (!scenario?.steps?.[currentStep]) return
+    const stepObj = scenario.steps[currentStep]
+    const label = getStepText(stepObj, 'label') || `Step ${currentStep + 1}`
+    const instruction = getStepText(stepObj, 'instruction') || ''
+
+    let speechText = ''
+    if (lang === 'hi') {
+      speechText = `चरण ${currentStep + 1}: ${label}। ${instruction}`
+    } else if (lang === 'sat') {
+      speechText = `${label}। ${instruction}`
+    } else {
+      speechText = `Step ${currentStep + 1}: ${label}. ${instruction}`
+    }
+
+    const timer = setTimeout(() => {
+      speak(speechText, lang)
+    }, 700)
+
+    return () => {
+      clearTimeout(timer)
+      stopSpeech()
+    }
+  }, [currentStep, scenario, lang, getStepText])
 
   // ── Synchronous Timer Cancellation Helper ─────────────────────────────────
   const stopTimer = useCallback(() => {

@@ -81,14 +81,37 @@ export function isVoiceSupported(lang) {
 }
 
 let currentUtterance = null
+let currentAudio = null
 
-/** Speak text aloud. Returns false if TTS not supported. */
+/** Stop any currently playing speech or audio narration */
+export function stopSpeech() {
+  if (typeof window !== 'undefined' && window.AndroidTTS && typeof window.AndroidTTS.stop === 'function') {
+    try {
+      window.AndroidTTS.stop()
+    } catch {}
+  }
+  if (currentAudio) {
+    try {
+      currentAudio.pause()
+      currentAudio.currentTime = 0
+    } catch {}
+    currentAudio = null
+  }
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    try {
+      window.speechSynthesis.cancel()
+    } catch {}
+    currentUtterance = null
+  }
+}
+
+/** Speak text aloud using dual-engine (HD audio stream + native Web Speech API fallback) */
 export function speak(text, lang = 'en', onEnd = null) {
-  if (!window.speechSynthesis) return false
-  const ttsLang = TTS_LANG[lang] || 'en-IN'
+  if (!text) return false
+  stopSpeech()
 
-  // Stop any current speech
-  window.speechSynthesis.cancel()
+  const ttsLang = TTS_LANG[lang] || 'en-IN'
+  const shortLang = ttsLang.split('-')[0] // 'hi' or 'en'
 
   // For Santali, convert Ol Chiki script to phonemes so Indian TTS can pronounce it clearly
   let speechText = text
@@ -96,41 +119,132 @@ export function speak(text, lang = 'en', onEnd = null) {
     speechText = olChikiToHindi(text)
   }
 
-  const utterance = new SpeechSynthesisUtterance(speechText)
-  utterance.lang = ttsLang
-  utterance.rate = 0.88
-  utterance.pitch = 1
-  utterance.volume = 1
+  // Strip emojis, markdown, and unwanted symbols for smooth, natural pronunciation
+  const cleanText = speechText
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .replace(/[#*_~`]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 
-  if (onEnd) {
-    utterance.onend = () => {
-      currentUtterance = null
-      onEnd()
-    }
-    utterance.onerror = () => {
-      currentUtterance = null
-      onEnd()
+  if (!cleanText) return false
+
+  // 1. First priority on Android Native App: Hardware Native TextToSpeech Engine
+  if (typeof window !== 'undefined' && window.AndroidTTS && typeof window.AndroidTTS.speak === 'function') {
+    try {
+      window.AndroidTTS.speak(cleanText, shortLang)
+      if (onEnd) {
+        const words = cleanText.split(' ').length
+        const estimatedMs = Math.max(1200, (words / 2.5) * 1000)
+        setTimeout(onEnd, estimatedMs)
+      }
+      return true
+    } catch (e) {
+      console.warn('[SurakshaAR Voice] AndroidTTS bridge failed, falling back:', e)
     }
   }
 
-  // Try to find a matching Indian voice (hi-IN, bn-IN, or en-IN)
-  const voices = window.speechSynthesis.getVoices()
-  const voice = voices.find(v => v.lang === ttsLang) ||
-                voices.find(v => v.lang.startsWith(ttsLang.split('-')[0])) ||
-                voices.find(v => v.lang.includes('IN')) ||
-                voices[0]
-  if (voice) utterance.voice = voice
+  let fallbackAttempted = false
 
-  currentUtterance = utterance
-  window.speechSynthesis.speak(utterance)
-  return true
-}
+  const playWithSpeechSynthesis = () => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      if (onEnd) onEnd()
+      return false
+    }
 
-/** Stop any currently playing speech */
-export function stopSpeech() {
-  if (window.speechSynthesis) {
-    window.speechSynthesis.cancel()
-    currentUtterance = null
+    try {
+      const utterance = new SpeechSynthesisUtterance(cleanText)
+      utterance.lang = ttsLang
+      utterance.rate = 0.90
+      utterance.pitch = 1
+      utterance.volume = 1
+
+      utterance.onend = () => {
+        currentUtterance = null
+        if (onEnd) onEnd()
+      }
+      utterance.onerror = (e) => {
+        console.warn('[SurakshaAR Voice] SpeechSynthesis error:', e)
+        currentUtterance = null
+        if (!fallbackAttempted) {
+          fallbackAttempted = true
+          playWithAudioStream()
+        } else if (onEnd) {
+          onEnd()
+        }
+      }
+
+      const voices = window.speechSynthesis.getVoices() || []
+      const voice = voices.find(v => v.lang === ttsLang) ||
+                    voices.find(v => v.lang.startsWith(shortLang)) ||
+                    voices.find(v => v.lang.includes('IN')) ||
+                    voices[0]
+      if (voice) utterance.voice = voice
+
+      currentUtterance = utterance
+      window.speechSynthesis.speak(utterance)
+      return true
+    } catch (err) {
+      console.warn('[SurakshaAR Voice] SpeechSynthesis exception:', err)
+      if (!fallbackAttempted) {
+        fallbackAttempted = true
+        return playWithAudioStream()
+      }
+      return false
+    }
+  }
+
+  const playWithAudioStream = () => {
+    try {
+      // Chunk up to first 220 chars for quick stream start
+      const encoded = encodeURIComponent(cleanText.slice(0, 220))
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${shortLang}&q=${encoded}`
+      const audio = new Audio(audioUrl)
+      currentAudio = audio
+
+      audio.onended = () => {
+        currentAudio = null
+        if (onEnd) onEnd()
+      }
+
+      audio.onerror = () => {
+        currentAudio = null
+        // Fall back to native speechSynthesis if network stream fails
+        if (!fallbackAttempted) {
+          fallbackAttempted = true
+          playWithSpeechSynthesis()
+        } else if (onEnd) {
+          onEnd()
+        }
+      }
+
+      const p = audio.play()
+      if (p !== undefined) {
+        p.catch(err => {
+          console.warn('[SurakshaAR Voice] Audio playback blocked, attempting SpeechSynthesis:', err)
+          if (!fallbackAttempted) {
+            fallbackAttempted = true
+            playWithSpeechSynthesis()
+          }
+        })
+      }
+      return true
+    } catch (err) {
+      console.warn('[SurakshaAR Voice] Audio stream error:', err)
+      if (!fallbackAttempted) {
+        fallbackAttempted = true
+        return playWithSpeechSynthesis()
+      }
+      return false
+    }
+  }
+
+  // If online, prefer the Google TTS audio stream for crisp, authentic pronunciation
+  if (typeof navigator !== 'undefined' && navigator.onLine) {
+    return playWithAudioStream()
+  } else {
+    return playWithSpeechSynthesis()
   }
 }
 
@@ -141,7 +255,7 @@ export function getCurrentUtterance() {
 
 /** Check if TTS is supported for a language */
 export function isTTSSupported(lang) {
-  return !!window.speechSynthesis && !!TTS_LANG[lang]
+  return true
 }
 
 /** Returns available voices — call after 'voiceschanged' event */

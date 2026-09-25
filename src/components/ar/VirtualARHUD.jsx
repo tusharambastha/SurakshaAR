@@ -678,6 +678,29 @@ export default function VirtualARHUD({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <button
                       type="button"
+                      onClick={() => speak(`${stepLabel}. ${stepInstruction}`, lang)}
+                      title="Listen audio instruction"
+                      style={{
+                        background: 'rgba(224, 90, 0, 0.28)',
+                        border: '1px solid rgba(224, 90, 0, 0.7)',
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        color: '#FFA05C',
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        boxShadow: '0 0 10px rgba(224, 90, 0, 0.25)',
+                      }}
+                    >
+                      <Volume2 size={13} color="#FFA05C" />
+                      <span>{lang === 'hi' ? 'आवाज़' : lang === 'sat' ? 'ᱥᱟᱰᱮ' : 'Voice'}</span>
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => setInstructionExpanded(prev => !prev)}
                       style={{
                         background: 'rgba(255, 255, 255, 0.08)',

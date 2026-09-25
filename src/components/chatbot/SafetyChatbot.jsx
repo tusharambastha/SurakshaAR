@@ -452,6 +452,8 @@ export default function SafetyChatbot() {
               }
             ])
             streamedSuccess = true
+            setSpeakingMsgId(botMsgId)
+            speak(replyText, chatLang, () => setSpeakingMsgId(null))
             break
           }
         }
@@ -491,6 +493,9 @@ export default function SafetyChatbot() {
           }
         ]
       })
+
+      setSpeakingMsgId(botMsgId)
+      speak(text, chatLang, () => setSpeakingMsgId(null))
     }
 
     setIsGenerating(false)
