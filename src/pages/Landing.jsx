@@ -22,6 +22,7 @@ export default function Landing() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const videoRef = useRef(null)
+  const mobileVideoRef = useRef(null)
   const [activeChapter, setActiveChapter] = useState(0)
 
   const handleChapterClick = (seconds, idx) => {
@@ -699,12 +700,39 @@ export default function Landing() {
           </div>
 
           <style>{`
+            .showcase-dual-container {
+              display: flex;
+              gap: 32px;
+              align-items: flex-start;
+              justify-content: center;
+              max-width: 1220px;
+              margin: 0 auto;
+            }
+            .showcase-desktop-col {
+              flex: 1.6;
+              min-width: 0;
+            }
+            .showcase-mobile-col {
+              flex: 0 0 290px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+            }
             .video-timestamps-grid {
               display: grid;
               grid-template-columns: repeat(4, 1fr);
-              gap: 12px;
+              gap: 10px;
             }
-            @media (max-width: 640px) {
+            @media (max-width: 980px) {
+              .showcase-dual-container {
+                flex-direction: column;
+                align-items: center;
+                gap: 44px;
+              }
+              .showcase-desktop-col {
+                width: 100%;
+                max-width: 720px;
+              }
               .video-timestamps-grid {
                 grid-template-columns: repeat(2, 1fr);
                 gap: 8px;
@@ -720,68 +748,216 @@ export default function Landing() {
             }
           `}</style>
 
-          <div style={{
-            maxWidth: 960,
-            margin: '0 auto',
-            background: '#000000',
-            borderRadius: 'var(--radius-lg, 16px)',
-            overflow: 'hidden',
-            boxShadow: '0 20px 48px rgba(0, 0, 0, 0.16)',
-            border: '1px solid var(--color-border)',
-            position: 'relative',
-            aspectRatio: '16 / 9',
-          }}>
-            <video
-              ref={videoRef}
-              onTimeUpdate={handleTimeUpdate}
-              src={`${import.meta.env.BASE_URL}suraksha_ar_final_demo.mp4`}
-              controls
-              playsInline
-              preload="metadata"
-              style={{
-                width: '100%',
-                height: '100%',
-                display: 'block',
-                objectFit: 'contain',
-              }}
-            >
-              Your browser does not support the video tag.
-            </video>
-          </div>
+          <div className="showcase-dual-container">
+            {/* Left Column: Desktop Web Platform Walkthrough */}
+            <div className="showcase-desktop-col">
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 12,
+                padding: '0 4px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '1.15rem' }}>💻</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-primary)' }}>
+                    Desktop Web Platform Walkthrough
+                  </span>
+                </div>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: 'var(--color-text-muted)',
+                  background: 'var(--color-surface-alt, #FAF8F5)',
+                  border: '1px solid var(--color-border)',
+                  padding: '3px 9px',
+                  borderRadius: 6,
+                }}>
+                  16:9 HD
+                </span>
+              </div>
 
-          {/* Chapters / Timeline Highlights - Minimal Original Design, Systematic Grid */}
-          <div style={{
-            maxWidth: 960,
-            margin: '16px auto 0',
-          }} className="video-timestamps-grid">
-            {VIDEO_CHAPTERS.map((ch, idx) => {
-              const isActive = activeChapter === idx
-              return (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleChapterClick(ch.seconds, idx)}
-                  className="timestamp-card-btn"
+              <div style={{
+                width: '100%',
+                background: '#000000',
+                borderRadius: 'var(--radius-lg, 16px)',
+                overflow: 'hidden',
+                boxShadow: '0 20px 48px rgba(0, 0, 0, 0.16)',
+                border: '1px solid var(--color-border)',
+                position: 'relative',
+                aspectRatio: '16 / 9',
+              }}>
+                <video
+                  ref={videoRef}
+                  onTimeUpdate={handleTimeUpdate}
+                  src={`${import.meta.env.BASE_URL}suraksha_ar_final_demo.mp4`}
+                  controls
+                  playsInline
+                  preload="metadata"
                   style={{
-                    padding: '12px 8px',
-                    background: isActive ? 'var(--color-brand-50, #FFF3EB)' : 'var(--color-surface-alt, #FAF8F5)',
-                    borderRadius: 'var(--radius-md, 8px)',
-                    border: isActive ? '2px solid var(--color-brand, #E05A00)' : '1px solid var(--color-border)',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    outline: 'none',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    width: '100%',
+                    height: '100%',
+                    display: 'block',
+                    objectFit: 'contain',
                   }}
                 >
-                  <div style={{ fontSize: '1.25rem', marginBottom: 2 }}>{ch.icon}</div>
-                  <div style={{ fontWeight: 700, color: 'var(--color-brand)', fontSize: '0.85rem' }}>{ch.time}</div>
-                  <div style={{ color: 'var(--color-text-secondary)', marginTop: 2, fontSize: '0.78rem', fontWeight: 600 }}>{ch.label}</div>
-                </button>
-              )
-            })}
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+
+              {/* Chapters / Timeline Highlights - Minimal Original Design, Systematic Grid */}
+              <div style={{ marginTop: 14 }} className="video-timestamps-grid">
+                {VIDEO_CHAPTERS.map((ch, idx) => {
+                  const isActive = activeChapter === idx
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleChapterClick(ch.seconds, idx)}
+                      className="timestamp-card-btn"
+                      style={{
+                        padding: '12px 8px',
+                        background: isActive ? 'var(--color-brand-50, #FFF3EB)' : 'var(--color-surface-alt, #FAF8F5)',
+                        borderRadius: 'var(--radius-md, 8px)',
+                        border: isActive ? '2px solid var(--color-brand, #E05A00)' : '1px solid var(--color-border)',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <div style={{ fontSize: '1.25rem', marginBottom: 2 }}>{ch.icon}</div>
+                      <div style={{ fontWeight: 700, color: 'var(--color-brand)', fontSize: '0.85rem' }}>{ch.time}</div>
+                      <div style={{ color: 'var(--color-text-secondary)', marginTop: 2, fontSize: '0.78rem', fontWeight: 600 }}>{ch.label}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Right Column: Mobile App in Action (Inside Realistic Smartphone Frame) */}
+            <div className="showcase-mobile-col">
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                marginBottom: 12,
+                padding: '0 4px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '1.15rem' }}>📱</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--color-text-primary)' }}>
+                    Mobile Screen View
+                  </span>
+                </div>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: 'var(--color-brand, #E05A00)',
+                  background: 'var(--color-brand-50, #FFF3EB)',
+                  border: '1px solid var(--color-brand-100, #FED7AA)',
+                  padding: '3px 9px',
+                  borderRadius: 6,
+                }}>
+                  Live Android AR
+                </span>
+              </div>
+
+              {/* Smartphone Mockup Chassis */}
+              <div style={{
+                width: 284,
+                height: 576,
+                background: '#121721',
+                borderRadius: 44,
+                padding: '12px 10px',
+                boxShadow: '0 24px 55px -10px rgba(0, 0, 0, 0.35), 0 0 0 2px #263143, inset 0 0 0 1.5px rgba(255,255,255,0.08)',
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                boxSizing: 'border-box',
+              }}>
+                {/* Speaker Notch / Dynamic Island */}
+                <div style={{
+                  position: 'absolute',
+                  top: 14,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 76,
+                  height: 12,
+                  background: '#000000',
+                  borderRadius: 8,
+                  zIndex: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  pointerEvents: 'none',
+                }}>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#1c2438' }} />
+                  <div style={{ width: 24, height: 3, borderRadius: 2, background: '#252d3d' }} />
+                </div>
+
+                {/* Inner Screen Display */}
+                <div style={{
+                  flex: 1,
+                  width: '100%',
+                  height: '100%',
+                  background: '#000000',
+                  borderRadius: 34,
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}>
+                  <video
+                    ref={mobileVideoRef}
+                    src={`${import.meta.env.BASE_URL}suraksha_ar_mobile_demo.mp4`}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'block',
+                      objectFit: 'cover',
+                      borderRadius: 34,
+                    }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+
+                  {/* Home Bar Indicator */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 6,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 76,
+                    height: 3.5,
+                    background: 'rgba(255, 255, 255, 0.45)',
+                    borderRadius: 2,
+                    pointerEvents: 'none',
+                    zIndex: 10,
+                  }} />
+                </div>
+              </div>
+
+              <div style={{
+                marginTop: 14,
+                textAlign: 'center',
+                fontSize: '0.78rem',
+                color: 'var(--color-text-muted)',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}>
+                <CheckCircle size={14} style={{ color: 'var(--color-success)' }} />
+                <span>Live Camera AR · Android Screen Capture</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>

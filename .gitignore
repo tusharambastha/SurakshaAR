@@ -28,6 +28,8 @@ npm-debug.log*
 # Large video recordings & scratch binaries
 *.mov
 *.mp4
+!public/suraksha_ar_final_demo.mp4
+!public/suraksha_ar_mobile_demo.mp4
 bin/
 scratch/
 assemble_demo.py
