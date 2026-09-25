@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, Camera, CheckCircle, ArrowRight } from 'lucide-react'
 import { useLang } from '../contexts/LanguageContext'
@@ -5,10 +6,42 @@ import { useAuth } from '../contexts/AuthContext'
 import { Navbar } from '../components/layout/Navbar'
 import { Footer } from '../components/layout/Footer'
 
+const VIDEO_CHAPTERS = [
+  { step: '01', time: '00:00', seconds: 0, label: 'Registration & OTP', desc: 'Secure worker login with instant email OTP confirmation', tag: 'Onboarding', icon: '🔐' },
+  { step: '02', time: '00:36', seconds: 36, label: 'Dashboard & Navigation', desc: 'Full hamburger menu drawer, profile & safety modules', tag: 'Navigation', icon: '📊' },
+  { step: '03', time: '00:59', seconds: 59, label: 'Camera AR Hazard Scan', desc: 'Live physical environment scan & real-time telemetry', tag: 'AR Mode', icon: '🔥' },
+  { step: '04', time: '01:25', seconds: 85, label: '3D Simulation Mode', desc: 'Interactive factory floor walkthrough & escape drill', tag: '3D Sim', icon: '🏢' },
+  { step: '05', time: '01:48', seconds: 109, label: 'Assessment & Voice Quiz', desc: 'Read-aloud safety evaluation with instant scoring', tag: 'Assessment', icon: '📝' },
+  { step: '06', time: '02:18', seconds: 138, label: 'Suraksha Mitra Copilot', desc: 'Multilingual safety assistant in English, Hindi & Santali', tag: 'AI Assist', icon: '💬' },
+  { step: '07', time: '02:43', seconds: 163, label: 'Verified Certificate', desc: 'Tamper-proof verifiable digital certificate with QR', tag: 'Credentials', icon: '📜' },
+  { step: '08', time: '03:02', seconds: 183, label: 'Compliance & Analytics', desc: 'Admin supervision dashboard with readiness scores', tag: 'Analytics', icon: '🛡️' },
+]
+
 export default function Landing() {
   const { T, lang } = useLang()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const videoRef = useRef(null)
+  const [activeChapter, setActiveChapter] = useState(0)
+
+  const handleChapterClick = (seconds, idx) => {
+    setActiveChapter(idx)
+    if (videoRef.current) {
+      videoRef.current.currentTime = seconds
+      videoRef.current.play().catch(() => {})
+    }
+  }
+
+  const handleTimeUpdate = () => {
+    if (!videoRef.current) return
+    const cur = videoRef.current.currentTime
+    for (let i = VIDEO_CHAPTERS.length - 1; i >= 0; i--) {
+      if (cur >= VIDEO_CHAPTERS[i].seconds) {
+        setActiveChapter(i)
+        break
+      }
+    }
+  }
 
   const HOW_IT_WORKS = [
     { step: T('step_learn'), desc: T('step_learn_desc'), icon: '📖', color: '#3498DB' },
@@ -665,18 +698,46 @@ export default function Landing() {
             </p>
           </div>
 
+          <style>{`
+            .video-chapters-grid {
+              display: grid;
+              grid-template-columns: repeat(4, 1fr);
+              gap: 12px;
+            }
+            @media (max-width: 860px) {
+              .video-chapters-grid {
+                grid-template-columns: repeat(2, 1fr);
+              }
+            }
+            @media (max-width: 480px) {
+              .video-chapters-grid {
+                grid-template-columns: 1fr;
+              }
+            }
+            .chapter-card-btn {
+              transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            .chapter-card-btn:hover {
+              transform: translateY(-2px);
+              border-color: var(--color-brand) !important;
+              box-shadow: 0 6px 18px rgba(224, 90, 0, 0.12) !important;
+            }
+          `}</style>
+
           <div style={{
-            maxWidth: 920,
+            maxWidth: 960,
             margin: '0 auto',
             background: '#000000',
             borderRadius: 'var(--radius-lg, 16px)',
             overflow: 'hidden',
-            boxShadow: '0 16px 40px rgba(0, 0, 0, 0.12)',
+            boxShadow: '0 20px 48px rgba(0, 0, 0, 0.16)',
             border: '1px solid var(--color-border)',
             position: 'relative',
             aspectRatio: '16 / 9',
           }}>
             <video
+              ref={videoRef}
+              onTimeUpdate={handleTimeUpdate}
               src={`${import.meta.env.BASE_URL}suraksha_ar_final_demo.mp4`}
               controls
               playsInline
@@ -692,40 +753,141 @@ export default function Landing() {
             </video>
           </div>
 
-          {/* Chapters / Timeline Highlights */}
+          {/* Systematic Interactive Chapters / Highlights */}
           <div style={{
-            maxWidth: 920,
-            margin: '20px auto 0',
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-            gap: 12,
-            textAlign: 'center',
+            maxWidth: 960,
+            margin: '22px auto 0',
           }}>
-            {[
-              { time: '00:00', label: 'Registration & OTP', icon: '🔐' },
-              { time: '00:33', label: 'Dashboard & Modules', icon: '📊' },
-              { time: '00:51', label: 'Camera AR Hazard', icon: '🔥' },
-              { time: '01:17', label: '3D Evacuation Sim', icon: '🏢' },
-              { time: '01:39', label: 'Assessment Quiz', icon: '📝' },
-              { time: '02:07', label: 'Safety AI Assistant', icon: '💬' },
-              { time: '02:31', label: 'Verified Certificate', icon: '📜' },
-              { time: '02:49', label: 'Admin Compliance', icon: '🛡️' },
-            ].map((ch, idx) => (
-              <div
-                key={idx}
-                style={{
-                  padding: '10px 8px',
-                  background: 'var(--color-surface-alt, #FAF8F5)',
-                  borderRadius: 'var(--radius-md, 8px)',
-                  border: '1px solid var(--color-border)',
-                  fontSize: 'var(--text-xs)',
-                }}
-              >
-                <div style={{ fontSize: '1rem', marginBottom: 2 }}>{ch.icon}</div>
-                <div style={{ fontWeight: 700, color: 'var(--color-brand)' }}>{ch.time}</div>
-                <div style={{ color: 'var(--color-text-secondary)', marginTop: 2, fontSize: '0.75rem' }}>{ch.label}</div>
+            {/* Chapters Header Bar */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 12,
+              padding: '0 2px',
+              flexWrap: 'wrap',
+              gap: 10,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color: 'var(--color-brand, #E05A00)',
+                  background: 'var(--color-brand-50, #FFF3EB)',
+                  padding: '3px 8px',
+                  borderRadius: 6,
+                  border: '1px solid var(--color-brand-100, #FFD4B3)',
+                }}>
+                  Chapters • 8 Steps
+                </span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                  Click any card to jump directly to that chapter
+                </span>
               </div>
-            ))}
+
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                fontSize: '0.78rem',
+                color: 'var(--color-text-secondary)',
+                background: 'var(--color-surface, #FFFFFF)',
+                padding: '4px 12px',
+                borderRadius: 20,
+                border: '1px solid var(--color-border)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+              }}>
+                <span style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: '#22c55e',
+                  boxShadow: '0 0 0 3px rgba(34, 197, 94, 0.2)',
+                  display: 'inline-block',
+                }} />
+                <span>Now: <strong style={{ color: 'var(--color-text-primary)' }}>{VIDEO_CHAPTERS[activeChapter]?.label}</strong> ({VIDEO_CHAPTERS[activeChapter]?.time})</span>
+              </div>
+            </div>
+
+            {/* Systematic 4x2 / 2x4 Cards Grid */}
+            <div className="video-chapters-grid">
+              {VIDEO_CHAPTERS.map((ch, idx) => {
+                const isActive = activeChapter === idx
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleChapterClick(ch.seconds, idx)}
+                    className="chapter-card-btn"
+                    style={{
+                      padding: '12px 14px',
+                      background: isActive ? 'var(--color-brand-50, #FFF3EB)' : 'var(--color-surface, #FFFFFF)',
+                      borderRadius: 'var(--radius-md, 12px)',
+                      border: isActive ? '2px solid var(--color-brand, #E05A00)' : '1px solid var(--color-border)',
+                      boxShadow: isActive ? '0 4px 16px rgba(224, 90, 0, 0.16)' : '0 1px 3px rgba(0, 0, 0, 0.03)',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: 6,
+                      position: 'relative',
+                      outline: 'none',
+                      minHeight: 104,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                      <span style={{
+                        fontSize: '0.66rem',
+                        fontWeight: 800,
+                        letterSpacing: '0.04em',
+                        color: isActive ? 'var(--color-brand, #E05A00)' : 'var(--color-text-muted)',
+                        background: isActive ? 'rgba(224, 90, 0, 0.12)' : 'var(--color-surface-alt, #F1F5F9)',
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                      }}>
+                        STEP {ch.step}
+                      </span>
+                      <span style={{
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        fontFamily: 'monospace',
+                        color: isActive ? 'var(--color-brand, #E05A00)' : 'var(--color-text-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 3,
+                      }}>
+                        ▶ {ch.time}
+                      </span>
+                    </div>
+
+                    <div style={{
+                      fontWeight: 700,
+                      fontSize: '0.84rem',
+                      color: isActive ? 'var(--color-brand, #E05A00)' : 'var(--color-text-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      lineHeight: 1.25,
+                    }}>
+                      <span style={{ fontSize: '1rem', lineHeight: 1 }}>{ch.icon}</span>
+                      <span>{ch.label}</span>
+                    </div>
+
+                    <div style={{
+                      fontSize: '0.71rem',
+                      color: 'var(--color-text-muted)',
+                      lineHeight: 1.35,
+                      marginTop: 2,
+                    }}>
+                      {ch.desc}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
       </section>
