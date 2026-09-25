@@ -11,6 +11,11 @@
     "lint": "oxlint src"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.6.9",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
     "@react-three/xr": "^6.6.30",
@@ -32,6 +37,7 @@
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "oxlint": "^0.16.6",
+    "typescript": "~5.4.5",
     "vite": "^5.4.19"
   }
 }

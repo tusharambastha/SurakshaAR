@@ -542,7 +542,7 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                     }}
                   >
                     <img
-                      src={`${import.meta.env.BASE_URL}images/surakshaar-emblem.png`}
+                      src={`${import.meta.env.BASE_URL}logo.png`}
                       alt="SurakshaAR"
                       style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                     />
@@ -844,7 +844,7 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                   }}
                 >
                   <img
-                    src={`${import.meta.env.BASE_URL}images/surakshaar-emblem.png`}
+                    src={`${import.meta.env.BASE_URL}logo.png`}
                     alt="SurakshaAR"
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                   />

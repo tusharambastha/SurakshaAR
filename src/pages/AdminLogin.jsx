@@ -56,9 +56,9 @@ export default function AdminLogin() {
         display: 'flex', alignItems: 'center', gap: 10,
       }}>
         <img
-          src={`${import.meta.env.BASE_URL}images/surakshaar-emblem.png`}
-          alt="SurakshaAR"
-          style={{ height: 26, width: 'auto', objectFit: 'contain' }}
+          src={`${import.meta.env.BASE_URL}logo.png`}
+          alt="Suraksha AR"
+          style={{ height: 30, width: 'auto', objectFit: 'contain' }}
         />
         <span style={{ color: 'white', fontWeight: 800, fontSize: '1.1rem' }}>SurakshaAR</span>
         <span className="badge badge-brand" style={{ marginLeft: 8 }}>ADMIN PORTAL</span>

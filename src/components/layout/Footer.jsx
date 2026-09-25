@@ -103,12 +103,12 @@ export function Footer() {
           <div style={{ maxWidth: 360, minWidth: 260, flex: '1 1 280px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <img
-                src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
-                alt="SurakshaAR Logo"
-                style={{ height: 32, width: 'auto', objectFit: 'contain' }}
+                src={`${import.meta.env.BASE_URL}logo.png`}
+                alt="Suraksha AR Logo"
+                style={{ height: 36, width: 'auto', objectFit: 'contain' }}
                 onError={(e) => { e.currentTarget.style.display = 'none' }}
               />
-              <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--color-text-primary)', letterSpacing: '0.02em' }}>
+              <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--color-text-primary)', letterSpacing: '0.02em' }}>
                 Suraksha<span style={{ color: 'var(--color-brand)' }}>AR</span>
               </span>
             </div>

@@ -82,8 +82,8 @@ export default function Verify() {
         padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 10,
       }}>
         <img
-          src={`${import.meta.env.BASE_URL}images/surakshaar-emblem.png`}
-          alt="SurakshaAR"
+          src={`${import.meta.env.BASE_URL}logo.png`}
+          alt="Suraksha AR"
           style={{ width: 36, height: 36, objectFit: 'contain' }}
         />
         <div>
