@@ -88,7 +88,7 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <Navbar />
-      <main style={{ paddingTop: 'calc(var(--navbar-height) + 24px)', paddingBottom: 48 }}>
+      <main style={{ paddingTop: 'calc(var(--total-navbar-height, var(--navbar-height)) + 20px)', paddingBottom: 'calc(84px + env(safe-area-inset-bottom, 0px))' }}>
         <div className="page-container">
           <div style={{ marginBottom: 28 }}>
             <h1 style={{ fontSize: 'var(--text-2xl)', marginBottom: 4 }}>{getGreeting(firstName, T)}</h1>

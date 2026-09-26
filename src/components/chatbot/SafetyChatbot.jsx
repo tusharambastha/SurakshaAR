@@ -619,8 +619,8 @@ export default function SafetyChatbot() {
           onKeyDown={(e) => { if (e.key === 'Enter') handleOpen() }}
           style={{
             position: 'fixed',
-            bottom: 88,
-            right: 24,
+            bottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
+            right: 'max(24px, env(safe-area-inset-right, 0px))',
             maxWidth: 'calc(100vw - 48px)',
             background: 'var(--color-surface)',
             border: '1.5px solid rgba(224, 90, 0, 0.35)',
@@ -685,7 +685,9 @@ export default function SafetyChatbot() {
         onClick={open ? handleClose : handleOpen}
         aria-label="Suraksha Mitra AI Assistant"
         style={{
-          position: 'fixed', bottom: 24, right: 24,
+          position: 'fixed',
+          bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+          right: 'max(24px, env(safe-area-inset-right, 0px))',
           width: 56, height: 56, borderRadius: '50%',
           background: open ? 'var(--color-text-secondary)' : 'var(--color-brand)',
           border: 'none', cursor: 'pointer',

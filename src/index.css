@@ -108,8 +108,11 @@
   --transition-base: 200ms ease;
   --transition-slow: 350ms ease;
 
-  /* Navbar height */
-  --navbar-height: 60px;
+  /* Navbar height & Safe Area Insets */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --navbar-height: calc(60px + var(--safe-top));
+  --total-navbar-height: var(--navbar-height);
 
   /* Z-index layers */
   --z-dropdown: 100;
@@ -251,8 +254,10 @@ input, textarea, select { font-family: inherit; }
 }
 
 .main-content {
-  padding-top: var(--navbar-height);
+  padding-top: var(--total-navbar-height);
+  padding-bottom: calc(var(--space-10) + var(--safe-bottom));
   min-height: 100vh;
+  box-sizing: border-box;
 }
 
 /* ── Card ── */
@@ -573,7 +578,7 @@ input, textarea, select { font-family: inherit; }
 /* ── Offline Banner ── */
 .offline-banner {
   position: fixed;
-  top: var(--navbar-height);
+  top: var(--total-navbar-height);
   left: 0;
   right: 0;
   z-index: var(--z-toast);
@@ -591,7 +596,7 @@ input, textarea, select { font-family: inherit; }
 
 .sync-banner {
   position: fixed;
-  top: var(--navbar-height);
+  top: var(--total-navbar-height);
   left: 0;
   right: 0;
   z-index: var(--z-toast);
@@ -1037,7 +1042,7 @@ tr:hover td { background: var(--color-bg); }
 @media (max-width: 640px) {
   .notif-dropdown {
     position: fixed;
-    top: calc(var(--navbar-height) + 8px);
+    top: calc(var(--total-navbar-height) + 8px);
     left: 12px;
     right: 12px;
     width: auto;
