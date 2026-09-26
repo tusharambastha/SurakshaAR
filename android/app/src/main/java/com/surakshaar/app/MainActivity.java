@@ -11,10 +11,7 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
-import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 import java.util.Locale;
@@ -31,7 +28,7 @@ public class MainActivity extends BridgeActivity {
         // Ensure system status bar & navigation bar are styled and do NOT overlap app content
         Window window = getWindow();
         WindowCompat.setDecorFitsSystemWindows(window, true);
-        window.setStatusBarColor(Color.parseColor("#F7F5F1"));
+        window.setStatusBarColor(Color.parseColor("#FFFFFF"));
         window.setNavigationBarColor(Color.parseColor("#F7F5F1"));
 
         WindowInsetsControllerCompat insetsController =
@@ -39,15 +36,6 @@ public class MainActivity extends BridgeActivity {
         if (insetsController != null) {
             insetsController.setAppearanceLightStatusBars(true);
             insetsController.setAppearanceLightNavigationBars(true);
-        }
-
-        View rootContentView = findViewById(android.R.id.content);
-        if (rootContentView != null) {
-            ViewCompat.setOnApplyWindowInsetsListener(rootContentView, (v, insets) -> {
-                Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-                v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-                return insets;
-            });
         }
 
         // Initialize Android Hardware TextToSpeech

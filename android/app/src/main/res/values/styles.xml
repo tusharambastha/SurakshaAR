@@ -14,7 +14,7 @@
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
         <item name="android:fitsSystemWindows">true</item>
-        <item name="android:statusBarColor">#F7F5F1</item>
+        <item name="android:statusBarColor">#FFFFFF</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:navigationBarColor">#F7F5F1</item>
         <item name="android:windowLightNavigationBar">true</item>

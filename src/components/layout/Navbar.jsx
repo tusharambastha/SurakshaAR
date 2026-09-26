@@ -410,14 +410,13 @@ export function Navbar() {
           position: 'fixed',
           top: 0, left: 0, right: 0,
           height: 'var(--navbar-height)',
-          paddingTop: 'var(--safe-top, 0px)',
           background: 'var(--color-surface)',
           borderBottom: '1px solid var(--color-border)',
           boxShadow: 'var(--shadow-sm)',
           zIndex: 'var(--z-dropdown)',
           display: 'flex',
           alignItems: 'center',
-          padding: '0 clamp(16px, 4vw, 20px)',
+          padding: '0 clamp(12px, 3vw, 20px)',
           boxSizing: 'border-box',
           transition: 'background var(--transition-fast), border-color var(--transition-fast)',
         }}
@@ -469,7 +468,7 @@ export function Navbar() {
               <img
                 src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
                 alt="SurakshaAR"
-                style={{ height: 'clamp(28px, 5.5vw, 36px)', maxWidth: '100%', width: 'auto', objectFit: 'contain', display: 'block' }}
+                style={{ height: 38, maxWidth: '100%', width: 'auto', objectFit: 'contain', display: 'block' }}
               />
               {isAdmin && (
                 <span className="badge badge-brand" style={{ fontSize: '0.65rem', marginLeft: 4 }}>ADMIN</span>

@@ -88,7 +88,7 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <Navbar />
-      <main style={{ paddingTop: 'calc(var(--total-navbar-height, var(--navbar-height)) + 20px)', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', width: '100%', boxSizing: 'border-box' }}>
+      <main style={{ paddingTop: 'calc(var(--navbar-height) + 16px)', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', width: '100%', boxSizing: 'border-box' }}>
         <div className="page-container">
           <div style={{ marginBottom: 24 }}>
             <h1 style={{ fontSize: 'clamp(1.5rem, 5vw, var(--text-2xl))', marginBottom: 4 }}>{getGreeting(firstName, T)}</h1>
@@ -97,7 +97,7 @@ export default function Dashboard() {
             </p>
           </div>
 
-          {/* Stats — 100% width 1 column on mobile, 4 on desktop */}
+          {/* Stats — 2 columns on mobile, 4 on desktop */}
           <div className="dashboard-stats-grid">
             <StatCard icon={<Trophy size={20} style={{ color: 'var(--color-brand)' }} />}
               label={T('safetyReadiness')}
