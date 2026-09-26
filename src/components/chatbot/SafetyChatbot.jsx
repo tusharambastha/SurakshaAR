@@ -619,9 +619,9 @@ export default function SafetyChatbot() {
           onKeyDown={(e) => { if (e.key === 'Enter') handleOpen() }}
           style={{
             position: 'fixed',
-            bottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
-            right: 'max(24px, env(safe-area-inset-right, 0px))',
-            maxWidth: 'calc(100vw - 48px)',
+            bottom: 'calc(82px + env(safe-area-inset-bottom, 0px))',
+            right: 'max(18px, env(safe-area-inset-right, 0px))',
+            maxWidth: 'calc(100vw - 36px)',
             background: 'var(--color-surface)',
             border: '1.5px solid rgba(224, 90, 0, 0.35)',
             borderRadius: '16px 16px 4px 16px',
@@ -686,9 +686,9 @@ export default function SafetyChatbot() {
         aria-label="Suraksha Mitra AI Assistant"
         style={{
           position: 'fixed',
-          bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
-          right: 'max(24px, env(safe-area-inset-right, 0px))',
-          width: 56, height: 56, borderRadius: '50%',
+          bottom: 'calc(18px + env(safe-area-inset-bottom, 0px))',
+          right: 'max(18px, env(safe-area-inset-right, 0px))',
+          width: 58, height: 58, borderRadius: '50%',
           background: open ? 'var(--color-text-secondary)' : 'var(--color-brand)',
           border: 'none', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -708,7 +708,9 @@ export default function SafetyChatbot() {
           aria-label="Suraksha Mitra AI Assistant"
           className="suraksha-chat-window"
           style={{
-            position: 'fixed', bottom: 92, right: 24,
+            position: 'fixed',
+            bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))',
+            right: 'max(16px, env(safe-area-inset-right, 0px))',
             width: 'min(420px, calc(100vw - 32px))',
             height: 'min(580px, calc(100vh - 110px))',
             background: 'var(--color-surface)',

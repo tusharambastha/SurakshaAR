@@ -417,8 +417,7 @@ export function Navbar() {
           zIndex: 'var(--z-dropdown)',
           display: 'flex',
           alignItems: 'center',
-          paddingLeft: 'max(12px, env(safe-area-inset-left, 0px))',
-          paddingRight: 'max(12px, env(safe-area-inset-right, 0px))',
+          padding: '0 clamp(16px, 4vw, 20px)',
           boxSizing: 'border-box',
           transition: 'background var(--transition-fast), border-color var(--transition-fast)',
         }}
@@ -432,7 +431,7 @@ export function Navbar() {
           justifyContent: 'space-between',
         }}>
           {/* Left: Hamburger Button + Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px, 2vw, 12px)' }}>
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
@@ -470,7 +469,7 @@ export function Navbar() {
               <img
                 src={`${import.meta.env.BASE_URL}images/surakshaar-logo.png`}
                 alt="SurakshaAR"
-                style={{ height: 38, width: 'auto', objectFit: 'contain', display: 'block' }}
+                style={{ height: 'clamp(28px, 5.5vw, 36px)', maxWidth: '100%', width: 'auto', objectFit: 'contain', display: 'block' }}
               />
               {isAdmin && (
                 <span className="badge badge-brand" style={{ fontSize: '0.65rem', marginLeft: 4 }}>ADMIN</span>
@@ -479,7 +478,7 @@ export function Navbar() {
           </div>
 
           {/* Right: Offline status + Notifications Bell + Profile / Login */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'clamp(6px, 1.8vw, 10px)' }}>
             {/* Offline badge */}
             {!isOnline && (
               <div
@@ -505,6 +504,7 @@ export function Navbar() {
             {/* 🛡️ Safety Tips Icon (Navigates directly to dedicated /safety-tips page in same tab) */}
             <button
               type="button"
+              className="hide-on-compact"
               onClick={() => {
                 setNotifOpen(false)
                 setProfileDropOpen(false)
@@ -719,6 +719,7 @@ export function Navbar() {
               <div style={{ position: 'relative' }} ref={profileDropRef}>
                 <button
                   type="button"
+                  className="profile-btn-pill"
                   onClick={() => {
                     setProfileDropOpen(o => !o)
                     setNotifOpen(false)
@@ -740,14 +741,20 @@ export function Navbar() {
                   }}
                 >
                   <UserAvatar user={user} profile={profile} size={26} />
-                  <span style={{
-                    fontSize: 'var(--text-sm)', fontWeight: 600,
-                    color: 'var(--color-text-primary)',
-                    maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
+                  <span
+                    className="profile-name-text"
+                    style={{
+                      fontSize: 'var(--text-sm)', fontWeight: 600,
+                      color: 'var(--color-text-primary)',
+                      maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}
+                  >
                     {firstName}
                   </span>
-                  <ChevronDown size={13} color="var(--color-text-muted)"
+                  <ChevronDown
+                    size={13}
+                    color="var(--color-text-muted)"
+                    className="profile-chevron"
                     style={{ transform: profileDropOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
                   />
                 </button>

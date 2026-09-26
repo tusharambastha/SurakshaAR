@@ -88,17 +88,17 @@ export default function Dashboard() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <Navbar />
-      <main style={{ paddingTop: 'calc(var(--total-navbar-height, var(--navbar-height)) + 20px)', paddingBottom: 'calc(84px + env(safe-area-inset-bottom, 0px))' }}>
+      <main style={{ paddingTop: 'calc(var(--total-navbar-height, var(--navbar-height)) + 20px)', paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))', width: '100%', boxSizing: 'border-box' }}>
         <div className="page-container">
-          <div style={{ marginBottom: 28 }}>
-            <h1 style={{ fontSize: 'var(--text-2xl)', marginBottom: 4 }}>{getGreeting(firstName, T)}</h1>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
+          <div style={{ marginBottom: 24 }}>
+            <h1 style={{ fontSize: 'clamp(1.5rem, 5vw, var(--text-2xl))', marginBottom: 4 }}>{getGreeting(firstName, T)}</h1>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', margin: 0 }}>
               Continue your safety training. Stay prepared, stay safe.
             </p>
           </div>
 
-          {/* Stats */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 16, marginBottom: 36 }}>
+          {/* Stats — 100% width 1 column on mobile, 4 on desktop */}
+          <div className="dashboard-stats-grid">
             <StatCard icon={<Trophy size={20} style={{ color: 'var(--color-brand)' }} />}
               label={T('safetyReadiness')}
               value={avgScore !== null ? `${avgScore} pts` : '—'}
@@ -121,21 +121,7 @@ export default function Dashboard() {
           </div>
 
           {/* How to Use / Video Tutorial Banner */}
-          <div
-            style={{
-              background: 'linear-gradient(135deg, var(--color-brand-50, #FFF3EB) 0%, var(--color-surface, #FFFFFF) 100%)',
-              border: '1.5px solid var(--color-brand-100, #FFE6D5)',
-              borderRadius: 'var(--radius-lg, 16px)',
-              padding: '16px 20px',
-              marginBottom: 32,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              flexWrap: 'wrap',
-              gap: 16,
-              boxShadow: '0 2px 8px rgba(224, 90, 0, 0.06)',
-            }}
-          >
+          <div className="dashboard-how-to-use-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <div
                 style={{
@@ -164,29 +150,20 @@ export default function Dashboard() {
             </div>
 
             <button
-              className="btn btn-primary"
+              className="btn btn-primary dashboard-how-to-use-btn"
               onClick={() => setShowVideoTutorial(true)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 18px',
-                fontSize: 'var(--text-sm)',
-                fontWeight: 700,
-                borderRadius: 'var(--radius-md, 10px)',
-              }}
             >
               <PlayCircle size={17} /> {T('watchTutorial') || 'Watch Video Guide'}
             </button>
           </div>
 
-          {/* Modules */}
+          {/* Modules — 100% width 1 column on mobile, auto-fill on desktop */}
           <section style={{ marginBottom: 40 }}>
             <h2 className="section-title" style={{ marginBottom: 4 }}>{T('trainingModules')}</h2>
             <p className="section-subtitle" style={{ marginBottom: 20 }}>{T('selectModuleSubtitle')}</p>
 
             {loadingS ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+              <div className="dashboard-modules-grid">
                 {[0,1,2].map(i => <div key={i} className="card skeleton" style={{ height: 220 }} />)}
               </div>
             ) : !scenarios?.length ? (
@@ -194,7 +171,7 @@ export default function Dashboard() {
                 <AlertTriangle size={16} />{T('noScenariosYet')}
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+              <div className="dashboard-modules-grid">
                 {[...scenarios]
                   .sort((a, b) => {
                     const idxA = SCENARIO_ORDER.indexOf(a.id)
