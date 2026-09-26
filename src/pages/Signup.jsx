@@ -17,7 +17,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LanguageContext'
 import { SUPPORTED_LANGUAGES } from '../lib/i18n'
 import { supabase, isSupabaseConfigured, friendlyAuthError } from '../lib/supabase'
-import { mockSignUp, mockSignIn, mockUpdateProfile } from '../lib/mockDb'
+import { mockSignUp } from '../lib/mockDb'
 import GoogleAccountModal from '../components/auth/GoogleAccountModal'
 import { Navbar } from '../components/layout/Navbar'
 import {
@@ -29,7 +29,7 @@ import {
 import { sendEmailOtp } from '../lib/emailService'
 
 export default function Signup() {
-  const { user, profile, refreshProfile, loading: authLoading } = useAuth()
+  const { user, profile, refreshProfile, loginWithGoogle, loading: authLoading } = useAuth()
   const { T } = useLang()
   const navigate = useNavigate()
   const otpInputId = useId()
@@ -204,22 +204,20 @@ export default function Signup() {
     setError('')
     try {
       const cleanEmail = accEmail.trim().toLowerCase()
-      const { data, error: err } = await mockSignUp({
+      const res = await loginWithGoogle({
         email: cleanEmail,
-        password: 'GoogleUser@123',
         fullName: name,
-        language: prefLang,
         avatarUrl: avatarUrl || null,
+        language: prefLang || 'en',
       })
-      if (err && err.message.includes('already')) {
-        const { data: signData } = await mockSignIn({ email: cleanEmail, password: 'GoogleUser@123' })
-        if (signData?.session?.userId && avatarUrl) {
-          await mockUpdateProfile(signData.session.userId, { avatar_url: avatarUrl })
-        }
+      if (res?.error) {
+        setError(res.error.message || 'Google Sign-in failed. Please try again.')
+        setLoading(false)
+        return
       }
-      await refreshProfile()
       navigate('/dashboard', { replace: true })
-    } catch {
+    } catch (e) {
+      console.error('[Google Sign-in error]', e)
       setError('Google Sign-in failed. Please try again.')
     } finally {
       setLoading(false)

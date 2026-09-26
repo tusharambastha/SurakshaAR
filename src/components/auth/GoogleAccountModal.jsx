@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react'
-import { X, UserPlus, ArrowLeft, Check, Clock, Bell, Trash2 } from 'lucide-react'
+import { X, UserPlus, ArrowLeft, Check, Clock, Trash2, Zap } from 'lucide-react'
 import { getGooglePresetAvatar } from '../../data/googleAvatars'
 
 const STORAGE_KEY = 'suraksha_device_google_accounts'
+
+const DEMO_ACCOUNT = {
+  name: 'Trainee Demo',
+  email: 'trainee@surakshaar.demo',
+  avatar: getGooglePresetAvatar('trainee@surakshaar.demo', 'Trainee Demo'),
+}
 
 export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount }) {
   // Saved Google accounts ONLY for this specific device
@@ -24,7 +30,6 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
       const raw = localStorage.getItem(STORAGE_KEY)
       const accounts = raw ? JSON.parse(raw) : []
       setSavedAccounts(accounts)
-      // If no accounts on this device, directly show clean input form
       if (!accounts || accounts.length === 0) {
         setShowInputForm(true)
       } else {
@@ -38,6 +43,8 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
     setIsVerifying(false)
     setVerifyStep(0)
     setFormError('')
+    setEmailInput('')
+    setNameInput('')
   }, [isOpen])
 
   if (!isOpen) return null
@@ -63,13 +70,40 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
     }
   }
 
+  function startVerificationAndSignIn(account) {
+    if (isVerifying) return
+    setSelectedAccount(account)
+    setIsVerifying(true)
+    setVerifyStep(1)
+
+    // Save to this device's storage
+    saveAccountToDevice(account)
+
+    // Crisp, fast, authentic Google OAuth flow (~750ms total)
+    setTimeout(() => {
+      setVerifyStep(2)
+    }, 280)
+
+    setTimeout(() => {
+      setVerifyStep(3)
+    }, 520)
+
+    setTimeout(() => {
+      onSelectAccount({
+        name: account.name,
+        email: account.email,
+        avatarUrl: account.avatar || getGooglePresetAvatar(account.email, account.name),
+      })
+    }, 750)
+  }
+
   function handleFormSubmit(e) {
     e.preventDefault()
     setFormError('')
 
     const cleanEmail = emailInput.trim().toLowerCase()
     if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      setFormError('Please enter a valid Google / Gmail address')
+      setFormError('Please enter a valid Google / Gmail address (e.g. name@gmail.com)')
       return
     }
 
@@ -83,41 +117,7 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
       avatar,
     }
 
-    setSelectedAccount(account)
-    setShowInputForm(false)
-  }
-
-  function handleConfirmSignIn() {
-    if (!selectedAccount || isVerifying) return
-    setIsVerifying(true)
-    setVerifyStep(1)
-
-    // Save to this device's storage
-    saveAccountToDevice(selectedAccount)
-
-    // Step 1: Handshake
-    setTimeout(() => {
-      setVerifyStep(2)
-    }, 700)
-
-    // Step 2: Tokens & Verification
-    setTimeout(() => {
-      setVerifyStep(3)
-    }, 1500)
-
-    // Step 3: Authorization
-    setTimeout(() => {
-      setVerifyStep(4)
-    }, 2300)
-
-    // Step 4: Finish & Redirect
-    setTimeout(() => {
-      onSelectAccount({
-        name: selectedAccount.name,
-        email: selectedAccount.email,
-        avatarUrl: selectedAccount.avatar || getGooglePresetAvatar(selectedAccount.email, selectedAccount.name),
-      })
-    }, 2900)
+    startVerificationAndSignIn(account)
   }
 
   return (
@@ -144,7 +144,7 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
           color: '#E8EAED',
           border: '1px solid #3c4043',
           borderRadius: 24,
-          maxWidth: 580,
+          maxWidth: 480,
           width: '100%',
           maxHeight: '92vh',
           display: 'flex',
@@ -164,13 +164,13 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
             100% { transform: rotate(360deg); }
           }
           .google-spinner-mini {
-            width: 20px;
-            height: 20px;
+            width: 18px;
+            height: 18px;
             border-radius: 50%;
             border: 2.5px solid rgba(66, 133, 244, 0.25);
             border-top-color: #4285F4;
             border-right-color: #EA4335;
-            animation: googleSpin 0.75s linear infinite;
+            animation: googleSpin 0.7s linear infinite;
             flex-shrink: 0;
           }
         `}</style>
@@ -183,7 +183,7 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
               width: '100%',
               background: 'linear-gradient(90deg, #4285F4 0%, #EA4335 25%, #FBBC05 50%, #34A853 75%, #4285F4 100%)',
               backgroundSize: '200% 100%',
-              animation: 'googleBarShift 1.2s linear infinite',
+              animation: 'googleBarShift 1.1s linear infinite',
             }}
           />
         )}
@@ -233,19 +233,19 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
           )}
         </div>
 
-        {/* Modal Content */}
-        <div style={{ padding: isVerifying ? '28px 24px' : '22px 24px', overflowY: 'auto' }}>
+        {/* Modal Body */}
+        <div style={{ padding: isVerifying ? '28px 22px' : '20px 22px', overflowY: 'auto' }}>
           {isVerifying && selectedAccount ? (
-            /* VERIFICATION IN PROGRESS */
-            <div style={{ textAlign: 'center', maxWidth: 480, margin: '0 auto' }}>
-              <div style={{ position: 'relative', width: 84, height: 84, margin: '0 auto 16px' }}>
+            /* FAST VERIFICATION IN PROGRESS */
+            <div style={{ textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
+              <div style={{ position: 'relative', width: 76, height: 76, margin: '0 auto 14px' }}>
                 <div
                   style={{
                     position: 'absolute',
                     inset: -4,
                     borderRadius: '50%',
                     background: 'conic-gradient(#4285F4, #EA4335, #FBBC05, #34A853, #4285F4)',
-                    animation: 'googleSpin 2s linear infinite',
+                    animation: 'googleSpin 1.4s linear infinite',
                     filter: 'blur(3px)',
                     opacity: 0.85,
                   }}
@@ -265,7 +265,7 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                 />
               </div>
 
-              <h3 style={{ fontSize: 19, fontWeight: 600, color: '#FFFFFF', margin: '0 0 4px' }}>
+              <h3 style={{ fontSize: 18, fontWeight: 600, color: '#FFFFFF', margin: '0 0 4px' }}>
                 {selectedAccount.name}
               </h3>
               <div style={{ fontSize: 13, color: '#9AA0A6', marginBottom: 18 }}>
@@ -278,100 +278,59 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                   background: '#1E1F22',
                   border: '1px solid #3C4043',
                   borderRadius: 14,
-                  padding: '16px 18px',
-                  margin: '0 auto 16px',
+                  padding: '14px 16px',
+                  margin: '0 auto 14px',
                   textAlign: 'left',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 12,
+                  gap: 10,
                 }}
               >
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#9AA0A6', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-                  Google OAuth 2.0 Identity Protocol
-                </div>
-
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {verifyStep > 1 ? (
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Check size={11} color="#FFFFFF" strokeWidth={3} />
                       </div>
                     ) : (
                       <div className="google-spinner-mini" />
                     )}
                     <span style={{ fontSize: 13, color: verifyStep >= 1 ? '#E8EAED' : '#9AA0A6' }}>
-                      Secure Identity Handshake
+                      Google Identity Verification
                     </span>
                   </div>
                   <span style={{ fontSize: 11, color: verifyStep > 1 ? '#81C995' : '#8AB4F8', fontWeight: 600 }}>
-                    {verifyStep > 1 ? 'Connected ✓' : 'Connecting...'}
+                    {verifyStep > 1 ? 'Verified ✓' : 'Verifying...'}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {verifyStep > 2 ? (
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                    {verifyStep >= 3 ? (
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Check size={11} color="#FFFFFF" strokeWidth={3} />
                       </div>
                     ) : verifyStep === 2 ? (
                       <div className="google-spinner-mini" />
                     ) : (
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1px solid #5F6368', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', border: '1px solid #5F6368', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Clock size={10} color="#80868B" />
                       </div>
                     )}
                     <span style={{ fontSize: 13, color: verifyStep >= 2 ? '#E8EAED' : '#9AA0A6' }}>
-                      Verifying Account Credentials
+                      Signing into SurakshaAR Portal
                     </span>
                   </div>
-                  <span style={{ fontSize: 11, color: verifyStep > 2 ? '#81C995' : verifyStep === 2 ? '#8AB4F8' : '#80868B', fontWeight: 600 }}>
-                    {verifyStep > 2 ? 'Verified ✓' : verifyStep === 2 ? 'Verifying...' : 'Pending'}
+                  <span style={{ fontSize: 11, color: verifyStep >= 3 ? '#81C995' : verifyStep === 2 ? '#8AB4F8' : '#80868B', fontWeight: 600 }}>
+                    {verifyStep >= 3 ? 'Ready ✓' : verifyStep === 2 ? 'Connecting...' : 'Pending'}
                   </span>
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    {verifyStep >= 4 ? (
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#137333', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Check size={12} color="#FFFFFF" strokeWidth={3} />
-                      </div>
-                    ) : (
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', border: '1px solid #5F6368', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Clock size={10} color="#80868B" />
-                      </div>
-                    )}
-                    <span style={{ fontSize: 13, color: verifyStep >= 4 ? '#E8EAED' : '#9AA0A6' }}>
-                      Authorizing SurakshaAR Portal
-                    </span>
-                  </div>
-                  <span style={{ fontSize: 11, color: verifyStep >= 4 ? '#81C995' : '#80868B', fontWeight: 600 }}>
-                    {verifyStep >= 4 ? 'Authorized ✓' : 'Pending'}
-                  </span>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '8px 14px',
-                  background: 'rgba(66, 133, 244, 0.12)',
-                  border: '1px solid rgba(66, 133, 244, 0.3)',
-                  borderRadius: 18,
-                  fontSize: 12,
-                  color: '#D2E3FC',
-                }}
-              >
-                <Bell size={13} color="#8AB4F8" />
-                <span>Logging into SurakshaAR as {selectedAccount.name}...</span>
               </div>
             </div>
-          ) : !selectedAccount && showInputForm ? (
-            /* ENTER GOOGLE ACCOUNT FORM (Always clean & privacy-safe for each person) */
-            <div style={{ maxWidth: 440, margin: '0 auto' }}>
-              <div style={{ marginBottom: 20 }}>
+          ) : showInputForm ? (
+            /* CLEAN INPUT FORM */
+            <div style={{ maxWidth: 420, margin: '0 auto' }}>
+              <div style={{ marginBottom: 16 }}>
                 {savedAccounts.length > 0 && (
                   <button
                     type="button"
@@ -386,24 +345,85 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                       gap: 4,
                       fontSize: 13,
                       padding: 0,
-                      marginBottom: 12,
+                      marginBottom: 10,
                     }}
                   >
                     <ArrowLeft size={14} /> Back to saved accounts
                   </button>
                 )}
-                <h2 style={{ fontSize: 24, fontWeight: 500, margin: '0 0 6px', color: '#FFFFFF' }}>
+                <h2 style={{ fontSize: 22, fontWeight: 500, margin: '0 0 6px', color: '#FFFFFF' }}>
                   Use your Google Account
                 </h2>
                 <p style={{ margin: 0, fontSize: 13, color: '#9AA0A6' }}>
-                  Enter your Google / Gmail details to continue to <strong style={{ color: '#FFFFFF' }}>SurakshaAR</strong>
+                  Sign in instantly with your Google / Gmail account
                 </p>
               </div>
 
-              <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* 1-Tap Quick Demo Button */}
+              <button
+                type="button"
+                onClick={() => startVerificationAndSignIn(DEMO_ACCOUNT)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  background: 'rgba(66, 133, 244, 0.12)',
+                  border: '1.5px solid rgba(66, 133, 244, 0.4)',
+                  borderRadius: 12,
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  marginBottom: 16,
+                  textAlign: 'left',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
+                      background: '#4285F4',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Zap size={16} color="#FFFFFF" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#D2E3FC' }}>
+                      ⚡ 1-Tap Instant Sign-In
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9AA0A6' }}>
+                      trainee@surakshaar.demo (No typing needed)
+                    </div>
+                  </div>
+                </div>
+                <span style={{ fontSize: 12, color: '#8AB4F8', fontWeight: 600 }}>Use →</span>
+              </button>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  margin: '12px 0 16px',
+                  color: '#80868B',
+                  fontSize: 12,
+                }}
+              >
+                <div style={{ flex: 1, height: 1, background: '#3C4043' }} />
+                <span>or enter your Google email</span>
+                <div style={{ flex: 1, height: 1, background: '#3C4043' }} />
+              </div>
+
+              <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 13, color: '#BDC1C6', marginBottom: 6, fontWeight: 500 }}>
-                    Email or phone *
+                    Google / Gmail Address *
                   </label>
                   <input
                     type="email"
@@ -428,7 +448,7 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
 
                 <div>
                   <label style={{ display: 'block', fontSize: 13, color: '#BDC1C6', marginBottom: 6, fontWeight: 500 }}>
-                    Full Name (as on your certificate)
+                    Full Name (optional)
                   </label>
                   <input
                     type="text"
@@ -453,7 +473,7 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                   <div style={{ fontSize: 12, color: '#F28B82' }}>{formError}</div>
                 )}
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
                   <button
                     type="button"
                     onClick={onClose}
@@ -475,23 +495,23 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                       background: '#8AB4F8',
                       color: '#131314',
                       border: 'none',
-                      padding: '10px 24px',
+                      padding: '10px 22px',
                       borderRadius: 20,
                       fontWeight: 600,
-                      fontSize: 14,
+                      fontSize: 13,
                       cursor: 'pointer',
                     }}
                   >
-                    Continue
+                    Sign in with Google
                   </button>
                 </div>
               </form>
             </div>
-          ) : !selectedAccount && savedAccounts.length > 0 ? (
-            /* SAVED ACCOUNTS ON THIS SPECIFIC PHONE (Zero hardcoded data) */
-            <div style={{ maxWidth: 480, margin: '0 auto' }}>
-              <div style={{ marginBottom: 18 }}>
-                <h2 style={{ fontSize: 24, fontWeight: 500, margin: '0 0 6px', color: '#FFFFFF' }}>
+          ) : (
+            /* SAVED ACCOUNTS ON THIS PHONE (1-Tap to sign in) */
+            <div style={{ maxWidth: 440, margin: '0 auto' }}>
+              <div style={{ marginBottom: 16 }}>
+                <h2 style={{ fontSize: 22, fontWeight: 500, margin: '0 0 4px', color: '#FFFFFF' }}>
                   Choose an account
                 </h2>
                 <p style={{ margin: 0, fontSize: 13, color: '#9AA0A6' }}>
@@ -499,11 +519,11 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                 </p>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
                 {savedAccounts.map((acc) => (
                   <div
                     key={acc.email}
-                    onClick={() => setSelectedAccount(acc)}
+                    onClick={() => startVerificationAndSignIn(acc)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -513,10 +533,10 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                       borderRadius: 12,
                       background: '#1F1F23',
                       border: '1px solid #3C4043',
-                      transition: 'background 0.15s ease',
+                      transition: 'all 0.15s ease',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                       <img
                         src={acc.avatar || getGooglePresetAvatar(acc.email, acc.name)}
                         alt={acc.name}
@@ -528,11 +548,11 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                           flexShrink: 0,
                         }}
                       />
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#FFFFFF' }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#FFFFFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {acc.name}
                         </div>
-                        <div style={{ fontSize: 12, color: '#9AA0A6' }}>
+                        <div style={{ fontSize: 12, color: '#9AA0A6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {acc.email}
                         </div>
                       </div>
@@ -541,7 +561,7 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                     <button
                       type="button"
                       onClick={(e) => removeAccountFromDevice(e, acc.email)}
-                      title="Remove from device"
+                      title="Remove from this phone"
                       style={{
                         background: 'transparent',
                         border: 'none',
@@ -552,6 +572,7 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        flexShrink: 0,
                       }}
                     >
                       <Trash2 size={15} />
@@ -559,19 +580,59 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                   </div>
                 ))}
 
-                {/* Use another account option */}
+                {/* 1-Tap Quick Demo Account */}
+                <div
+                  onClick={() => startVerificationAndSignIn(DEMO_ACCOUNT)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 14px',
+                    cursor: 'pointer',
+                    borderRadius: 12,
+                    background: 'rgba(66, 133, 244, 0.08)',
+                    border: '1px solid rgba(66, 133, 244, 0.3)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: '#4285F4',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#FFFFFF',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Zap size={16} />
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: '#D2E3FC' }}>
+                      ⚡ Quick 1-Tap Demo Account
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9AA0A6' }}>
+                      trainee@surakshaar.demo
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 12, color: '#8AB4F8', fontWeight: 600 }}>Login →</span>
+                </div>
+
+                {/* Use another account */}
                 <div
                   onClick={() => setShowInputForm(true)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 12,
-                    padding: '12px 14px',
+                    padding: '10px 14px',
                     cursor: 'pointer',
                     borderRadius: 12,
                     background: 'transparent',
                     border: '1px dashed #5F6368',
-                    marginTop: 6,
+                    marginTop: 4,
                   }}
                 >
                   <div
@@ -589,91 +650,13 @@ export default function GoogleAccountModal({ isOpen, onClose, onSelectAccount })
                   >
                     <UserPlus size={16} />
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: '#8AB4F8' }}>
-                    Use another account
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#8AB4F8' }}>
+                    Use another Google account
                   </div>
                 </div>
               </div>
             </div>
-          ) : selectedAccount ? (
-            /* CONFIRM SIGN-IN DIALOG */
-            <div style={{ maxWidth: 460, margin: '0 auto' }}>
-              <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                <img
-                  src={selectedAccount.avatar || getGooglePresetAvatar(selectedAccount.email, selectedAccount.name)}
-                  alt={selectedAccount.name}
-                  style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                    margin: '0 auto 12px',
-                    border: '2px solid #8AB4F8',
-                  }}
-                />
-                <h3 style={{ fontSize: 18, fontWeight: 600, color: '#FFFFFF', margin: '0 0 4px' }}>
-                  Continue as {selectedAccount.name}
-                </h3>
-                <div style={{ fontSize: 13, color: '#9AA0A6' }}>
-                  {selectedAccount.email}
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background: '#1F1F23',
-                  borderRadius: 12,
-                  padding: 14,
-                  fontSize: 12,
-                  color: '#9AA0A6',
-                  lineHeight: 1.5,
-                  marginBottom: 20,
-                  border: '1px solid #3C4043',
-                }}
-              >
-                Google will share your name, email address, and profile details with{' '}
-                <strong style={{ color: '#FFFFFF' }}>SurakshaAR</strong> to authenticate your safety training session.
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedAccount(null)}
-                  style={{
-                    padding: '9px 20px',
-                    borderRadius: 20,
-                    background: 'transparent',
-                    border: '1px solid #5F6368',
-                    color: '#E8EAED',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Back
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleConfirmSignIn}
-                  style={{
-                    padding: '9px 24px',
-                    borderRadius: 20,
-                    background: '#8AB4F8',
-                    color: '#131314',
-                    border: 'none',
-                    fontWeight: 600,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
-                >
-                  <Check size={14} /> Continue
-                </button>
-              </div>
-            </div>
-          ) : null}
+          )}
         </div>
       </div>
     </div>

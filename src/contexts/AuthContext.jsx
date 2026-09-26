@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import {
-  mockSignOut, mockGetAuthSession, mockGetProfile,
+  mockSignOut, mockGetAuthSession, mockGetProfile, mockGoogleSignIn,
 } from '../lib/mockDb'
 
 const AuthContext = createContext(null)
@@ -98,8 +98,25 @@ export function AuthProvider({ children }) {
     await fetchProfile(authUser)
   }
 
+  async function loginWithGoogle({ email, fullName, avatarUrl, language = 'en' }) {
+    if (!isSupabaseConfigured) {
+      const res = await mockGoogleSignIn({ email, fullName, avatarUrl, language })
+      if (res.error) return res
+      const session = res.data.session
+      const u = { id: session.userId, email: session.email, role: session.role }
+      setUser(u)
+      setProfile(res.data.profile)
+      return res
+    }
+    const { data: { session } } = await supabase.auth.getSession()
+    const authUser = session?.user ?? null
+    setUser(authUser)
+    await fetchProfile(authUser)
+    return { data: { user: authUser }, error: null }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile, loginWithGoogle }}>
       {children}
     </AuthContext.Provider>
   )

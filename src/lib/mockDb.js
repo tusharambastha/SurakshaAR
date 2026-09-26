@@ -1031,6 +1031,71 @@ export async function mockSignIn({ email, password }) {
   return { data: { user: { id: profile.id, email: profile.email }, session }, error: null }
 }
 
+export async function mockGoogleSignIn({ email, fullName, avatarUrl, language = 'en' }) {
+  await delay(150)
+  const cleanEmail = (email || '').trim().toLowerCase()
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return { data: null, error: { message: 'Invalid Google email address.' } }
+  }
+
+  const profiles = load(PROFILES_KEY, {})
+  let existingProfile = Object.values(profiles).find(
+    p => (p.email || '').toLowerCase() === cleanEmail
+  )
+
+  const presetAvatar = getGooglePresetAvatar(cleanEmail, fullName)
+  const validAvatar = (avatarUrl && typeof avatarUrl === 'string' && !avatarUrl.includes('unavatar.io'))
+    ? avatarUrl
+    : (presetAvatar || null)
+
+  let userId
+  if (existingProfile) {
+    userId = existingProfile.id
+    if (fullName && (!existingProfile.full_name || existingProfile.full_name === 'Trainee' || existingProfile.full_name.includes('@'))) {
+      existingProfile.full_name = fullName
+    }
+    if (validAvatar && !existingProfile.avatar_url) {
+      existingProfile.avatar_url = validAvatar
+    }
+    profiles[userId] = existingProfile
+    save(PROFILES_KEY, profiles)
+  } else {
+    userId = uuid()
+    const autoName = fullName || cleanEmail.split('@')[0].replace(/[._]/g, ' ')
+    const capName = autoName.charAt(0).toUpperCase() + autoName.slice(1)
+    existingProfile = {
+      id: userId,
+      email: cleanEmail,
+      full_name: capName,
+      employee_id: `SAR-${Math.floor(1000 + Math.random() * 9000)}`,
+      department: 'Safety Training',
+      preferred_language: language || 'en',
+      role: 'trainee',
+      avatar_url: validAvatar,
+      created_at: new Date().toISOString(),
+      _password: 'GoogleOAuthUser',
+    }
+    profiles[userId] = existingProfile
+    save(PROFILES_KEY, profiles)
+  }
+
+  const session = {
+    userId: existingProfile.id,
+    email: existingProfile.email,
+    role: existingProfile.role || 'trainee',
+  }
+  save(SESSION_KEY, session)
+
+  return {
+    data: {
+      user: { id: existingProfile.id, email: existingProfile.email },
+      session,
+      profile: existingProfile,
+    },
+    error: null,
+  }
+}
+
 export async function mockSignOut() {
   await delay(200)
   localStorage.removeItem(SESSION_KEY)
