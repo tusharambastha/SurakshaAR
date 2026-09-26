@@ -11,7 +11,10 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Toast;
 import androidx.activity.OnBackPressedCallback;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 import java.util.Locale;
@@ -25,9 +28,9 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Ensure system status bar & navigation bar are styled and do NOT overlap app content
+        // Ensure system status bar & navigation bar are styled and app renders strictly below status bar on all Android 10+ devices
         Window window = getWindow();
-        WindowCompat.setDecorFitsSystemWindows(window, true);
+        WindowCompat.setDecorFitsSystemWindows(window, false);
         window.setStatusBarColor(Color.parseColor("#FFFFFF"));
         window.setNavigationBarColor(Color.parseColor("#F7F5F1"));
 
@@ -36,6 +39,25 @@ public class MainActivity extends BridgeActivity {
         if (insetsController != null) {
             insetsController.setAppearanceLightStatusBars(true);
             insetsController.setAppearanceLightNavigationBars(true);
+        }
+
+        View rootContentView = findViewById(android.R.id.content);
+        if (rootContentView != null) {
+            rootContentView.setBackgroundColor(Color.parseColor("#FFFFFF"));
+            ViewCompat.setOnApplyWindowInsetsListener(rootContentView, (v, insets) -> {
+                Insets systemBars = insets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+                );
+                Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+                boolean imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime());
+                v.setPadding(
+                    systemBars.left,
+                    systemBars.top,
+                    systemBars.right,
+                    imeVisible ? ime.bottom : systemBars.bottom
+                );
+                return insets;
+            });
         }
 
         // Initialize Android Hardware TextToSpeech

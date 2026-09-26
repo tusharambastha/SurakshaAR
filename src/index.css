@@ -109,7 +109,7 @@
   --transition-slow: 350ms ease;
 
   /* Navbar height & Safe Area Insets */
-  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-top: 0px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --navbar-height: 60px;
   --total-navbar-height: var(--navbar-height);
