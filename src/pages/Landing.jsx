@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Camera, CheckCircle, ArrowRight } from 'lucide-react'
+import { Shield, Camera, CheckCircle, ArrowRight, Download } from 'lucide-react'
 import { useLang } from '../contexts/LanguageContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Navbar } from '../components/layout/Navbar'
@@ -185,20 +185,38 @@ export default function Landing() {
           </p>
 
           {/* CTAs */}
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
             <button
               className="btn btn-primary btn-lg"
               onClick={() => navigate('/dashboard')}
-              style={{ fontSize: '1.05rem', padding: '14px 32px' }}
+              style={{ fontSize: '1.05rem', padding: '14px 30px' }}
             >
               <Camera size={20} />
               {T('startARTraining')}
               <ArrowRight size={18} />
             </button>
+            <a
+              href={`${import.meta.env.BASE_URL}SurakshaAR.apk`}
+              download="SurakshaAR.apk"
+              className="btn btn-secondary btn-lg"
+              style={{
+                fontSize: '1.02rem',
+                padding: '14px 24px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                textDecoration: 'none',
+                border: '1.5px solid var(--color-brand, #E05A00)',
+                color: 'var(--color-brand, #E05A00)',
+              }}
+            >
+              <Download size={19} />
+              Download Android APK
+            </a>
             <button
               className="btn btn-secondary btn-lg"
               onClick={() => document.getElementById('how-it-works').scrollIntoView({ behavior: 'smooth' })}
-              style={{ fontSize: '1.05rem', padding: '14px 32px' }}
+              style={{ fontSize: '1.05rem', padding: '14px 26px' }}
             >
               {T('exploreTraining')}
             </button>
@@ -854,17 +872,39 @@ export default function Landing() {
                     Mobile Screen View
                   </span>
                 </div>
-                <span style={{
-                  fontSize: '0.72rem',
-                  fontWeight: 700,
-                  color: 'var(--color-brand, #E05A00)',
-                  background: 'var(--color-brand-50, #FFF3EB)',
-                  border: '1px solid var(--color-brand-100, #FED7AA)',
-                  padding: '3px 9px',
-                  borderRadius: 6,
-                }}>
-                  Live Android AR
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <a
+                    href={`${import.meta.env.BASE_URL}SurakshaAR.apk`}
+                    download="SurakshaAR.apk"
+                    title="Download SurakshaAR Android APK (76 MB)"
+                    style={{
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      color: '#FFFFFF',
+                      background: 'var(--color-brand, #E05A00)',
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      boxShadow: '0 2px 6px rgba(224, 90, 0, 0.3)',
+                    }}
+                  >
+                    <Download size={12} /> Get APK
+                  </a>
+                  <span style={{
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    color: 'var(--color-brand, #E05A00)',
+                    background: 'var(--color-brand-50, #FFF3EB)',
+                    border: '1px solid var(--color-brand-100, #FED7AA)',
+                    padding: '3px 9px',
+                    borderRadius: 6,
+                  }}>
+                    Live Android AR
+                  </span>
+                </div>
               </div>
 
               {/* Smartphone Mockup Chassis */}
