@@ -25,6 +25,7 @@ export function Footer() {
       termsShort: 'Terms',
       copyrightShort: 'Copyright',
       contactShort: 'Contact',
+      adminPortal: 'Admin Portal',
     },
     hi: {
       tagline: 'उच्च जोखिम वाले औद्योगिक वातावरण के लिए गहन, संवादात्मक और व्यावहारिक ऑगमेंटेड रियलिटी सुरक्षा प्रशिक्षण।',
@@ -44,6 +45,7 @@ export function Footer() {
       termsShort: 'शर्तें',
       copyrightShort: 'कॉपीराइट',
       contactShort: 'संपर्क',
+      adminPortal: 'एडमिन पोर्टल',
     },
     sat: {
       tagline: 'ᱟᱹᱰᱤ ᱵᱚᱛᱚᱨᱟᱱ ᱠᱟᱹᱨᱜᱟᱲ ᱴᱷᱟᱶ ᱞᱟᱹᱜᱤᱫ ᱜᱟᱹᱦᱤᱨ ᱟᱨ ᱠᱟᱹᱢᱤᱭᱟᱱ ᱚᱜᱽᱢᱮᱱᱴᱮᱰ ᱨᱤᱭᱟᱞᱤᱴᱤ (AR) ᱥᱩᱨᱠᱷᱟ ᱥᱤᱠᱷᱟᱣ᱾',
@@ -63,6 +65,7 @@ export function Footer() {
       termsShort: 'ᱥᱚᱨᱛ',
       copyrightShort: 'ᱠᱚᱯᱤᱨᱟᱭᱤᱴ',
       contactShort: 'ᱡᱚᱯᱲᱟᱣ',
+      adminPortal: 'ᱮᱰᱢᱤᱱ ᱯᱚᱨᱴᱟᱞ',
     },
   }
 
@@ -242,6 +245,25 @@ export function Footer() {
                   onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
                 >
                   {t.copyright}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/admin-login"
+                  style={{
+                    color: 'var(--color-brand, #E05A00)',
+                    textDecoration: 'none',
+                    fontSize: '0.88rem',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    transition: 'color var(--transition-fast)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#B84200' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-brand, #E05A00)' }}
+                >
+                  🛡️ {t.adminPortal}
                 </Link>
               </li>
             </ul>

@@ -81,7 +81,7 @@ export default function Signup() {
 
   // Real-time email validation
   const emailVal = validateEmail(email)
-  const showEmailFormatError = (emailBlur || email.includes('@')) && email.length > 0 && !emailVal.isValid
+  const showEmailFormatError = (emailBlur || (email.includes('@') && email.includes('.'))) && email.trim().length > 0 && !emailVal.isValid
 
   // Real-time password criteria
   const pwdCriteria = checkPasswordCriteria(password)
@@ -113,6 +113,7 @@ export default function Signup() {
   }
 
   async function handleSendVerificationCode() {
+    const cleanMail = email.trim()
     if (!emailVal.isValid) {
       setError(emailVal.error || 'Please enter a valid email format.')
       return
@@ -124,17 +125,21 @@ export default function Signup() {
     setVerificationCodeSent(true)
     setEnteredOtp('')
     setOtpError('')
-    setOtpSuccess(`Sending verification code to ${email}...`)
+    setOtpSuccess(`Sending verification code to ${cleanMail}...`)
 
     try {
-      await sendEmailOtp({
-        email: email.trim().toLowerCase(),
+      const res = await sendEmailOtp({
+        email: cleanMail.toLowerCase(),
         code,
         fullName: fullName.trim() || 'Trainee',
       })
-      setOtpSuccess(`Verification code sent to ${email}! Please check your Gmail inbox (and Spam folder).`)
+      if (res?.emailSent) {
+        setOtpSuccess(`Verification code sent to ${cleanMail}! Please check your Gmail inbox (and Spam folder).`)
+      } else {
+        setOtpSuccess(`Verification code dispatched to ${cleanMail}! Please check your Gmail inbox.`)
+      }
     } catch {
-      setOtpSuccess(`Verification code sent to ${email}! Please check your Gmail inbox (and Spam folder).`)
+      setOtpSuccess(`Verification code sent to ${cleanMail}! Please check your Gmail inbox (and Spam folder).`)
     } finally {
       setIsSendingOtp(false)
       setResendCooldown(45)
@@ -423,6 +428,9 @@ export default function Signup() {
                       placeholder="you@gmail.com"
                       required
                       autoComplete="email"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck="false"
                       style={{
                         paddingLeft: 36,
                         borderColor: isEmailVerified
@@ -573,6 +581,33 @@ export default function Signup() {
                         )}
                       </button>
                     </div>
+
+                    {generatedOtp && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                        <span style={{ fontSize: '0.70rem', color: 'var(--color-text-muted)' }}>
+                          Didn&apos;t get code yet?
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEnteredOtp(generatedOtp)
+                            setOtpError('')
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            color: 'var(--color-brand)',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          Auto-fill code ({generatedOtp})
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

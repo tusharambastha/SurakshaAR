@@ -10,7 +10,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import {
   Menu, X, Home, LayoutDashboard, Target, Award, Bell,
   PlayCircle, Settings, Globe, Moon, Sun, LogOut,
-  ChevronRight, WifiOff, ShieldCheck, AlertTriangle, Info,
+  ChevronRight, WifiOff, ShieldCheck, Shield, AlertTriangle, Info,
   User, Phone, HelpCircle, Mail, LifeBuoy, ChevronDown,
 } from 'lucide-react'
 import VideoTutorialModal from '../ui/VideoTutorialModal'
@@ -1069,6 +1069,21 @@ export function Navbar() {
               <span>{drawerT.settings}</span>
             </div>
             <ChevronRight size={14} color="var(--color-text-muted)" />
+          </button>
+
+          {/* 🛡️ Admin Portal */}
+          <button
+            type="button"
+            onClick={() => handleNavigate(isAdmin ? '/admin' : '/admin-login')}
+            style={navItemStyle(location.pathname.startsWith('/admin'))}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Shield size={18} color="var(--color-brand, #E05A00)" />
+              <span>{isAdmin ? drawerT.adminDashboard : drawerT.adminPanel}</span>
+            </div>
+            <span className="badge badge-brand" style={{ fontSize: '0.62rem', padding: '2px 6px' }}>
+              ADMIN
+            </span>
           </button>
         </div>
 

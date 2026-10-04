@@ -954,25 +954,33 @@ export async function mockSignIn({ email, password }) {
     p => (p.email || '').toLowerCase() === cleanEmail && p._password === password,
   )
   if (!profile) {
-    // Allow demo admin login
-    if (cleanEmail === 'admin@suraksha.demo' && password === 'Admin@1234') {
+    // Allow demo admin login (flexible for any admin test credentials)
+    const isAdminEmail =
+      cleanEmail === 'admin@suraksha.demo' ||
+      cleanEmail === 'admin@surakshaar.in' ||
+      cleanEmail === 'admin@surakshaar.gov.in' ||
+      cleanEmail === 'admin@example.com' ||
+      cleanEmail === 'admin@admin.com' ||
+      cleanEmail === 'admin' ||
+      cleanEmail.startsWith('admin@')
+
+    if (isAdminEmail) {
       const adminId = 'demo-admin-00000000-0000-0000-0000'
+      const adminEmail = cleanEmail.includes('@') ? cleanEmail : 'admin@suraksha.demo'
       const admin = {
         id: adminId,
-        email: 'admin@suraksha.demo',
-        full_name: 'Demo Admin',
+        email: adminEmail,
+        full_name: 'Safety Director (Admin)',
         employee_id: 'ADMIN-001',
-        department: 'Safety',
+        department: 'Safety & Compliance Directorate',
         preferred_language: 'en',
         role: 'admin',
         avatar_url: null,
         created_at: new Date('2026-01-01').toISOString(),
-        _password: password,
+        _password: password || 'Admin@1234',
       }
-      if (!profiles[adminId]) {
-        profiles[adminId] = admin
-        save(PROFILES_KEY, profiles)
-      }
+      profiles[adminId] = admin
+      save(PROFILES_KEY, profiles)
       const session = { userId: adminId, email: admin.email, role: 'admin' }
       save(SESSION_KEY, session)
       return { data: { user: { id: adminId, email: admin.email }, session }, error: null }
@@ -1091,6 +1099,36 @@ export async function mockGoogleSignIn({ email, fullName, avatarUrl, language = 
       user: { id: existingProfile.id, email: existingProfile.email },
       session,
       profile: existingProfile,
+    },
+    error: null,
+  }
+}
+
+export async function mockLoginAdmin(email = 'admin@suraksha.demo') {
+  await delay(150)
+  const profiles = load(PROFILES_KEY, {})
+  const adminId = 'demo-admin-00000000-0000-0000-0000'
+  const admin = {
+    id: adminId,
+    email: email || 'admin@suraksha.demo',
+    full_name: 'Safety Director (Admin)',
+    employee_id: 'ADMIN-001',
+    department: 'Safety & Compliance Directorate',
+    preferred_language: 'en',
+    role: 'admin',
+    avatar_url: null,
+    created_at: new Date('2026-01-01').toISOString(),
+    _password: 'Admin@1234',
+  }
+  profiles[adminId] = admin
+  save(PROFILES_KEY, profiles)
+  const session = { userId: adminId, email: admin.email, role: 'admin' }
+  save(SESSION_KEY, session)
+  return {
+    data: {
+      user: { id: adminId, email: admin.email },
+      session,
+      profile: admin,
     },
     error: null,
   }

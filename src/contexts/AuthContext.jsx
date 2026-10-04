@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 import {
-  mockSignOut, mockGetAuthSession, mockGetProfile, mockGoogleSignIn,
+  mockSignOut, mockGetAuthSession, mockGetProfile, mockGoogleSignIn, mockLoginAdmin, mockSignIn,
 } from '../lib/mockDb'
 
 const AuthContext = createContext(null)
@@ -115,8 +115,36 @@ export function AuthProvider({ children }) {
     return { data: { user: authUser }, error: null }
   }
 
+  async function loginAdmin({ email, password } = {}) {
+    if (!isSupabaseConfigured) {
+      const res = (email || password)
+        ? await mockSignIn({ email, password })
+        : await mockLoginAdmin('admin@suraksha.demo')
+      if (res.error) return res
+      const session = res.data?.session
+      if (!session || session.role !== 'admin') {
+        return { error: { message: 'This account does not have admin access. Contact your system administrator.' } }
+      }
+      const u = { id: session.userId, email: session.email, role: 'admin' }
+      setUser(u)
+      const pRes = mockGetProfile(session.userId)
+      setProfile(pRes?.data ?? { id: session.userId, email: session.email, role: 'admin', full_name: 'Safety Director (Admin)' })
+      return { data: res.data, error: null }
+    }
+    const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
+    if (err) return { error: err }
+    const { data: prof } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
+    if (prof?.role !== 'admin') {
+      await supabase.auth.signOut()
+      return { error: { message: 'This account does not have admin access. Contact your system administrator.' } }
+    }
+    setUser(data.user)
+    setProfile(prof)
+    return { data, error: null }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile, loginWithGoogle }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile, loginWithGoogle, loginAdmin }}>
       {children}
     </AuthContext.Provider>
   )

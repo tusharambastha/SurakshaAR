@@ -79,8 +79,9 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
+      const cleanEmail = (email || '').trim().toLowerCase()
       if (!isSupabaseConfigured) {
-        const { data, error: err } = await mockSignIn({ email, password })
+        const { data, error: err } = await mockSignIn({ email: cleanEmail, password })
         if (err) { setError(err.message); setLoading(false); return }
         if (data?.session?.role === 'admin') {
           // Reject admin login on trainee portal
@@ -91,7 +92,7 @@ export default function Login() {
         await refreshProfile()
         navigate('/dashboard', { replace: true })
       } else {
-        const { data, error: err } = await supabase.auth.signInWithPassword({ email, password })
+        const { data, error: err } = await supabase.auth.signInWithPassword({ email: cleanEmail, password })
         if (err) { setError(friendlyAuthError(err)); setLoading(false); return }
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', data.user.id).single()
         if (profile?.role === 'admin') {
@@ -213,6 +214,7 @@ export default function Login() {
                   id="email" type="email" className="form-input"
                   value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="you@example.com" required autoComplete="email"
+                  autoCapitalize="none" autoCorrect="off" spellCheck="false"
                 />
               </div>
 
